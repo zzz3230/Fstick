@@ -92,8 +92,6 @@ paths:
                 $ref: '#/components/schemas/PluginListResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -130,10 +128,6 @@ paths:
                 $ref: '#/components/schemas/PluginResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
@@ -157,8 +151,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PluginDetailResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -193,10 +185,6 @@ paths:
                 $ref: '#/components/schemas/PluginResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -236,10 +224,6 @@ paths:
                 $ref: '#/components/schemas/DeleteResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -274,8 +258,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -310,10 +292,6 @@ paths:
                 $ref: '#/components/schemas/VersionResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -352,10 +330,6 @@ paths:
                 $ref: '#/components/schemas/AssetsResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
@@ -380,10 +354,6 @@ paths:
       responses:
         '204':
           description: Файл успешно удалён
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -420,40 +390,60 @@ paths:
                 $ref: '#/components/schemas/PluginResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /api/v1/plugins/{pluginId}/code:
+  /api/v1/plugins/{pluginId}/code/client:
     get:
       tags:
         - Plugins
-      summary: Получить код
+      summary: Получить исходный код для клиента
       description: |
-        Получить исходный код плагина.
+        Получить исходный код плагина для клиента.
 
-      operationId: getPluginCode
+      operationId: getPluginCodeClient
       parameters:
         - $ref: '#/components/parameters/PluginId'
+        - $ref: '#/components/parameters/Version'
       responses:
         '200':
           description: Исходный код успешно получен
           content:
-            application/zip:
+            application/text-plain:
               schema:
                 $ref: '#/components/schemas/PluginCodeResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/plugins/{pluginId}/code/server:
+    get:
+      tags:
+        - Plugins
+      summary: Получить исходный код для сервера.
+      description: |
+        Получить исходный код плагина для сервера.
+
+      operationId: getPluginCodeServer
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/RuntimeVersion'
+      responses:
+        '200':
+          description: Исходный код успешно получен
+          content:
+            application/text-plain:
+              schema:
+                $ref: '#/components/schemas/PluginCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -461,13 +451,6 @@ paths:
   
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Matrix OAuth 2.0 токен
-
   parameters:
     PluginId:
       name: pluginId
@@ -477,6 +460,20 @@ components:
       schema:
         type: string
         format: uuid
+    Version:
+      name: Version
+      in: path
+      required: true
+      description: Версия плагина
+      schema:
+        type: string
+    RuntimeVersion:
+      name: RuntimeVersion
+      in: path
+      required: true
+      description: Версия плагина
+      schema:
+        type: string
 
   schemas:
     # === Запросы ===
@@ -675,13 +672,8 @@ components:
     PluginCodeResponse:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-          description: Уникальный идентификатор плагина
         code:
           type: string
-          format: binary
 
 
     PluginDetailResponse:
@@ -915,28 +907,6 @@ components:
                 - field: "page"
                   message: "Must be a positive integer"
                   value: "-1"
-
-    Unauthorized:
-      description: Требуется аутентификация
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: "UNAUTHORIZED"
-              message: "Invalid or expired token"
-
-    Forbidden:
-      description: Доступ запрещён
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: "FORBIDDEN"
-              message: "You don't have permission to modify this plugin"
 
     NotFound:
       description: Ресурс не найден
