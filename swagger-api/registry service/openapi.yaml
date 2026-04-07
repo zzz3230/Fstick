@@ -408,6 +408,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PluginId'
         - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Runtime'
       responses:
         '200':
           description: Исходный код успешно получен
@@ -434,7 +435,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PluginId'
         - $ref: '#/components/parameters/Version'
-        - $ref: '#/components/parameters/RuntimeVersion'
+        - $ref: '#/components/parameters/Runtime'
       responses:
         '200':
           description: Исходный код успешно получен
@@ -461,15 +462,15 @@ components:
         type: string
         format: uuid
     Version:
-      name: Version
-      in: path
+      name: version
+      in: query
       required: true
       description: Версия плагина
       schema:
         type: string
-    RuntimeVersion:
-      name: RuntimeVersion
-      in: path
+    Runtime:
+      name: runtime
+      in: query
       required: true
       description: Версия плагина
       schema:
@@ -670,7 +671,7 @@ components:
           format: date-time
     
     PluginCodeResponse:
-      type: object
+      type: string
       properties:
         code:
           type: string
