@@ -15,6 +15,7 @@ CREATE TABLE "plugins" (
   "status_id" BIGINT REFERENCES statuses(status_id) ON DELETE SET NULL,
   "category_id" BIGINT REFERENCES categories(category_id) ON DELETE SET NULL,
   "author_id" VARCHAR(100) NOT NULL,
+  "s3_icon_key" VARCHAR(300) NOT NULL,
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -34,6 +35,7 @@ CREATE TABLE "versions" (
   "version_id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "version_number" VARCHAR(50) NOT NULL,
   "changelog" VARCHAR(2000) NOT NULL,
+  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "s3_archive_key" VARCHAR(300) NOT NULL,
   "plugin_id" BIGINT REFERENCES plugins(plugin_id) ON DELETE CASCADE
 );

@@ -125,7 +125,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PluginResponse'
+                $ref: '#/components/schemas/PluginDetailResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
@@ -449,7 +449,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  
+
 
 components:
   parameters:
@@ -479,6 +479,38 @@ components:
   schemas:
     # === Запросы ===
 
+    PluginRequest:
+      type: object
+      required:
+        - name
+        - description
+        - version
+        - changelog
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Zа-яА-ЯёЁ0-9\s][a-zA-Zа-яА-ЯёЁ0-9\s]*[a-zA-Zа-яА-ЯёЁ0-9]$'
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          type: string
+          enum: [utility, integration, social, productivity, entertainment]
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 30
+          maxItems: 10
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+        changelog:
+          type: string
+          maxLength: 2000
+
     CreatePluginRequest:
       type: object
       required:
@@ -486,42 +518,10 @@ components:
         - description
         - version
         - archive
+        - changelog
       properties:
-        name:
-          type: string
-          minLength: 3
-          maxLength: 50
-          pattern: '^[a-zA-Zа-яА-ЯёЁ0-9\s][a-zA-Zа-яА-ЯёЁ0-9\s]*[a-zA-Zа-яА-ЯёЁ0-9]$'
-          description: Название плагина (уникальное, без пробелов в начале/конце)
-          example: "Markdown Preview"
-        description:
-          type: string
-          maxLength: 2000
-          description: Описание плагина
-          example: "Плагин для предпросмотра Markdown-файлов в чате"
-        category:
-          type: string
-          enum: [utility, integration, social, productivity, entertainment]
-          description: Категория плагина
-          example: "utility"
-        tags:
-          type: array
-          items:
-            type: string
-            maxLength: 30
-          maxItems: 10
-          description: Теги для поиска
-          example: ["markdown", "preview", "chat"]
-        version:
-          type: string
-          pattern: '^\d+\.\d+\.\d+$'
-          description: Версия плагина (SemVer)
-          example: "1.0.0"
-        changelog:
-          type: string
-          maxLength: 2000
-          description: Список изменений для первой версии
-          example: "Initial release with basic preview functionality"
+        data:
+          $ref: '#/components/schemas/PluginRequest'
         archive:
           type: string
           format: binary
@@ -658,7 +658,7 @@ components:
         updated_at:
           type: string
           format: date-time
-    
+
     PluginCodeResponse:
       type: string
       properties:
@@ -671,8 +671,6 @@ components:
         - $ref: '#/components/schemas/PluginResponse'
         - type: object
           properties:
-            creator:
-              $ref: '#/components/schemas/UserInfo'
             versions:
               type: array
               items:
@@ -810,20 +808,6 @@ components:
           description: Дата физического удаления (для soft delete)
 
     # === Вспомогательные схемы ===
-
-    UserInfo:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        username:
-          type: string
-        display_name:
-          type: string
-        avatar_url:
-          type: string
-          format: uri
 
     Pagination:
       type: object
