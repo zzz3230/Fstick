@@ -1,5 +1,6 @@
 package ru.fstick.registry_service.service;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import ru.fstick.registry_service.dto.api.request.PluginRequest;
@@ -12,6 +13,7 @@ import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.repository.PluginsRepositoryMock;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class PluginsService {
@@ -53,9 +55,7 @@ public class PluginsService {
                 pluginRequest.getName(),
                 pluginRequest.getDescription(),
                 pluginRequest.getCategory(),
-                pluginRequest.getTags(),
-                pluginRequest.getVersion(),
-                pluginRequest.getChangelog());
+                pluginRequest.getTags());
 
         List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
         List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
@@ -67,8 +67,7 @@ public class PluginsService {
                 .name(pluginData.getName())
                 .description(pluginData.getDescription())
                 .category(pluginData.getCategory())
-                .tags(pluginRequest.getTags())
-                .currentVersion(pluginData.getCurrentVersion())
+                .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
                 .iconUrl(pluginData.getIconUrlKey())
                 .createdAt(pluginData.getCreatedAt())
@@ -78,4 +77,55 @@ public class PluginsService {
                 .build();
     }
 
+    //получить плагин по id
+    public PluginView getPlugin(UUID pluginId) {
+        PluginData pluginData = pluginsRepositoryMock.getPlugin(pluginId);
+
+        List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
+        List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+
+        return PluginView.builder()
+                .id(pluginData.getId())
+                .creatorId(pluginData.getCreatorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(pluginData.getIconUrlKey())
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .versions(versions)
+                .screenshots(screenshotsData)
+                .build();
+    }
+
+
+    //обновить метаданные плагина
+    public PluginView updatePlugin(UUID pluginId, PluginRequest pluginRequest) {
+        PluginData pluginData = pluginsRepositoryMock.updatePlugin(
+                pluginId,
+                pluginRequest.getName(),
+                pluginRequest.getDescription(),
+                pluginRequest.getCategory(),
+                pluginRequest.getTags());
+
+        List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
+        List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+
+        return PluginView.builder()
+                .id(pluginData.getId())
+                .creatorId(pluginData.getCreatorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(pluginData.getIconUrlKey())
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .versions(versions)
+                .screenshots(screenshotsData)
+                .build();
+    }
 }

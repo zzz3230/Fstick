@@ -16,7 +16,6 @@ public class PluginView {
     private String description;
     private String category;
     private List<String> tags;
-    private String currentVersion;
     private String status;
     private String iconUrl;
     private String createdAt;

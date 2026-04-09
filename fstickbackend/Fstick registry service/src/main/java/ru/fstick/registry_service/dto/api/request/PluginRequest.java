@@ -13,8 +13,4 @@ public class PluginRequest {
     private String description;
     private String category;
     private List<String> tags;
-    @NotBlank
-    private String version;
-    @NotBlank
-    private String changelog;
 }
