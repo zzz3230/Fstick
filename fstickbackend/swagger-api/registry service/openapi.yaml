@@ -519,6 +519,7 @@ components:
         - version
         - archive
         - changelog
+        - data
       properties:
         data:
           $ref: '#/components/schemas/PluginRequest'

@@ -12,11 +12,11 @@ import java.util.*;
 
 @Repository
 public class PluginsRepositoryMock {
-    private final JdbcTemplate jdbcTemplate;
+    /*private final JdbcTemplate jdbcTemplate;
 
     public PluginsRepositoryMock(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-    }
+    }*/
 
     //сделать запрос в базу данных на поиск плагинов
     public List<PluginData> getPlugins(Integer offset, Integer limit, String category, String search, String sort, String order) {
@@ -28,7 +28,6 @@ public class PluginsRepositoryMock {
                 .description("mock")
                 .category("social")
                 .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
-                .currentVersion("1.0.0")
                 .status("active").iconUrlKey("iconurls3key")
                 .createdAt(LocalDateTime.now().toString())
                 .updatedAt(LocalDateTime.now().toString())
@@ -44,7 +43,7 @@ public class PluginsRepositoryMock {
         //TODO
     }
 
-    public PluginData addPlugin(@NotBlank String name, @NotBlank String description, String category, List<String> tags, @NotBlank String version, @NotBlank String changelog) {
+    public PluginData addPlugin(@NotBlank String name, @NotBlank String description, String category, List<String> tags) {
         return PluginData.builder()
                 .id(UUID.randomUUID())
                 .creatorId(UUID.randomUUID())
@@ -52,7 +51,6 @@ public class PluginsRepositoryMock {
                 .description("mock")
                 .category("social")
                 .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
-                .currentVersion("1.0.0")
                 .status("active").iconUrlKey("iconurls3key")
                 .createdAt(LocalDateTime.now().toString())
                 .updatedAt(LocalDateTime.now().toString())
@@ -77,6 +75,39 @@ public class PluginsRepositoryMock {
                 .screenshotId(UUID.randomUUID())
                 .s3ScreenshotKey("s3key")
                 .build()));
+        //TODO
+    }
+
+    //Получить плагин по id
+    public PluginData getPlugin(UUID pluginId) {
+        return PluginData.builder()
+                .id(pluginId)
+                .creatorId(UUID.randomUUID())
+                .name("test")
+                .description("mock")
+                .category("social")
+                .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
+                .status("active").iconUrlKey("iconurls3key")
+                .createdAt(LocalDateTime.now().toString())
+                .updatedAt(LocalDateTime.now().toString())
+                .build();
+        //TODO
+    }
+
+
+    //обновить метаданные плагина
+    public PluginData updatePlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags) {
+        return PluginData.builder()
+                .id(pluginId)
+                .creatorId(UUID.randomUUID())
+                .name(name)
+                .description(description)
+                .category(category)
+                .tags(tags)
+                .status("active").iconUrlKey("iconurls3key")
+                .createdAt(LocalDateTime.now().toString())
+                .updatedAt(LocalDateTime.now().toString())
+                .build();
         //TODO
     }
 }
