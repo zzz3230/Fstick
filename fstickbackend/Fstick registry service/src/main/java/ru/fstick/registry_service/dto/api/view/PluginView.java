@@ -1,15 +1,15 @@
-package ru.fstick.registry_service.dto.bd;
-
+package ru.fstick.registry_service.dto.api.view;
 
 import lombok.Builder;
 import lombok.Data;
+import ru.fstick.registry_service.dto.model.Screenshot;
+import ru.fstick.registry_service.dto.model.Version;
 
 import java.util.List;
 import java.util.UUID;
-
 @Data
 @Builder
-public class PluginData {
+public class PluginView {
     private UUID id;
     private UUID creatorId;
     private String name;
@@ -18,7 +18,9 @@ public class PluginData {
     private List<String> tags;
     private String currentVersion;
     private String status;
-    private String iconUrlKey;
+    private String iconUrl;
     private String createdAt;
     private String updatedAt;
+    private List<Version> versions;
+    private List<Screenshot> screenshots;
 }

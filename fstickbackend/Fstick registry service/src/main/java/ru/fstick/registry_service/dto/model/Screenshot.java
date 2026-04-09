@@ -1,4 +1,4 @@
-package ru.fstick.registry_service.dto.bd;
+package ru.fstick.registry_service.dto.model;
 
 import lombok.Builder;
 import lombok.Data;

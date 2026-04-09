@@ -1,15 +1,15 @@
-package ru.fstick.registry_service.services;
+package ru.fstick.registry_service.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import ru.fstick.registry_service.dto.api.requests.PluginRequest;
-import ru.fstick.registry_service.dto.api.responsies.PluginResponse;
-import ru.fstick.registry_service.dto.bd.Screenshot;
-import ru.fstick.registry_service.dto.bd.Version;
+import ru.fstick.registry_service.dto.api.request.PluginRequest;
+import ru.fstick.registry_service.dto.api.view.PluginView;
+import ru.fstick.registry_service.dto.model.Screenshot;
+import ru.fstick.registry_service.dto.model.Version;
 import ru.fstick.registry_service.dto.service.PaginationData;
-import ru.fstick.registry_service.dto.bd.PluginData;
-import ru.fstick.registry_service.dto.api.responsies.PluginsResponse;
-import ru.fstick.registry_service.repositories.PluginsRepositoryMock;
+import ru.fstick.registry_service.dto.model.PluginData;
+import ru.fstick.registry_service.dto.api.view.PluginsView;
+import ru.fstick.registry_service.repository.PluginsRepositoryMock;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ public class PluginsService {
     }
 
     //получить список плагинов и их пагинацию по критериям
-    public PluginsResponse getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
+    public PluginsView getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
         Integer offset = page * limit;
         List<PluginData> pluginsData = pluginsRepositoryMock.getPlugins(offset, limit, category, search, sort, order);
         Integer pluginsTotal = pluginsRepositoryMock.countPlugins(category, search);
@@ -39,7 +39,7 @@ public class PluginsService {
                 .hasPrev(page>0)
                 .build();
 
-        return PluginsResponse.builder()
+        return PluginsView.builder()
                 .items(pluginsData)
                 .pagination(paginationData)
                 .build();
@@ -47,7 +47,7 @@ public class PluginsService {
 
 
     //добавить плагин
-    public PluginResponse addPlugin(PluginRequest pluginRequest, MultipartFile archive, MultipartFile icon, List<MultipartFile> screenshots) {
+    public PluginView addPlugin(PluginRequest pluginRequest, MultipartFile archive, MultipartFile icon, List<MultipartFile> screenshots) {
 
         PluginData pluginData = pluginsRepositoryMock.addPlugin(
                 pluginRequest.getName(),
@@ -61,7 +61,7 @@ public class PluginsService {
         List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
 
 
-        return PluginResponse.builder()
+        return PluginView.builder()
                 .id(pluginData.getId())
                 .creatorId(pluginData.getCreatorId())
                 .name(pluginData.getName())
