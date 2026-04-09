@@ -1,13 +1,12 @@
-package ru.fstick.registry_service.repositories;
+package ru.fstick.registry_service.repository;
 
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import ru.fstick.registry_service.dto.bd.PluginData;
-import ru.fstick.registry_service.dto.bd.Screenshot;
-import ru.fstick.registry_service.dto.bd.Version;
+import ru.fstick.registry_service.dto.model.PluginData;
+import ru.fstick.registry_service.dto.model.Screenshot;
+import ru.fstick.registry_service.dto.model.Version;
 
-import java.sql.Time;
 import java.time.LocalDateTime;
 import java.util.*;
 
