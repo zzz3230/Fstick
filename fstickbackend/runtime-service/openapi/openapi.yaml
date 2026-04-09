@@ -1,0 +1,71 @@
+openapi: 3.0.1
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+paths:
+  /command:
+    post:
+      tags:
+      - plugin-execute-controller
+      operationId: handleCommand
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+components:
+  schemas:
+    CommandRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        plugin_id:
+          type: string
+        user_id:
+          type: string
+        chat_id:
+          type: string
+        track_id:
+          type: string
+        args:
+          type: object
+          additionalProperties:
+            type: object
+    CommandError:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+          format: int32
+        details:
+          type: string
+    CommandResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - OK
+          - UNKNOWN_ERROR
+          - VALIDATION_ERROR
+          - PLUGIN_ERROR
+        response:
+          type: object
+          additionalProperties:
+            type: object
+        error:
+          $ref: "#/components/schemas/CommandError"
