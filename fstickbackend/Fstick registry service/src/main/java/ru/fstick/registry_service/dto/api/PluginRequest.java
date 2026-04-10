@@ -1,4 +1,4 @@
-package ru.fstick.registry_service.dto.api.request;
+package ru.fstick.registry_service.dto.api;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
