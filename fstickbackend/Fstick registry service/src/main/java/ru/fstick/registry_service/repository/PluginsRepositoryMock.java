@@ -1,7 +1,6 @@
 package ru.fstick.registry_service.repository;
 
 import jakarta.validation.constraints.NotBlank;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.dto.model.Screenshot;
@@ -43,9 +42,9 @@ public class PluginsRepositoryMock {
         //TODO
     }
 
-    public PluginData addPlugin(@NotBlank String name, @NotBlank String description, String category, List<String> tags) {
+    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags) {
         return PluginData.builder()
-                .id(UUID.randomUUID())
+                .id(pluginId)
                 .creatorId(UUID.randomUUID())
                 .name("test")
                 .description("mock")
@@ -104,6 +103,38 @@ public class PluginsRepositoryMock {
                 .description(description)
                 .category(category)
                 .tags(tags)
+                .status("active").iconUrlKey("iconurls3key")
+                .createdAt(LocalDateTime.now().toString())
+                .updatedAt(LocalDateTime.now().toString())
+                .build();
+        //TODO
+    }
+
+
+    //удалить плагин
+    public PluginData deletePlugin(UUID pluginId) {
+        return PluginData.builder()
+                .id(pluginId)
+                .creatorId(UUID.randomUUID())
+                .name("test")
+                .description("mock")
+                .category("social")
+                .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
+                .status("active").iconUrlKey("iconurls3key")
+                .createdAt(LocalDateTime.now().toString())
+                .updatedAt(LocalDateTime.now().toString())
+                .build();
+        //TODO
+    }
+
+    public PluginData addPluginVersion(UUID pluginId) {
+        return PluginData.builder()
+                .id(pluginId)
+                .creatorId(UUID.randomUUID())
+                .name("test")
+                .description("mock")
+                .category("social")
+                .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
                 .status("active").iconUrlKey("iconurls3key")
                 .createdAt(LocalDateTime.now().toString())
                 .updatedAt(LocalDateTime.now().toString())
