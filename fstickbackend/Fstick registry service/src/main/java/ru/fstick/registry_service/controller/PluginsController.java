@@ -2,7 +2,12 @@ package ru.fstick.registry_service.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
-import ru.fstick.registry_service.dto.api.*;
+import ru.fstick.registry_service.dto.api.request.*;
+import ru.fstick.registry_service.dto.api.response.AddPluginResponse;
+import ru.fstick.registry_service.dto.api.response.AddVersionResponse;
+import ru.fstick.registry_service.dto.api.response.ChangeStatusResponse;
+import ru.fstick.registry_service.dto.api.view.PluginView;
+import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.service.PluginsService;
 
 import java.util.UUID;
@@ -71,7 +76,7 @@ public class PluginsController {
 
     @PostMapping(path = "/{pluginId}/versions")
     public AddVersionResponse addPluginVersion(@PathVariable UUID pluginId,
-                                       @RequestBody AddPluginVersionRequest request) {
+                                               @RequestBody AddPluginVersionRequest request) {
 
         return pluginsService.addPluginVersion(pluginId, request);
 

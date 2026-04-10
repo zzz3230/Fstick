@@ -2,7 +2,12 @@ package ru.fstick.registry_service.service;
 
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.dto.Status;
-import ru.fstick.registry_service.dto.api.*;
+import ru.fstick.registry_service.dto.api.request.*;
+import ru.fstick.registry_service.dto.api.response.AddPluginResponse;
+import ru.fstick.registry_service.dto.api.response.AddVersionResponse;
+import ru.fstick.registry_service.dto.api.response.ChangeStatusResponse;
+import ru.fstick.registry_service.dto.api.view.PluginView;
+import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.dto.model.Screenshot;
 import ru.fstick.registry_service.dto.model.Version;
 import ru.fstick.registry_service.dto.service.FileUploadData;
