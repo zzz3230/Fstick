@@ -4,7 +4,10 @@ import lombok.Getter;
 
 @Getter
 public enum Status {
-    DELETED("DELETED");
+    ACTIVE("ACTIVE"),
+    DELETED("DELETED"),
+    HIDDEN("HIDDEN"),
+    ARCHIVED("ARCHIVED");
 
     private final String value;
 

@@ -2,10 +2,12 @@ package ru.fstick.registry_service.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
-import ru.fstick.registry_service.dto.api.response.AddPluginResponse;
-import ru.fstick.registry_service.dto.api.response.AddVersionResponse;
-import ru.fstick.registry_service.dto.api.response.ChangeStatusResponse;
+import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
+import ru.fstick.registry_service.dto.api.response.*;
 import ru.fstick.registry_service.dto.api.view.PluginView;
 import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.service.PluginsService;
@@ -73,7 +75,6 @@ public class PluginsController {
         return pluginsService.deletePlugin(pluginId);
     }
 
-
     @PostMapping(path = "/{pluginId}/versions")
     public AddVersionResponse addPluginVersion(@PathVariable UUID pluginId,
                                                @RequestBody AddPluginVersionRequest request) {
@@ -90,7 +91,48 @@ public class PluginsController {
         return pluginsService.commitVersion(pluginId, request);
     }
 
+    @PostMapping("/{pluginId}/assets")
+    public UpdateAssetsResponse updateAssets(@PathVariable UUID pluginId,
+                                             @RequestBody UpdateAssetsRequest request) {
 
+        return pluginsService.updateAssets(pluginId, request);
+    }
 
+    @PostMapping("/{pluginId}/assets/commit")
+    public PluginView commitAssets(@PathVariable UUID pluginId,
+                                   @RequestBody CommitAssetsRequest request) {
+
+        return pluginsService.commitAssets(pluginId, request);
+    }
+
+    @DeleteMapping("/{pluginId}/assets/{assetId}")
+    public void deleteAssets(@PathVariable UUID pluginId,
+                             @PathVariable UUID assetId) {
+
+        pluginsService.deleteAsset(pluginId, assetId);
+    }
+
+    @PutMapping("/{pluginId}/status")
+    public ChangeStatusResponse changeStatus(@PathVariable UUID pluginId,
+                                             @RequestBody Status status) {
+
+        return pluginsService.changeStatus(pluginId, status);
+    }
+
+    @GetMapping("/{pluginId}/code/client")
+    public CodeLinksResponse getPluginCodeClient(@PathVariable UUID pluginId,
+                                                 @RequestParam String version,
+                                                 @RequestParam String runtime) {
+
+        return pluginsService.getPluginCodeClient(pluginId, version, runtime);
+    }
+
+    @GetMapping("/{pluginId}/code/server")
+    public CodeLinksResponse getPluginCodeServer(@PathVariable UUID pluginId,
+                                                 @RequestParam String version,
+                                                 @RequestParam String runtime) {
+
+        return pluginsService.getPluginCodeServer(pluginId, version, runtime);
+    }
 
 }

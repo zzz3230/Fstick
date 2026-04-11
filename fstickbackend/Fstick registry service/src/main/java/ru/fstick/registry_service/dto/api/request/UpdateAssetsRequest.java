@@ -6,6 +6,6 @@ import ru.fstick.registry_service.dto.service.FileRequest;
 import java.util.List;
 
 @Data
-public class AddPluginVersionRequest {
+public class UpdateAssetsRequest {
     private List<FileRequest> files;
 }

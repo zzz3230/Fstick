@@ -3,9 +3,10 @@ package ru.fstick.registry_service.service;
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
-import ru.fstick.registry_service.dto.api.response.AddPluginResponse;
-import ru.fstick.registry_service.dto.api.response.AddVersionResponse;
-import ru.fstick.registry_service.dto.api.response.ChangeStatusResponse;
+import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
+import ru.fstick.registry_service.dto.api.response.*;
 import ru.fstick.registry_service.dto.api.view.PluginView;
 import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.dto.model.Screenshot;
@@ -175,6 +176,35 @@ public class PluginsService {
     }
 
     public PluginView commitVersion(UUID pluginId, CommitVersionRequest request) {
+        //TODO
+        return null;
+    }
+
+    public UpdateAssetsResponse updateAssets(UUID pluginId, UpdateAssetsRequest request) {
+        //TODO
+        return null;
+    }
+
+    public PluginView commitAssets(UUID pluginId, CommitAssetsRequest request) {
+        //TODO
+        return null;
+    }
+
+    public void deleteAsset(UUID pluginId, UUID assetId) {
+        //TODO
+    }
+
+    public ChangeStatusResponse changeStatus(UUID pluginId, Status status) {
+        //TODO
+        return null;
+    }
+
+    public CodeLinksResponse getPluginCodeClient(UUID pluginId, String version, String runtime) {
+        //TODO
+        return null;
+    }
+
+    public CodeLinksResponse getPluginCodeServer(UUID pluginId, String version, String runtime) {
         //TODO
         return null;
     }
