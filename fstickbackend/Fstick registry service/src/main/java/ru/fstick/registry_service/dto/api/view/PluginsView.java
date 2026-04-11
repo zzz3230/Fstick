@@ -11,6 +11,6 @@ import java.util.List;
 @Data
 @Builder
 public class PluginsView {
-    private List<PluginData> items;
+    private List<PluginViewShrink> items;
     private PaginationData pagination;
 }

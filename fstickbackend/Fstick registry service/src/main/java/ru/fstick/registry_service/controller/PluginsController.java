@@ -8,7 +8,7 @@ import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
 import ru.fstick.registry_service.dto.api.response.*;
-import ru.fstick.registry_service.dto.api.view.PluginView;
+import ru.fstick.registry_service.dto.api.view.PluginViewExtend;
 import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.service.PluginsService;
 
@@ -45,7 +45,7 @@ public class PluginsController {
 
 
     @PostMapping("/{pluginId}/commit")
-    public PluginView commitPlugin(
+    public PluginViewExtend commitPlugin(
             @PathVariable UUID pluginId,
             @RequestBody CommitPluginRequest request) {
 
@@ -54,15 +54,15 @@ public class PluginsController {
 
     //получить плагин по id
     @GetMapping("/{pluginId}")
-    public PluginView getPlugin(@PathVariable UUID pluginId) {
+    public PluginViewExtend getPlugin(@PathVariable UUID pluginId) {
 
         return pluginsService.getPlugin(pluginId);
     }
 
     //обновить метаданные плагина
     @PutMapping("/{pluginId}")
-    public PluginView updatePlugin(@PathVariable UUID pluginId,
-                                   @RequestBody @Valid PluginRequest requestData) {
+    public PluginViewExtend updatePlugin(@PathVariable UUID pluginId,
+                                         @RequestBody @Valid PluginRequest requestData) {
 
         return pluginsService.updatePlugin(pluginId, requestData);
     }
@@ -84,7 +84,7 @@ public class PluginsController {
     }
 
     @PostMapping("/{pluginId}/versions/commit")
-    public PluginView commitVersion(
+    public PluginViewExtend commitVersion(
             @PathVariable UUID pluginId,
             @RequestBody CommitVersionRequest request) {
 
@@ -99,8 +99,8 @@ public class PluginsController {
     }
 
     @PostMapping("/{pluginId}/assets/commit")
-    public PluginView commitAssets(@PathVariable UUID pluginId,
-                                   @RequestBody CommitAssetsRequest request) {
+    public PluginViewExtend commitAssets(@PathVariable UUID pluginId,
+                                         @RequestBody CommitAssetsRequest request) {
 
         return pluginsService.commitAssets(pluginId, request);
     }
