@@ -7,8 +7,7 @@ import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
 import ru.fstick.registry_service.dto.api.response.*;
-import ru.fstick.registry_service.dto.api.view.PluginView;
-import ru.fstick.registry_service.dto.api.view.PluginsView;
+import ru.fstick.registry_service.dto.api.view.*;
 import ru.fstick.registry_service.dto.model.Screenshot;
 import ru.fstick.registry_service.dto.model.Version;
 import ru.fstick.registry_service.dto.service.FileUploadData;
@@ -16,6 +15,7 @@ import ru.fstick.registry_service.dto.service.PaginationData;
 import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.repository.PluginsRepositoryMock;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +34,23 @@ public class PluginsService {
     public PluginsView getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
         Integer offset = page * limit;
         List<PluginData> pluginsData = pluginsRepositoryMock.getPlugins(offset, limit, category, search, sort, order);
+
+        List<PluginViewShrink> pluginViewShrinks = new ArrayList<>();
+
+        pluginsData.forEach(pluginData -> pluginViewShrinks.add(PluginViewShrink.builder()
+                .id(pluginData.getId())
+                .creatorId(pluginData.getCreatorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(pluginData.getIconUrlKey())
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .build()));
+
+
         Integer pluginsTotal = pluginsRepositoryMock.countPlugins(category, search);
 
         int totalPages = (int) Math.ceil((double) pluginsTotal / limit);
@@ -48,19 +65,32 @@ public class PluginsService {
                 .build();
 
         return PluginsView.builder()
-                .items(pluginsData)
+                .items(pluginViewShrinks)
                 .pagination(paginationData)
                 .build();
     }
 
     //получить плагин по id
-    public PluginView getPlugin(UUID pluginId) {
+    public PluginViewExtend getPlugin(UUID pluginId) {
         PluginData pluginData = pluginsRepositoryMock.getPlugin(pluginId);
 
         List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
-        List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepositoryMock.getScreenshots(pluginData.getId());
 
-        return PluginView.builder()
+
+        List<VersionView> versionViews = new ArrayList<>();
+        versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .version(version.getVersion())
+                .changelog(version.getChangelog())
+                .build());});
+
+        List<ScreenshotView> screenshotViews = new ArrayList<>();
+        screenshots.forEach(screenshot -> {ScreenshotView.builder()
+                .screenshotId(screenshot.getScreenshotId())
+                .screenshotUrl(screenshot.getS3ScreenshotKey())
+                .build();});
+
+        return PluginViewExtend.builder()
                 .id(pluginData.getId())
                 .creatorId(pluginData.getCreatorId())
                 .name(pluginData.getName())
@@ -71,14 +101,14 @@ public class PluginsService {
                 .iconUrl(pluginData.getIconUrlKey())
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
-                .versions(versions)
-                .screenshots(screenshotsData)
+                .versions(versionViews)
+                .screenshots(screenshotViews)
                 .build();
     }
 
 
     //обновить метаданные плагина
-    public PluginView updatePlugin(UUID pluginId, PluginRequest pluginRequest) {
+    public PluginViewExtend updatePlugin(UUID pluginId, PluginRequest pluginRequest) {
         PluginData pluginData = pluginsRepositoryMock.updatePlugin(
                 pluginId,
                 pluginRequest.getName(),
@@ -87,9 +117,21 @@ public class PluginsService {
                 pluginRequest.getTags());
 
         List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
-        List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepositoryMock.getScreenshots(pluginData.getId());
 
-        return PluginView.builder()
+        List<VersionView> versionViews = new ArrayList<>();
+        versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .version(version.getVersion())
+                .changelog(version.getChangelog())
+                .build());});
+
+        List<ScreenshotView> screenshotViews = new ArrayList<>();
+        screenshots.forEach(screenshot -> {ScreenshotView.builder()
+                .screenshotId(screenshot.getScreenshotId())
+                .screenshotUrl(screenshot.getS3ScreenshotKey())
+                .build();});
+
+        return PluginViewExtend.builder()
                 .id(pluginData.getId())
                 .creatorId(pluginData.getCreatorId())
                 .name(pluginData.getName())
@@ -100,8 +142,8 @@ public class PluginsService {
                 .iconUrl(pluginData.getIconUrlKey())
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
-                .versions(versions)
-                .screenshots(screenshotsData)
+                .versions(versionViews)
+                .screenshots(screenshotViews)
                 .build();
     }
 
@@ -117,7 +159,7 @@ public class PluginsService {
                 .build();
     }
 
-    public PluginView commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
+    public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
 
         PluginData pluginData = pluginsRepositoryMock.addPlugin(
                 pluginId,
@@ -127,10 +169,21 @@ public class PluginsService {
                 commitPluginRequest.getTags());
 
         List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
-        List<Screenshot> screenshotsData = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepositoryMock.getScreenshots(pluginData.getId());
 
+        List<VersionView> versionViews = new ArrayList<>();
+        versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .version(version.getVersion())
+                .changelog(version.getChangelog())
+                .build());});
 
-        return PluginView.builder()
+        List<ScreenshotView> screenshotViews = new ArrayList<>();
+        screenshots.forEach(screenshot -> {ScreenshotView.builder()
+                .screenshotId(screenshot.getScreenshotId())
+                .screenshotUrl(screenshot.getS3ScreenshotKey())
+                .build();});
+
+        return PluginViewExtend.builder()
                 .id(pluginData.getId())
                 .creatorId(pluginData.getCreatorId())
                 .name(pluginData.getName())
@@ -141,8 +194,8 @@ public class PluginsService {
                 .iconUrl(pluginData.getIconUrlKey())
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
-                .versions(versions)
-                .screenshots(screenshotsData)
+                .versions(versionViews)
+                .screenshots(screenshotViews)
                 .build();
     }
 
@@ -175,7 +228,7 @@ public class PluginsService {
         return null;
     }
 
-    public PluginView commitVersion(UUID pluginId, CommitVersionRequest request) {
+    public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest request) {
         //TODO
         return null;
     }
@@ -185,7 +238,7 @@ public class PluginsService {
         return null;
     }
 
-    public PluginView commitAssets(UUID pluginId, CommitAssetsRequest request) {
+    public PluginViewExtend commitAssets(UUID pluginId, CommitAssetsRequest request) {
         //TODO
         return null;
     }

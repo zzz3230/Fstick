@@ -24,7 +24,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PluginView"
+                $ref: "#/components/schemas/PluginViewExtend"
     put:
       tags:
       - plugins-controller
@@ -48,7 +48,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PluginView"
+                $ref: "#/components/schemas/PluginViewExtend"
     delete:
       tags:
       - plugins-controller
@@ -214,7 +214,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PluginView"
+                $ref: "#/components/schemas/PluginViewExtend"
   /api/v1/plugins/{pluginId}/commit:
     post:
       tags:
@@ -239,7 +239,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PluginView"
+                $ref: "#/components/schemas/PluginViewExtend"
   /api/v1/plugins/{pluginId}/assets:
     post:
       tags:
@@ -289,7 +289,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PluginView"
+                $ref: "#/components/schemas/PluginViewExtend"
   /api/v1/plugins/{pluginId}/code/server:
     get:
       tags:
@@ -387,7 +387,7 @@ components:
           type: array
           items:
             type: string
-    PluginView:
+    PluginViewExtend:
       type: object
       properties:
         id:
@@ -417,20 +417,20 @@ components:
         versions:
           type: array
           items:
-            $ref: "#/components/schemas/Version"
+            $ref: "#/components/schemas/VersionView"
         screenshots:
           type: array
           items:
-            $ref: "#/components/schemas/Screenshot"
-    Screenshot:
+            $ref: "#/components/schemas/ScreenshotView"
+    ScreenshotView:
       type: object
       properties:
         screenshotId:
           type: string
           format: uuid
-        s3ScreenshotKey:
+        screenshotUrl:
           type: string
-    Version:
+    VersionView:
       type: object
       properties:
         id:
@@ -562,7 +562,7 @@ components:
           type: boolean
         hasNext:
           type: boolean
-    PluginData:
+    PluginViewShrink:
       type: object
       properties:
         id:
@@ -583,7 +583,7 @@ components:
             type: string
         status:
           type: string
-        iconUrlKey:
+        iconUrl:
           type: string
         createdAt:
           type: string
@@ -595,7 +595,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/PluginData"
+            $ref: "#/components/schemas/PluginViewShrink"
         pagination:
           $ref: "#/components/schemas/PaginationData"
     CodeLinksResponse:
