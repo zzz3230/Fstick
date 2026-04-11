@@ -7,5 +7,5 @@ import lombok.Data;
 @Data
 @Builder
 public class FileDownloadData {
-    private String DownloadUrl;
+    private String downloadUrl;
 }
