@@ -1,4 +1,4 @@
-package ru.fstick.registry_service.dto.api.request;
+package ru.fstick.registry_service.dto.api.request.commit;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
