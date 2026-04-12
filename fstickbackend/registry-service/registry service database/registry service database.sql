@@ -48,3 +48,9 @@ CREATE TABLE "screenshots" (
     "plugin_id" UUID REFERENCES plugins(plugin_id) ON DELETE CASCADE,
     "s3_screenshot_key" VARCHAR(300) NOT NULL
 );
+
+CREATE TABLE "files" (
+    "file_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "version_id" UUID REFERENCES versions(version_id) ON DELETE CASCADE,
+    "s3_file_key" VARCHAR(300) NOT NULL
+)

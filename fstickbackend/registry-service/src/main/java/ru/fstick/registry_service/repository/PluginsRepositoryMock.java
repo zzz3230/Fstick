@@ -42,7 +42,7 @@ public class PluginsRepositoryMock {
         //TODO
     }
 
-    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags) {
+    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category,List<String> keys , List<String> tags) {
         return PluginData.builder()
                 .id(pluginId)
                 .creatorId(UUID.randomUUID())

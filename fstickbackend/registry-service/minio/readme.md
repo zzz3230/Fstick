@@ -17,14 +17,20 @@
 ```text
 f-stick-plugins/
 ├── plugins/
-│   └── {plugin_id}/              # UUID плагина (например, 550e8400-...)
-│       ├── screenshots/          # Папка для скриншотов
-│       │   ├── {uuid_v4}.png     # Уникальное имя файла
-│       │   └── {uuid_v4}.jpg
-│       └── versions/
-│           └── {version_number}/ # Версия SemVer (например, 1.0.0)
-│               ├── archive.zip   # Архив с исходным кодом
-│               └── manifest.json # (Опционально) Метаданные версии
+    └── {plugin_id}/              # UUID плагина (например, 550e8400-...)
+        ├── screenshots/          # Папка для скриншотов
+        │   ├── {uuid_v4}.png     # Уникальное имя файла
+        │   └── {uuid_v4}.jpg
+        └── versions/
+            └── {version_number}/ # Версия SemVer (например, 1.0.0)
+                └── client/ # код для клиента
+                    └── js/ # язык
+                        └── 1.0.0/ # версия
+                            └── something.js
+                └── server/ # код для сервера
+                    └── lua/ # язык
+                        └── 1.0.0/ # версия
+                            └── main.lua
 ```
 
 ## 3. Соглашения об именовании (Naming Convention)
