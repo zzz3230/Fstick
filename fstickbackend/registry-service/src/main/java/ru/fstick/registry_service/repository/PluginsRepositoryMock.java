@@ -141,4 +141,19 @@ public class PluginsRepositoryMock {
                 .build();
         //TODO
     }
+
+    public String getAssetKey(UUID assetId) {
+        //TODO
+        return null;
+    }
+
+    public List<String> getCodeClient() {
+        //TODO
+        return null;
+    }
+
+    public List<String> getServerClient() {
+        //TODO
+        return null;
+    }
 }

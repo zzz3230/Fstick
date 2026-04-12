@@ -13,6 +13,7 @@ import ru.fstick.registry_service.dto.api.response.*;
 import ru.fstick.registry_service.dto.api.view.*;
 import ru.fstick.registry_service.dto.model.Screenshot;
 import ru.fstick.registry_service.dto.model.Version;
+import ru.fstick.registry_service.dto.service.FileDownloadData;
 import ru.fstick.registry_service.dto.service.FileUploadData;
 import ru.fstick.registry_service.dto.service.PaginationData;
 import ru.fstick.registry_service.dto.model.PluginData;
@@ -222,11 +223,9 @@ public class PluginsService {
                     if (resultType.container==Container.CODE) {
                         RuntimeParser.Result resultRuntime = RuntimeParser.parse(resultType.type);
                         key = "plugins/" + pluginId + "/versions/" + request.getVersion() + "/" + resultRuntime.getTarget() + "/" + resultRuntime.getLanguage() + "/" + resultRuntime.getVersion() + "/" + file.getFileName();
-                        System.out.println(key);
                     }
                     else if (resultType.container==Container.IMAGE) {
                         key = "plugins/" + pluginId + "/screenshots/" + file.getFileName();
-                        System.out.println(key);
                     }
 
                     if (key==null) {
@@ -250,27 +249,96 @@ public class PluginsService {
     }
 
     public AddVersionResponse initPluginVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
-        //TODO
-        return null;
+        UUID versionId = UUID.randomUUID();
+
+        List<FileUploadData> uploads = request.getFiles().stream()
+                .map(file -> {
+                    TypeParser.Result resultType = TypeParser.parse(file.getType());
+                    String key = null;
+
+                    if (resultType.container==Container.CODE) {
+                        RuntimeParser.Result resultRuntime = RuntimeParser.parse(resultType.type);
+                        key = "plugins/" + pluginId + "/versions/" + request.getVersion() + "/" + resultRuntime.getTarget() + "/" + resultRuntime.getLanguage() + "/" + resultRuntime.getVersion() + "/" + file.getFileName();
+                    }
+
+                    if (key==null) {
+                        throw new RuntimeException();
+                    }
+
+                    String url = s3Service.generateUploadUrl(key);
+
+                    return FileUploadData.builder()
+                            .fileName(file.getFileName())
+                            .key(key)
+                            .uploadUrl(url)
+                            .build();
+                })
+                .toList();
+
+        return AddVersionResponse.builder()
+                .pluginId(pluginId)
+                .versionId(versionId)
+                .uploads(uploads)
+                .build();
     }
 
-    public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest request) {
+    public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest commitVersionRequest) {
+
+        commitVersionRequest.getKeys().forEach(key -> {
+            String fileName = key.substring(key.lastIndexOf("/") + 1);
+            byte[] file = s3Service.getObject(key);
+            //VALIDATION TODO
+        });
         //TODO
+
         return null;
     }
 
     public UpdateAssetsResponse updateAssets(UUID pluginId, UpdateAssetsRequest request) {
-        //TODO
-        return null;
+        List<FileUploadData> uploads = request.getFiles().stream()
+                .map(file -> {
+                    TypeParser.Result resultType = TypeParser.parse(file.getType());
+                    String key = null;
+
+                    if (resultType.container==Container.IMAGE) {
+                        key = "plugins/" + pluginId + "/screenshots/" + file.getFileName();
+                    }
+
+                    if (key==null) {
+                        throw new RuntimeException();
+                    }
+
+                    String url = s3Service.generateUploadUrl(key);
+
+                    return FileUploadData.builder()
+                            .fileName(file.getFileName())
+                            .key(key)
+                            .uploadUrl(url)
+                            .build();
+                })
+                .toList();
+
+        return UpdateAssetsResponse.builder()
+                .pluginId(pluginId)
+                .uploads(uploads)
+                .build();
     }
 
-    public PluginViewExtend commitAssets(UUID pluginId, CommitAssetsRequest request) {
-        //TODO
+    public PluginViewExtend commitAssets(UUID pluginId, CommitAssetsRequest commitAssetsRequest) {
+
+        commitAssetsRequest.getKeys().forEach(key -> {
+            String fileName = key.substring(key.lastIndexOf("/") + 1);
+            byte[] file = s3Service.getObject(key);
+            //VALIDATION TODO
+        });
+
         return null;
     }
 
     public void deleteAsset(UUID pluginId, UUID assetId) {
-        //TODO
+        String key = pluginsRepositoryMock.getAssetKey(assetId);
+
+        s3Service.deleteAsset(key);
     }
 
     public ChangeStatusResponse changeStatus(UUID pluginId, Status status) {
@@ -279,12 +347,28 @@ public class PluginsService {
     }
 
     public CodeLinksResponse getPluginCodeClient(UUID pluginId, String version, String runtime) {
-        //TODO
-        return null;
+        List<String> keys = pluginsRepositoryMock.getCodeClient();
+
+        List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
+                .downloadUrl(s3Service.generateDownloadUrl(key))
+                .build()).toList();
+
+
+        return CodeLinksResponse.builder()
+                .files(downloads)
+                .build();
     }
 
     public CodeLinksResponse getPluginCodeServer(UUID pluginId, String version, String runtime) {
-        //TODO
-        return null;
+        List<String> keys = pluginsRepositoryMock.getServerClient();
+
+        List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
+                .downloadUrl(s3Service.generateDownloadUrl(key))
+                .build()).toList();
+
+
+        return CodeLinksResponse.builder()
+                .files(downloads)
+                .build();
     }
 }

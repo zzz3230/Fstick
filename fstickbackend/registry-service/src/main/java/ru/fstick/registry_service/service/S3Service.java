@@ -1,9 +1,6 @@
 package ru.fstick.registry_service.service;
 
-import io.minio.GetObjectArgs;
-import io.minio.GetObjectResponse;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
+import io.minio.*;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,6 +28,21 @@ public class S3Service {
         }
     }
 
+    public String generateDownloadUrl(String key) {
+        try {
+            return minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(props.getBucket())
+                            .object(key)
+                            .expiry(60 * 10) //10 минут
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public byte[] getObject(String key) {
         try (GetObjectResponse stream = minioClient.getObject(
                 GetObjectArgs.builder()
@@ -43,6 +55,19 @@ public class S3Service {
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to read object: " + key, e);
+        }
+    }
+
+    public void deleteAsset(String key) {
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(props.getBucket())
+                            .object(key)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }
