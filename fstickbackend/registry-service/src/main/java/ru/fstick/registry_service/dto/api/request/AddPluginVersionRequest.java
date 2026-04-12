@@ -8,4 +8,5 @@ import java.util.List;
 @Data
 public class AddPluginVersionRequest {
     private List<FileRequest> files;
+    private String version;
 }
