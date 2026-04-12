@@ -1,5 +1,8 @@
 package ru.fstick.registry_service.service;
 
+import io.minio.GetObjectArgs;
+import io.minio.GetObjectResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
@@ -14,21 +17,22 @@ import ru.fstick.registry_service.dto.service.FileUploadData;
 import ru.fstick.registry_service.dto.service.PaginationData;
 import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.repository.PluginsRepositoryMock;
+import ru.fstick.registry_service.util.Container;
+import ru.fstick.registry_service.util.RuntimeParser;
+import ru.fstick.registry_service.util.TypeParser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class PluginsService {
 
     private final PluginsRepositoryMock pluginsRepositoryMock;
     private final S3Service s3Service;
 
-    public PluginsService(PluginsRepositoryMock pluginsRepositoryMock, S3Service s3Service) {
-        this.pluginsRepositoryMock = pluginsRepositoryMock;
-        this.s3Service = s3Service;
-    }
 
     //получить список плагинов и их пагинацию по критериям
     public PluginsView getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
@@ -161,11 +165,19 @@ public class PluginsService {
 
     public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
 
+
+        commitPluginRequest.getKeys().forEach(key -> {
+            String fileName = key.substring(key.lastIndexOf("/") + 1);
+            byte[] file = s3Service.getObject(key);
+            //VALIDATION TODO
+        });
+
         PluginData pluginData = pluginsRepositoryMock.addPlugin(
                 pluginId,
                 commitPluginRequest.getName(),
                 commitPluginRequest.getDescription(),
                 commitPluginRequest.getCategory(),
+                commitPluginRequest.getKeys(),
                 commitPluginRequest.getTags());
 
         List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
@@ -204,10 +216,24 @@ public class PluginsService {
 
         List<FileUploadData> uploads = request.getFiles().stream()
                 .map(file -> {
+                    TypeParser.Result resultType = TypeParser.parse(file.getType());
+                    String key = null;
 
-                    String key = "plugins/" + pluginId + "/" + UUID.randomUUID() + "_" + file.getFileName();
+                    if (resultType.container==Container.CODE) {
+                        RuntimeParser.Result resultRuntime = RuntimeParser.parse(resultType.type);
+                        key = "plugins/" + pluginId + "/versions/" + request.getVersion() + "/" + resultRuntime.getTarget() + "/" + resultRuntime.getLanguage() + "/" + resultRuntime.getVersion() + "/" + file.getFileName();
+                        System.out.println(key);
+                    }
+                    else if (resultType.container==Container.IMAGE) {
+                        key = "plugins/" + pluginId + "/screenshots/" + file.getFileName();
+                        System.out.println(key);
+                    }
 
-                    String url = s3Service.generateUrl(key);
+                    if (key==null) {
+                        throw new RuntimeException();
+                    }
+
+                    String url = s3Service.generateUploadUrl(key);
 
                     return FileUploadData.builder()
                             .fileName(file.getFileName())
@@ -223,7 +249,7 @@ public class PluginsService {
                 .build();
     }
 
-    public AddVersionResponse addPluginVersion(UUID pluginId, AddPluginVersionRequest request) {
+    public AddVersionResponse initPluginVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
         //TODO
         return null;
     }

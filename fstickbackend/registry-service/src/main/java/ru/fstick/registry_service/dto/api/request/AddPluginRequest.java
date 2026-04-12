@@ -7,6 +7,7 @@ import java.util.List;
 
 @Data
 public class AddPluginRequest {
+    private String version;
     private List<FileRequest> files;
 }
 
