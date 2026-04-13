@@ -1,7 +1,5 @@
 package ru.fstick.registry_service.service;
 
-import io.minio.GetObjectArgs;
-import io.minio.GetObjectResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.dto.Status;
@@ -17,28 +15,27 @@ import ru.fstick.registry_service.dto.service.FileDownloadData;
 import ru.fstick.registry_service.dto.service.FileUploadData;
 import ru.fstick.registry_service.dto.service.PaginationData;
 import ru.fstick.registry_service.dto.model.PluginData;
-import ru.fstick.registry_service.repository.PluginsRepositoryMock;
+import ru.fstick.registry_service.repository.PluginsRepository;
 import ru.fstick.registry_service.util.Container;
 import ru.fstick.registry_service.util.RuntimeParser;
 import ru.fstick.registry_service.util.TypeParser;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class PluginsService {
 
-    private final PluginsRepositoryMock pluginsRepositoryMock;
+    private final PluginsRepository pluginsRepository;
     private final S3Service s3Service;
 
 
     //получить список плагинов и их пагинацию по критериям
     public PluginsView getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
         Integer offset = page * limit;
-        List<PluginData> pluginsData = pluginsRepositoryMock.getPlugins(offset, limit, category, search, sort, order);
+        List<PluginData> pluginsData = pluginsRepository.getPlugins(offset, limit, category, search, sort, order);
 
         List<PluginViewShrink> pluginViewShrinks = new ArrayList<>();
 
@@ -56,7 +53,7 @@ public class PluginsService {
                 .build()));
 
 
-        Integer pluginsTotal = pluginsRepositoryMock.countPlugins(category, search);
+        int pluginsTotal = pluginsData.size();
 
         int totalPages = (int) Math.ceil((double) pluginsTotal / limit);
 
@@ -77,10 +74,10 @@ public class PluginsService {
 
     //получить плагин по id
     public PluginViewExtend getPlugin(UUID pluginId) {
-        PluginData pluginData = pluginsRepositoryMock.getPlugin(pluginId);
+        PluginData pluginData = pluginsRepository.getPlugin(pluginId);
 
-        List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+        List<Version> versions = pluginsRepository.getVersionOfPlugin(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
 
         List<VersionView> versionViews = new ArrayList<>();
@@ -114,15 +111,15 @@ public class PluginsService {
 
     //обновить метаданные плагина
     public PluginViewExtend updatePlugin(UUID pluginId, PluginRequest pluginRequest) {
-        PluginData pluginData = pluginsRepositoryMock.updatePlugin(
+        PluginData pluginData = pluginsRepository.updatePlugin(
                 pluginId,
                 pluginRequest.getName(),
                 pluginRequest.getDescription(),
                 pluginRequest.getCategory(),
                 pluginRequest.getTags());
 
-        List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+        List<Version> versions = pluginsRepository.getVersionOfPlugin(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
@@ -155,7 +152,7 @@ public class PluginsService {
 
     //Удалить плагин
     public ChangeStatusResponse deletePlugin(UUID pluginId) {
-        PluginData pluginData = pluginsRepositoryMock.deletePlugin(pluginId);
+        PluginData pluginData = pluginsRepository.deletePlugin(pluginId);
 
         return ChangeStatusResponse.builder()
                 .pluginId(pluginData.getId())
@@ -173,7 +170,7 @@ public class PluginsService {
             //VALIDATION TODO
         });
 
-        PluginData pluginData = pluginsRepositoryMock.addPlugin(
+        PluginData pluginData = pluginsRepository.addPlugin(
                 pluginId,
                 commitPluginRequest.getName(),
                 commitPluginRequest.getDescription(),
@@ -181,8 +178,8 @@ public class PluginsService {
                 commitPluginRequest.getKeys(),
                 commitPluginRequest.getTags());
 
-        List<Version> versions = pluginsRepositoryMock.getVersionOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepositoryMock.getScreenshots(pluginData.getId());
+        List<Version> versions = pluginsRepository.getVersionOfPlugin(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
@@ -336,7 +333,7 @@ public class PluginsService {
     }
 
     public void deleteAsset(UUID pluginId, UUID assetId) {
-        String key = pluginsRepositoryMock.getAssetKey(assetId);
+        String key = pluginsRepository.getAssetKey(assetId);
 
         s3Service.deleteAsset(key);
     }
@@ -347,7 +344,7 @@ public class PluginsService {
     }
 
     public CodeLinksResponse getPluginCodeClient(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepositoryMock.getCodeClient();
+        List<String> keys = pluginsRepository.getCodeClient();
 
         List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
                 .downloadUrl(s3Service.generateDownloadUrl(key))
@@ -360,7 +357,7 @@ public class PluginsService {
     }
 
     public CodeLinksResponse getPluginCodeServer(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepositoryMock.getServerClient();
+        List<String> keys = pluginsRepository.getServerClient();
 
         List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
                 .downloadUrl(s3Service.generateDownloadUrl(key))
