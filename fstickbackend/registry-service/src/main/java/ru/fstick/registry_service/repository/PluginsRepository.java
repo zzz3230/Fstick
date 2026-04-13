@@ -20,40 +20,34 @@ public class PluginsRepository {
     private final PluginRowMapper pluginRowMapper;
     private final TagRowMapper tagRowMapper;
 
-    private List<String> getTags(UUID pluginId) {
-        String sql =
-        """
-            SELECT tags.name as tag_name
-            FROM tags
-            JOIN plugins_tags USING(tag_id)
-            WHERE plugin_id = ?
-        """;
-
-        return jdbcTemplate.query(sql, tagRowMapper, pluginId);
-    }
-
     //сделать запрос в базу данных на поиск плагинов
-    //ТУТ N+1 ПРОБЛЕМА С ТЭГАМИ, НАДО РЕШИТЬ ПО ХОРОШЕМУ
     public List<PluginData> getPlugins(Integer offset, Integer limit, String category, String search, String sort, String order) {
 
         String sql =
         """
             SELECT
-                plugin_id,
-                author_id,
-                plugins.name as plugin_name,
-                description,
-                categories.name as category_name,
-                statuses.name as status_name,
-                s3_icon_key,
-                created_at,
-                updated_at
-            FROM plugins
-            JOIN categories USING(category_id)
-            JOIN statuses USING(status_id)
-            WHERE categories.name ILIKE ? AND (plugins.name ILIKE ? OR plugins.description ILIKE ?)
+                p.plugin_id,
+                p.author_id,
+                p.name as plugin_name,
+                p.description,
+                c.name as category_name,
+                s.name as status_name,
+                p.s3_icon_key,
+                p.created_at,
+                p.updated_at,
+                COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), '{}') as tags
+            FROM plugins p
+            JOIN categories c USING(category_id)
+            JOIN statuses s USING(status_id)
+            LEFT JOIN plugins_tags pt USING(plugin_id)
+            LEFT JOIN tags t USING(tag_id)
+            WHERE c.name ILIKE ?
+              AND (p.name ILIKE ? OR p.description ILIKE ?)
+            GROUP BY
+                p.plugin_id, p.author_id, p.name, p.description,
+                c.name, s.name, p.s3_icon_key, p.created_at, p.updated_at
             ORDER BY %s %s
-            LIMIT ? OFFSET ?
+            LIMIT ? OFFSET ?;
         """;
 
         //защита от sql инъекции
@@ -68,14 +62,6 @@ public class PluginsRepository {
         sql = sql.formatted(sort, order);
 
         List<PluginData> pluginsData = jdbcTemplate.query(sql, pluginRowMapper, "%" + category + "%", "%" + search + "%", "%" + search + "%", limit, offset);
-
-        pluginsData.forEach(pluginData -> pluginData.setTags(getTags(pluginData.getId())));
-
-        System.out.println(pluginsData);
-        System.out.println(offset);
-        System.out.println(limit);
-        System.out.println(category);
-        System.out.println(search);
 
         return pluginsData;
     }
