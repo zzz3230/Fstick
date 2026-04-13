@@ -42,7 +42,7 @@ public class PluginsRepositoryMock {
         //TODO
     }
 
-    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags) {
+    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category,List<String> keys , List<String> tags) {
         return PluginData.builder()
                 .id(pluginId)
                 .creatorId(UUID.randomUUID())
@@ -140,5 +140,20 @@ public class PluginsRepositoryMock {
                 .updatedAt(LocalDateTime.now().toString())
                 .build();
         //TODO
+    }
+
+    public String getAssetKey(UUID assetId) {
+        //TODO
+        return null;
+    }
+
+    public List<String> getCodeClient() {
+        //TODO
+        return null;
+    }
+
+    public List<String> getServerClient() {
+        //TODO
+        return null;
     }
 }

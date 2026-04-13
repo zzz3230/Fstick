@@ -1,6 +1,7 @@
 package ru.fstick.registry_service.controller;
 
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
@@ -16,13 +17,11 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/plugins")
+@RequiredArgsConstructor
 public class PluginsController {
 
     private final PluginsService pluginsService;
 
-    public PluginsController(PluginsService pluginsService) {
-        this.pluginsService = pluginsService;
-    }
 
     //получить список плагинов
     @GetMapping
@@ -79,7 +78,7 @@ public class PluginsController {
     public AddVersionResponse addPluginVersion(@PathVariable UUID pluginId,
                                                @RequestBody AddPluginVersionRequest request) {
 
-        return pluginsService.addPluginVersion(pluginId, request);
+        return pluginsService.initPluginVersionUpload(pluginId, request);
 
     }
 
