@@ -8,7 +8,8 @@ import java.util.UUID;
 @Data
 @Builder
 public class Version {
-    private UUID id;
+    private UUID versionId;
+    private UUID pluginId;
     private String version;
     private String changelog;
     private String createdAt;

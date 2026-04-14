@@ -80,7 +80,6 @@ public class PluginsService {
         List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
         List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
-
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
                 .version(version.getVersion())
@@ -88,10 +87,12 @@ public class PluginsService {
                 .build());});
 
         List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> {ScreenshotView.builder()
+        screenshots.forEach(screenshot -> {screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(screenshot.getS3ScreenshotKey())
-                .build();});
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .build());});
+
+        String iconUrl = s3Service.generateDownloadUrl(pluginData.getIconUrlKey());
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
@@ -101,7 +102,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(pluginData.getIconUrlKey())
+                .iconUrl(iconUrl)
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -243,10 +244,11 @@ public class PluginsService {
                 .toList();
 
         //генерация url для иконки
+        //--------
         TypeParser.Result resultType = TypeParser.parse(request.getIcon().getType());
         String key = null;
         if (resultType.container==Container.IMAGE) {
-            key = "plugins/" + pluginId + "/screenshots/icon";
+            key = "plugins/" + pluginId + "/icon";
         }
         if (key==null) {
             throw new RuntimeException();
@@ -256,6 +258,7 @@ public class PluginsService {
                 .key(key)
                 .uploadUrl(s3Service.generateUploadUrl(key))
                 .build();
+        //--------
 
         return AddPluginResponse.builder()
                 .pluginId(pluginId)

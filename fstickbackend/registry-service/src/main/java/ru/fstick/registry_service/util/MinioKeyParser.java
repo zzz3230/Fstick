@@ -8,7 +8,7 @@ public class MinioKeyParser {
             Pattern.compile(".*/screenshots/[^/]+\\.(png|jpg|jpeg)$");
 
     private static final Pattern ICON_PATTERN =
-            Pattern.compile(".*/icon\\.png$");
+            Pattern.compile(".*/icon(\\.(png|jpg|jpeg))?$");
 
     private static final Pattern FILE_PATTERN =
             Pattern.compile(".*/versions/[^/]+/.+");

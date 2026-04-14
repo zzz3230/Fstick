@@ -9,7 +9,9 @@ import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.dto.model.Screenshot;
 import ru.fstick.registry_service.dto.model.Version;
 import ru.fstick.registry_service.repository.mapper.PluginRowMapper;
+import ru.fstick.registry_service.repository.mapper.ScreenshotRowMapper;
 import ru.fstick.registry_service.repository.mapper.TagRowMapper;
+import ru.fstick.registry_service.repository.mapper.VersionRowMapper;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -20,6 +22,8 @@ public class PluginsRepository {
     private final JdbcTemplate jdbcTemplate;
     private final PluginRowMapper pluginRowMapper;
     private final TagRowMapper tagRowMapper;
+    private final VersionRowMapper versionRowMapper;
+    private final ScreenshotRowMapper screenshotRowMapper;
 
     //сделать запрос в базу данных на поиск плагинов
     public List<PluginData> getPlugins(Integer offset, Integer limit, String category, String search, String sort, String order) {
@@ -66,6 +70,7 @@ public class PluginsRepository {
     }
 
     public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags, UUID authorId, String iconKey, List<String> screenshotKeys, List<String> fileKeys) {
+
         String sqlCategory =
         """
             SELECT categories.category_id as category_id
@@ -77,9 +82,9 @@ public class PluginsRepository {
 
         String sqlStatus =
                 """
-                    SELECT categories.category_id as category_id
-                    FROM categories
-                    WHERE categories.name=?;
+                    SELECT statuses.status_id as status_id
+                    FROM statuses
+                    WHERE statuses.name=?;
                 """;
 
         UUID statusId = jdbcTemplate.queryForObject(sqlStatus, UUID.class, Status.ACTIVE);
@@ -87,7 +92,8 @@ public class PluginsRepository {
 
         String sqlPluginInsert =
         """
-            INSERT INTO plugins (plugin_id, name, description, category_id, status_id, author_id, s3_icon_key) VALUES (?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO plugins (plugin_id, name, description, category_id, status_id, author_id, s3_icon_key)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
         """;
 
         jdbcTemplate.update(sqlPluginInsert, pluginId, name, description, categoryId, statusId, authorId, iconKey);
@@ -109,24 +115,32 @@ public class PluginsRepository {
 
     //Получить версии плагина
     public List<Version> getVersionsOfPlugin(UUID pluginId) {
+        String sql =
+        """
+            SELECT version_id as version_id,
+                   plugin_id as plugin_id,
+                   changelog as changelog,
+                   version_number as version_number,
+                   created_at as created_at
+            FROM versions
+            WHERE plugin_id=?;
+        """;
 
-
-
-        return new ArrayList<>(Arrays.asList(Version.builder()
-                .id(UUID.randomUUID())
-                .version("1.0.0")
-                .changelog("created")
-                .createdAt(LocalDateTime.now().toString()).build()));
-        //TODO
+        return jdbcTemplate.query(sql, versionRowMapper, pluginId);
     }
 
     //Получить скриншоты плагина
-    public List<Screenshot> getScreenshots(UUID id) {
-        return new ArrayList<>(Arrays.asList(Screenshot.builder()
-                .screenshotId(UUID.randomUUID())
-                .s3ScreenshotKey("s3key")
-                .build()));
-        //TODO
+    public List<Screenshot> getScreenshots(UUID pluginId) {
+        String sql =
+                """
+                    SELECT screenshot_id as screenshot_id,
+                           plugin_id as plugin_id,
+                           s3_screenshot_key as s3_screenshot_key
+                    FROM screenshots
+                    WHERE plugin_id=?;
+                """;
+
+        return jdbcTemplate.query(sql, screenshotRowMapper, pluginId);
     }
 
     //Получить плагин по id

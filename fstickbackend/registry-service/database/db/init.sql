@@ -39,7 +39,6 @@ CREATE TABLE "versions" (
     "version_number" VARCHAR(50) NOT NULL,
     "changelog" VARCHAR(2000) NOT NULL,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    "s3_archive_key" VARCHAR(300) NOT NULL,
     "plugin_id" UUID REFERENCES plugins(plugin_id) ON DELETE CASCADE,
     UNIQUE (plugin_id, version_number)
 );
