@@ -17,6 +17,7 @@ import ru.fstick.registry_service.dto.service.PaginationData;
 import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.repository.PluginsRepository;
 import ru.fstick.registry_service.util.Container;
+import ru.fstick.registry_service.util.MinioKeyParser;
 import ru.fstick.registry_service.util.RuntimeParser;
 import ru.fstick.registry_service.util.TypeParser;
 
@@ -41,7 +42,7 @@ public class PluginsService {
 
         pluginsData.forEach(pluginData -> pluginViewShrinks.add(PluginViewShrink.builder()
                 .id(pluginData.getId())
-                .creatorId(pluginData.getCreatorId())
+                .authorId(pluginData.getAuthorId())
                 .name(pluginData.getName())
                 .description(pluginData.getDescription())
                 .category(pluginData.getCategory())
@@ -76,7 +77,7 @@ public class PluginsService {
     public PluginViewExtend getPlugin(UUID pluginId) {
         PluginData pluginData = pluginsRepository.getPlugin(pluginId);
 
-        List<Version> versions = pluginsRepository.getVersionOfPlugin(pluginData.getId());
+        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
         List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
 
@@ -94,7 +95,7 @@ public class PluginsService {
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
-                .creatorId(pluginData.getCreatorId())
+                .authorId(pluginData.getAuthorId())
                 .name(pluginData.getName())
                 .description(pluginData.getDescription())
                 .category(pluginData.getCategory())
@@ -118,7 +119,7 @@ public class PluginsService {
                 pluginRequest.getCategory(),
                 pluginRequest.getTags());
 
-        List<Version> versions = pluginsRepository.getVersionOfPlugin(pluginData.getId());
+        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
         List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
         List<VersionView> versionViews = new ArrayList<>();
@@ -135,7 +136,7 @@ public class PluginsService {
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
-                .creatorId(pluginData.getCreatorId())
+                .authorId(pluginData.getAuthorId())
                 .name(pluginData.getName())
                 .description(pluginData.getDescription())
                 .category(pluginData.getCategory())
@@ -163,7 +164,6 @@ public class PluginsService {
 
     public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
 
-
         commitPluginRequest.getKeys().forEach(key -> {
             String fileName = key.substring(key.lastIndexOf("/") + 1);
             byte[] file = s3Service.getObject(key);
@@ -175,10 +175,13 @@ public class PluginsService {
                 commitPluginRequest.getName(),
                 commitPluginRequest.getDescription(),
                 commitPluginRequest.getCategory(),
-                commitPluginRequest.getKeys(),
-                commitPluginRequest.getTags());
+                commitPluginRequest.getTags(),
+                commitPluginRequest.getAuthorId(),
+                MinioKeyParser.getAllIcons(commitPluginRequest.getKeys()).get(0),
+                MinioKeyParser.getAllScreenshots(commitPluginRequest.getKeys()),
+                MinioKeyParser.getAllFiles(commitPluginRequest.getKeys()));
 
-        List<Version> versions = pluginsRepository.getVersionOfPlugin(pluginData.getId());
+        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
         List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
         List<VersionView> versionViews = new ArrayList<>();
@@ -195,7 +198,7 @@ public class PluginsService {
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
-                .creatorId(pluginData.getCreatorId())
+                .authorId(pluginData.getAuthorId())
                 .name(pluginData.getName())
                 .description(pluginData.getDescription())
                 .category(pluginData.getCategory())
@@ -239,9 +242,25 @@ public class PluginsService {
                 })
                 .toList();
 
+        //генерация url для иконки
+        TypeParser.Result resultType = TypeParser.parse(request.getIcon().getType());
+        String key = null;
+        if (resultType.container==Container.IMAGE) {
+            key = "plugins/" + pluginId + "/screenshots/icon";
+        }
+        if (key==null) {
+            throw new RuntimeException();
+        }
+        FileUploadData iconUpload = FileUploadData.builder()
+                .fileName("icon")
+                .key(key)
+                .uploadUrl(s3Service.generateUploadUrl(key))
+                .build();
+
         return AddPluginResponse.builder()
                 .pluginId(pluginId)
                 .uploads(uploads)
+                .iconUpload(iconUpload)
                 .build();
     }
 

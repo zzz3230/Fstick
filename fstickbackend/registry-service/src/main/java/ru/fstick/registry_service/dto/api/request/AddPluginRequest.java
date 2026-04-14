@@ -9,5 +9,6 @@ import java.util.List;
 public class AddPluginRequest {
     private String version;
     private List<FileRequest> files;
+    private FileRequest icon;
 }
 

@@ -12,4 +12,5 @@ import java.util.UUID;
 public class AddPluginResponse {
     private UUID pluginId;
     private List<FileUploadData> uploads;
+    private FileUploadData iconUpload;
 }

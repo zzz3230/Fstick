@@ -22,7 +22,7 @@ public class PluginRowMapper implements RowMapper<PluginData> {
                 : List.of();
         return PluginData.builder()
                 .id(rs.getObject("plugin_id", UUID.class))
-                .creatorId(rs.getObject("author_id", UUID.class))
+                .authorId(rs.getObject("author_id", UUID.class))
                 .name(rs.getString("plugin_name"))
                 .category(rs.getString("category_name"))
                 .status(rs.getString("status_name"))

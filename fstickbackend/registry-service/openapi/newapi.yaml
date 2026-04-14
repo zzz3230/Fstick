@@ -3,21 +3,21 @@ info:
   title: OpenAPI definition
   version: v0
 servers:
-- url: http://localhost:8080
-  description: Generated server url
+  - url: http://localhost:8080
+    description: Generated server url
 paths:
   /api/v1/plugins/{pluginId}:
     get:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: getPlugin
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -27,15 +27,15 @@ paths:
                 $ref: "#/components/schemas/PluginViewExtend"
     put:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: updatePlugin
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
@@ -51,15 +51,15 @@ paths:
                 $ref: "#/components/schemas/PluginViewExtend"
     delete:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: deletePlugin
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -70,25 +70,25 @@ paths:
   /api/v1/plugins/{pluginId}/status:
     put:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: changeStatus
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
             schema:
               type: string
               enum:
-              - ACTIVE
-              - DELETED
-              - HIDDEN
-              - ARCHIVED
+                - ACTIVE
+                - DELETED
+                - HIDDEN
+                - ARCHIVED
         required: true
       responses:
         "200":
@@ -100,47 +100,47 @@ paths:
   /api/v1/plugins:
     get:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: getPlugins
       parameters:
-      - name: page
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      - name: category
-        in: query
-        required: false
-        schema:
-          type: string
-          default: ""
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
-          default: ""
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-          default: name
-      - name: order
-        in: query
-        required: false
-        schema:
-          type: string
-          default: asc
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ""
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            default: name
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            default: asc
       responses:
         "200":
           description: OK
@@ -150,7 +150,7 @@ paths:
                 $ref: "#/components/schemas/PluginsView"
     post:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: addPlugin
       requestBody:
         content:
@@ -168,15 +168,15 @@ paths:
   /api/v1/plugins/{pluginId}/versions:
     post:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: addPluginVersion
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
@@ -193,15 +193,15 @@ paths:
   /api/v1/plugins/{pluginId}/versions/commit:
     post:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: commitVersion
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
@@ -218,15 +218,15 @@ paths:
   /api/v1/plugins/{pluginId}/commit:
     post:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: commitPlugin
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
@@ -243,15 +243,15 @@ paths:
   /api/v1/plugins/{pluginId}/assets:
     post:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: updateAssets
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
@@ -268,15 +268,15 @@ paths:
   /api/v1/plugins/{pluginId}/assets/commit:
     post:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: commitAssets
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         content:
           application/json:
@@ -293,25 +293,25 @@ paths:
   /api/v1/plugins/{pluginId}/code/server:
     get:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: getPluginCodeServer
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: version
-        in: query
-        required: true
-        schema:
-          type: string
-      - name: runtime
-        in: query
-        required: true
-        schema:
-          type: string
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: runtime
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -322,25 +322,25 @@ paths:
   /api/v1/plugins/{pluginId}/code/client:
     get:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: getPluginCodeClient
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: version
-        in: query
-        required: true
-        schema:
-          type: string
-      - name: runtime
-        in: query
-        required: true
-        schema:
-          type: string
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: runtime
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -351,21 +351,21 @@ paths:
   /api/v1/plugins/{pluginId}/assets/{assetId}:
     delete:
       tags:
-      - plugins-controller
+        - plugins-controller
       operationId: deleteAssets
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: assetId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -373,8 +373,8 @@ components:
   schemas:
     PluginRequest:
       required:
-      - description
-      - name
+        - description
+        - name
       type: object
       properties:
         name:
@@ -393,7 +393,7 @@ components:
         id:
           type: string
           format: uuid
-        creatorId:
+        authorId:
           type: string
           format: uuid
         name:
@@ -455,10 +455,14 @@ components:
     AddPluginRequest:
       type: object
       properties:
+        version:
+          type: string
         files:
           type: array
           items:
             $ref: "#/components/schemas/FileRequest"
+        icon:
+          $ref: "#/components/schemas/FileRequest"
     FileRequest:
       type: object
       properties:
@@ -476,6 +480,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileUploadData"
+        iconUpload:
+          $ref: "#/components/schemas/FileUploadData"
     FileUploadData:
       type: object
       properties:
@@ -492,6 +498,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileRequest"
+        version:
+          type: string
     AddVersionResponse:
       type: object
       properties:
@@ -512,16 +520,24 @@ components:
           type: string
         changelog:
           type: string
+        keys:
+          type: array
+          items:
+            type: string
     CommitPluginRequest:
       required:
-      - description
-      - name
+        - authorId
+        - description
+        - name
       type: object
       properties:
         name:
           type: string
         description:
           type: string
+        authorId:
+          type: string
+          format: uuid
         category:
           type: string
         tags:
@@ -541,8 +557,21 @@ components:
             $ref: "#/components/schemas/FileRequest"
     UpdateAssetsResponse:
       type: object
+      properties:
+        pluginId:
+          type: string
+          format: uuid
+        uploads:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileUploadData"
     CommitAssetsRequest:
       type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
     PaginationData:
       type: object
       properties:
@@ -568,7 +597,7 @@ components:
         id:
           type: string
           format: uuid
-        creatorId:
+        authorId:
           type: string
           format: uuid
         name:

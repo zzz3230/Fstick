@@ -11,7 +11,7 @@ import java.util.UUID;
 @Builder
 public class PluginData {
     private UUID id;
-    private UUID creatorId;
+    private UUID authorId;
     private String name;
     private String description;
     private String category;

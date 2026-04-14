@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.dto.model.Screenshot;
 import ru.fstick.registry_service.dto.model.Version;
@@ -61,21 +62,39 @@ public class PluginsRepository {
 
         sql = sql.formatted(sort, order);
 
-        List<PluginData> pluginsData = jdbcTemplate.query(sql, pluginRowMapper, "%" + category + "%", "%" + search + "%", "%" + search + "%", limit, offset);
-
-        return pluginsData;
+        return jdbcTemplate.query(sql, pluginRowMapper, "%" + category + "%", "%" + search + "%", "%" + search + "%", limit, offset);
     }
 
-    //сделать запрос в базу данных на количество плагинов
-    public Integer countPlugins(String category, String search) {
-        return 20;
-        //TODO
-    }
+    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags, UUID authorId, String iconKey, List<String> screenshotKeys, List<String> fileKeys) {
+        String sqlCategory =
+        """
+            SELECT categories.category_id as category_id
+            FROM categories
+            WHERE categories.name=?;
+        """;
 
-    public PluginData addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category,List<String> keys , List<String> tags) {
+        UUID categoryId = jdbcTemplate.queryForObject(sqlCategory, UUID.class, category);
+
+        String sqlStatus =
+                """
+                    SELECT categories.category_id as category_id
+                    FROM categories
+                    WHERE categories.name=?;
+                """;
+
+        UUID statusId = jdbcTemplate.queryForObject(sqlStatus, UUID.class, Status.ACTIVE);
+
+
+        String sqlPluginInsert =
+        """
+            INSERT INTO plugins (plugin_id, name, description, category_id, status_id, author_id, s3_icon_key) VALUES (?, ?, ?, ?, ?, ?, ?);
+        """;
+
+        jdbcTemplate.update(sqlPluginInsert, pluginId, name, description, categoryId, statusId, authorId, iconKey);
+
         return PluginData.builder()
                 .id(pluginId)
-                .creatorId(UUID.randomUUID())
+                .authorId(UUID.randomUUID())
                 .name("test")
                 .description("mock")
                 .category("social")
@@ -89,7 +108,10 @@ public class PluginsRepository {
 
 
     //Получить версии плагина
-    public List<Version> getVersionOfPlugin(UUID id) {
+    public List<Version> getVersionsOfPlugin(UUID pluginId) {
+
+
+
         return new ArrayList<>(Arrays.asList(Version.builder()
                 .id(UUID.randomUUID())
                 .version("1.0.0")
@@ -109,18 +131,31 @@ public class PluginsRepository {
 
     //Получить плагин по id
     public PluginData getPlugin(UUID pluginId) {
-        return PluginData.builder()
-                .id(pluginId)
-                .creatorId(UUID.randomUUID())
-                .name("test")
-                .description("mock")
-                .category("social")
-                .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
-                .status("active").iconUrlKey("iconurls3key")
-                .createdAt(LocalDateTime.now().toString())
-                .updatedAt(LocalDateTime.now().toString())
-                .build();
-        //TODO
+        String sql =
+                """
+                    SELECT
+                        p.plugin_id,
+                        p.author_id,
+                        p.name as plugin_name,
+                        p.description,
+                        c.name as category_name,
+                        s.name as status_name,
+                        p.s3_icon_key,
+                        p.created_at,
+                        p.updated_at,
+                        COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), '{}') as tags
+                    FROM plugins p
+                    JOIN categories c USING(category_id)
+                    JOIN statuses s USING(status_id)
+                    LEFT JOIN plugins_tags pt USING(plugin_id)
+                    LEFT JOIN tags t USING(tag_id)
+                    WHERE plugin_id=?
+                    GROUP BY
+                        p.plugin_id, p.author_id, p.name, p.description,
+                        c.name, s.name, p.s3_icon_key, p.created_at, p.updated_at
+                """;
+
+        return jdbcTemplate.query(sql, pluginRowMapper, pluginId).get(0);
     }
 
 
@@ -128,7 +163,7 @@ public class PluginsRepository {
     public PluginData updatePlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags) {
         return PluginData.builder()
                 .id(pluginId)
-                .creatorId(UUID.randomUUID())
+                .authorId(UUID.randomUUID())
                 .name(name)
                 .description(description)
                 .category(category)
@@ -145,7 +180,7 @@ public class PluginsRepository {
     public PluginData deletePlugin(UUID pluginId) {
         return PluginData.builder()
                 .id(pluginId)
-                .creatorId(UUID.randomUUID())
+                .authorId(UUID.randomUUID())
                 .name("test")
                 .description("mock")
                 .category("social")
@@ -160,7 +195,7 @@ public class PluginsRepository {
     public PluginData addPluginVersion(UUID pluginId) {
         return PluginData.builder()
                 .id(pluginId)
-                .creatorId(UUID.randomUUID())
+                .authorId(UUID.randomUUID())
                 .name("test")
                 .description("mock")
                 .category("social")
