@@ -6,8 +6,13 @@ info:
     Internal REST API микросервиса управления установками плагинов.
     Сервис принимает запросы только от Gateway Service.
     Плагины привязываются к чату (Matrix Room), а не к пользователю.
-    user_id и chat_id передаются как query parameters.
-  version: 2.0.0
+
+    Аутентификация: Matrix User ID передаётся в заголовке X-User-Id.
+    chat_id передаётся как query parameter.
+
+    Проверка членства пользователя в чате выполняется внутри сервиса
+    через вызов к Integration Service.
+  version: 2.1.0
 
 servers:
   - url: http://installation-service:8080/api/v1
@@ -19,7 +24,37 @@ tags:
 
 components:
 
+  parameters:
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Matrix User ID пользователя. Проставляется Gateway Service.
+      schema:
+        type: string
+      example: "@maksim:homeserver.org"
+
+    ChatId:
+      name: chat_id
+      in: query
+      required: true
+      description: Matrix Room ID чата
+      schema:
+        type: string
+      example: "!roomid:homeserver.org"
+
+    InstallationId:
+      name: installation_id
+      in: path
+      required: true
+      description: UUID записи установки
+      schema:
+        type: string
+        format: uuid
+      example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
   schemas:
+
     Installation:
       type: object
       properties:
@@ -37,11 +72,11 @@ components:
           type: string
           format: uuid
           example: "660f9511-f3ac-52e5-b827-557766551111"
-          description: UUID версии плагина из таблицы versions
+          description: UUID версии плагина
         version_number:
           type: string
           example: "1.2.0"
-          description: Номер версии (SemVer) — денормализован для удобства
+          description: Номер версии SemVer — денормализован для удобства чтения
         chat_id:
           type: string
           example: "!roomid:homeserver.org"
@@ -53,11 +88,11 @@ components:
         installed_at:
           type: string
           format: date-time
-          example: "2026-04-13T10:00:00Z"
+          example: "2026-04-15T10:00:00Z"
         updated_at:
           type: string
           format: date-time
-          example: "2026-04-13T12:30:00Z"
+          example: "2026-04-15T12:30:00Z"
       required:
         - installation_id
         - plugin_id
@@ -89,7 +124,7 @@ components:
         installed_at:
           type: string
           format: date-time
-          example: "2026-04-13T10:00:00Z"
+          example: "2026-04-15T10:00:00Z"
       required:
         - installation_id
         - plugin_id
@@ -109,14 +144,16 @@ components:
           type: string
           format: uuid
           example: "660f9511-f3ac-52e5-b827-557766551111"
-          description: UUID конкретной версии. Если не указан — устанавливается последняя версия.
+          description: |
+            UUID конкретной версии плагина.
+            Если не указан — устанавливается последняя доступная версия.
           nullable: true
       required:
         - plugin_id
 
     UpdateInstallationRequest:
       type: object
-      description: Обновление версии плагина в чате
+      description: Запрос на обновление версии установленного плагина
       properties:
         version_id:
           type: string
@@ -191,26 +228,16 @@ paths:
       summary: Установить плагин в чат
       description: |
         Создаёт запись установки плагина для указанного чата.
-        Перед созданием сервис обращается к Plugin Registry Service чтобы
-        убедиться что плагин существует и имеет статус active.
-        Проверяет что плагин ещё не установлен в этом чате (UNIQUE plugin_id + chat_id).
-        Если есть предупреждения совместимости — они возвращаются в поле warnings,
-        но установка при этом всё равно выполняется (статус 201).
+
+        Перед установкой сервис:
+        1. Проверяет что пользователь является участником чата (через Integration Service)
+        2. Проверяет что плагин существует и имеет статус active (через Registry Service)
+        3. Проверяет что плагин ещё не установлен в этом чате (иначе 409)
+        4. Проверяет совместимость версии — при наличии предупреждений установка
+           выполняется, но warnings возвращаются в ответе
       parameters:
-        - name: user_id
-          in: query
-          required: true
-          description: Matrix User ID пользователя который выполняет установку
-          schema:
-            type: string
-          example: "@maksim:homeserver.org"
-        - name: chat_id
-          in: query
-          required: true
-          description: Matrix Room ID чата в который устанавливается плагин
-          schema:
-            type: string
-          example: "!roomid:homeserver.org"
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ChatId'
       requestBody:
         required: true
         content:
@@ -271,25 +298,13 @@ paths:
 
     get:
       tags: [installations]
-      summary: Список плагинов установленных в чате
+      summary: Получить список плагинов установленных в чате
       description: |
-        Возвращает все установки плагинов для указанного чата.
-        Пользователь должен быть участником чата чтобы видеть его плагины.
+        Возвращает все установки плагинов для указанного чата с пагинацией.
+        Пользователь должен быть участником чата.
       parameters:
-        - name: user_id
-          in: query
-          required: true
-          description: Matrix User ID — для проверки что пользователь участник чата
-          schema:
-            type: string
-          example: "@maksim:homeserver.org"
-        - name: chat_id
-          in: query
-          required: true
-          description: Matrix Room ID чата установки которого нужно получить
-          schema:
-            type: string
-          example: "!roomid:homeserver.org"
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ChatId'
         - name: page
           in: query
           schema:
@@ -322,28 +337,16 @@ paths:
   /installations/{installation_id}:
 
     parameters:
-      - name: installation_id
-        in: path
-        required: true
-        description: UUID записи установки
-        schema:
-          type: string
-          format: uuid
-        example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      - $ref: '#/components/parameters/InstallationId'
 
     get:
       tags: [installations]
       summary: Получить детали установки
       description: |
-        Возвращает полную информацию об одной установке плагина в чате.
-        Пользователь должен быть участником чата.
+        Возвращает полную информацию об одной установке плагина.
+        Пользователь должен быть участником чата к которому относится установка.
       parameters:
-        - name: user_id
-          in: query
-          required: true
-          schema:
-            type: string
-          example: "@maksim:homeserver.org"
+        - $ref: '#/components/parameters/XUserId'
       responses:
         '200':
           description: Детали установки
@@ -369,16 +372,13 @@ paths:
       summary: Обновить версию плагина в чате
       description: |
         Обновляет версию установленного плагина до указанной.
-        Только участник чата может выполнять обновление.
+        Пользователь должен быть участником чата.
+
         Сервис проверяет совместимость новой версии перед обновлением.
-        При несовместимости возвращает 422 и обновление не выполняется.
+        При полной несовместимости возвращает 422 и обновление не выполняется.
+        При наличии предупреждений обновление выполняется, warnings возвращаются в ответе.
       parameters:
-        - name: user_id
-          in: query
-          required: true
-          schema:
-            type: string
-          example: "@maksim:homeserver.org"
+        - $ref: '#/components/parameters/XUserId'
       requestBody:
         required: true
         content:
@@ -387,7 +387,7 @@ paths:
               $ref: '#/components/schemas/UpdateInstallationRequest'
       responses:
         '200':
-          description: Версия плагина обновлена
+          description: Версия плагина успешно обновлена
           content:
             application/json:
               schema:
@@ -434,17 +434,12 @@ paths:
       tags: [installations]
       summary: Удалить плагин из чата
       description: |
-        Полностью удаляет запись установки плагина из чата.
-        Только участник чата может удалять плагины.
+        Физически удаляет запись установки плагина из чата.
+        Пользователь должен быть участником чата.
         После удаления плагин перестаёт работать в этом чате.
-        Операция необратима — запись удаляется физически.
+        Операция необратима.
       parameters:
-        - name: user_id
-          in: query
-          required: true
-          schema:
-            type: string
-          example: "@maksim:homeserver.org"
+        - $ref: '#/components/parameters/XUserId'
       responses:
         '204':
           description: Плагин успешно удалён из чата (тело ответа пустое)
