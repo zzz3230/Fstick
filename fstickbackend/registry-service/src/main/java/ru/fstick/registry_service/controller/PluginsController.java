@@ -29,7 +29,7 @@ public class PluginsController {
                                   @RequestParam(required = false, defaultValue = "20") Integer limit,
                                   @RequestParam(required = false, defaultValue = "") String category,
                                   @RequestParam(required = false, defaultValue = "") String search,
-                                  @RequestParam(required = false, defaultValue = "name") String sort,
+                                  @RequestParam(required = false, defaultValue = "plugin_name") String sort,
                                   @RequestParam(required = false, defaultValue = "asc") String order) {
 
         return pluginsService.getPlugins(page, limit, category, search, sort, order);
@@ -42,7 +42,7 @@ public class PluginsController {
         return pluginsService.initPluginUpload(request);
     }
 
-
+    //подтвердить создание плагина
     @PostMapping("/{pluginId}/commit")
     public PluginViewExtend commitPlugin(
             @PathVariable UUID pluginId,

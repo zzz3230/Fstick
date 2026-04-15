@@ -15,10 +15,10 @@ CREATE TABLE "plugins" (
     "plugin_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "name" VARCHAR(50) NOT NULL,
     "description" VARCHAR(2000),
-    "status_id" UUID REFERENCES statuses(status_id) ON DELETE SET NULL,
-    "category_id" UUID REFERENCES categories(category_id) ON DELETE SET NULL,
+    "status_id" UUID NOT NULL REFERENCES statuses(status_id) ON DELETE SET NULL,
+    "category_id" UUID NOT NULL REFERENCES categories(category_id) ON DELETE SET NULL,
     "author_id" UUID NOT NULL,
-    "s3_icon_key" VARCHAR(300) NOT NULL,
+    "s3_icon_key" VARCHAR(300) UNIQUE,
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -81,9 +81,10 @@ INSERT INTO categories (name) VALUES
 -- STATUSES
 -- =========================
 INSERT INTO statuses (name) VALUES
-                                ('active'),
-                                ('deprecated'),
-                                ('beta');
+                                ('ACTIVE'),
+                                ('DELETED'),
+                                ('HIDDEN'),
+                                ('ARCHIVED');
 
 -- =========================
 -- TAGS
@@ -110,7 +111,7 @@ VALUES
     (
         'Smart Analytics',
         'Advanced analytics plugin with AI insights.',
-        (SELECT status_id FROM statuses WHERE name = 'active'),
+        (SELECT status_id FROM statuses WHERE name = 'ACTIVE'),
         (SELECT category_id FROM categories WHERE name = 'Analytics'),
         gen_random_uuid(),
         'icons/smart-analytics.png'
@@ -118,7 +119,7 @@ VALUES
     (
         'Task Automator',
         'Automates repetitive workflows and tasks.',
-        (SELECT status_id FROM statuses WHERE name = 'beta'),
+        (SELECT status_id FROM statuses WHERE name = 'HIDDEN'),
         (SELECT category_id FROM categories WHERE name = 'Productivity'),
         gen_random_uuid(),
         'icons/task-automator.png'
@@ -126,7 +127,7 @@ VALUES
     (
         'Secure Auth',
         'Adds authentication and security layers.',
-        (SELECT status_id FROM statuses WHERE name = 'active'),
+        (SELECT status_id FROM statuses WHERE name = 'ACTIVE'),
         (SELECT category_id FROM categories WHERE name = 'Security'),
         gen_random_uuid(),
         'icons/secure-auth.png'
@@ -148,32 +149,27 @@ WHERE (p.name = 'Smart Analytics' AND t.name IN ('AI', 'dashboard'))
 INSERT INTO versions (
     version_number,
     changelog,
-    s3_archive_key,
     plugin_id
 )
 VALUES
     (
         '1.0.0',
         'Initial release with core features.',
-        'archives/smart-analytics/v1.0.0.zip',
         (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics')
     ),
     (
         '1.1.0',
         'Added predictive models.',
-        'archives/smart-analytics/v1.1.0.zip',
         (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics')
     ),
     (
         '0.1.0',
         'Beta release of automation engine.',
-        'archives/task-automator/v0.1.0.zip',
         (SELECT plugin_id FROM plugins WHERE name = 'Task Automator')
     ),
     (
         '2.0.0',
         'Major security overhaul.',
-        'archives/secure-auth/v2.0.0.zip',
         (SELECT plugin_id FROM plugins WHERE name = 'Secure Auth')
     );
 

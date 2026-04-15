@@ -38,6 +38,8 @@ public class PluginsService {
         Integer offset = page * limit;
         List<PluginData> pluginsData = pluginsRepository.getPlugins(offset, limit, category, search, sort, order);
 
+        System.out.println(pluginsData);
+
         List<PluginViewShrink> pluginViewShrinks = new ArrayList<>();
 
         pluginsData.forEach(pluginData -> pluginViewShrinks.add(PluginViewShrink.builder()
@@ -163,6 +165,7 @@ public class PluginsService {
                 .build();
     }
 
+    //подтвердить создание плагина
     public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
 
         commitPluginRequest.getKeys().forEach(key -> {
@@ -171,13 +174,8 @@ public class PluginsService {
             //VALIDATION TODO
         });
 
-        PluginData pluginData = pluginsRepository.addPlugin(
+        PluginData pluginData = pluginsRepository.addFiles(
                 pluginId,
-                commitPluginRequest.getName(),
-                commitPluginRequest.getDescription(),
-                commitPluginRequest.getCategory(),
-                commitPluginRequest.getTags(),
-                commitPluginRequest.getAuthorId(),
                 MinioKeyParser.getAllIcons(commitPluginRequest.getKeys()).get(0),
                 MinioKeyParser.getAllScreenshots(commitPluginRequest.getKeys()),
                 MinioKeyParser.getAllFiles(commitPluginRequest.getKeys()));
@@ -259,6 +257,8 @@ public class PluginsService {
                 .uploadUrl(s3Service.generateUploadUrl(key))
                 .build();
         //--------
+
+        pluginsRepository.addPlugin(pluginId, request.getName(), request.getDescription(), request.getCategory(), request.getTags(), request.getAuthorId());
 
         return AddPluginResponse.builder()
                 .pluginId(pluginId)
