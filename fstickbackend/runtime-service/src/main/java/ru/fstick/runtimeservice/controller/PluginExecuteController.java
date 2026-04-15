@@ -3,8 +3,10 @@ package ru.fstick.runtimeservice.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import ru.fstick.runtimeservice.dto.CommandExecutionResult;
+import ru.fstick.runtimeservice.dto.request.CommandRequest;
 import ru.fstick.runtimeservice.service.PluginRuntimeService;
 import ru.fstick.runtimeservice.dto.CommandStatus;
 
@@ -21,26 +23,21 @@ public class PluginExecuteController {
     }
 
 
-    public record CommandRequest(
-            String name,
-            UUID pluginId,
-            String userId,
-            String chatId,
-            String trackId,
-            Map<String, Object> args
-    ) {
-    }
+
 
     @PostMapping("/command")
-    public ResponseEntity<CommandExecutionResult> handleCommand(@RequestBody CommandRequest request) {
+    public ResponseEntity<CommandExecutionResult> handleCommand(
+            @RequestBody CommandRequest request,
+            @RequestHeader("X-User-Id") String userId
+    ) {
 
         var result = pluginRuntimeService.executeCommand(
-                request.name,
-                request.pluginId,
-                request.userId,
-                request.chatId,
-                request.trackId,
-                request.args
+                request.getName(),
+                request.getPluginId(),
+                userId,
+                request.getChatId(),
+                request.getTrackId(),
+                request.getArgs()
         );
 
         return ResponseEntity.ok(result);
