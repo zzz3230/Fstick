@@ -1,0 +1,457 @@
+openapi: 3.0.3
+
+info:
+  title: Plugin Installation Service API
+  description: |
+    Internal REST API микросервиса управления установками плагинов.
+    Сервис принимает запросы только от Gateway Service.
+    Плагины привязываются к чату (Matrix Room), а не к пользователю.
+
+    Аутентификация: Matrix User ID передаётся в заголовке X-User-Id.
+    chat_id передаётся как query parameter.
+
+    Проверка членства пользователя в чате выполняется внутри сервиса
+    через вызов к Integration Service.
+  version: 2.1.0
+
+servers:
+  - url: http://installation-service:8080/api/v1
+    description: Internal Docker network
+
+tags:
+  - name: installations
+    description: Управление установками плагинов в чатах
+
+components:
+
+  parameters:
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: true
+      description: Matrix User ID пользователя. Проставляется Gateway Service.
+      schema:
+        type: string
+      example: "@maksim:homeserver.org"
+
+    ChatId:
+      name: chat_id
+      in: query
+      required: true
+      description: Matrix Room ID чата
+      schema:
+        type: string
+      example: "!roomid:homeserver.org"
+
+    InstallationId:
+      name: installation_id
+      in: path
+      required: true
+      description: UUID записи установки
+      schema:
+        type: string
+        format: uuid
+      example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+  schemas:
+
+    Installation:
+      type: object
+      properties:
+        installation_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          description: Уникальный идентификатор записи установки
+        plugin_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+          description: UUID плагина из Plugin Registry
+        version_id:
+          type: string
+          format: uuid
+          example: "660f9511-f3ac-52e5-b827-557766551111"
+          description: UUID версии плагина
+        version_number:
+          type: string
+          example: "1.2.0"
+          description: Номер версии SemVer — денормализован для удобства чтения
+        chat_id:
+          type: string
+          example: "!roomid:homeserver.org"
+          description: Matrix Room ID чата в котором установлен плагин
+        installed_by:
+          type: string
+          example: "@maksim:homeserver.org"
+          description: Matrix User ID пользователя который установил плагин
+        installed_at:
+          type: string
+          format: date-time
+          example: "2026-04-15T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-04-15T12:30:00Z"
+      required:
+        - installation_id
+        - plugin_id
+        - version_id
+        - version_number
+        - chat_id
+        - installed_by
+        - installed_at
+        - updated_at
+
+    InstallationShort:
+      type: object
+      description: Краткое представление установки для списков
+      properties:
+        installation_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        plugin_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        version_number:
+          type: string
+          example: "1.2.0"
+        installed_by:
+          type: string
+          example: "@maksim:homeserver.org"
+        installed_at:
+          type: string
+          format: date-time
+          example: "2026-04-15T10:00:00Z"
+      required:
+        - installation_id
+        - plugin_id
+        - version_number
+        - installed_by
+        - installed_at
+
+    InstallRequest:
+      type: object
+      properties:
+        plugin_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+          description: UUID плагина который нужно установить
+        version_id:
+          type: string
+          format: uuid
+          example: "660f9511-f3ac-52e5-b827-557766551111"
+          description: |
+            UUID конкретной версии плагина.
+            Если не указан — устанавливается последняя доступная версия.
+          nullable: true
+      required:
+        - plugin_id
+
+    UpdateInstallationRequest:
+      type: object
+      description: Запрос на обновление версии установленного плагина
+      properties:
+        version_id:
+          type: string
+          format: uuid
+          example: "770a0622-a4bd-63f6-c938-668877662222"
+          description: UUID новой версии плагина
+      required:
+        - version_id
+
+    PaginatedInstallations:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstallationShort'
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total_count:
+          type: integer
+          example: 5
+        has_next:
+          type: boolean
+          example: false
+      required:
+        - data
+        - page
+        - limit
+        - total_count
+        - has_next
+
+    InstallWarning:
+      type: object
+      description: Предупреждение о совместимости при установке или обновлении
+      properties:
+        code:
+          type: string
+          enum: [VERSION_MISMATCH, CONFLICT_WITH_INSTALLED]
+          example: VERSION_MISMATCH
+        message:
+          type: string
+          example: "Plugin requires messenger version 2.0+, current is 1.8"
+      required:
+        - code
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Машиночитаемый код ошибки
+          example: PLUGIN_NOT_FOUND
+        message:
+          type: string
+          description: Человекочитаемое описание ошибки
+          example: "Plugin with id 550e8400-e29b-41d4-a716-446655440000 not found or not active"
+      required:
+        - error
+        - message
+
+paths:
+
+  /installations:
+
+    post:
+      tags: [installations]
+      summary: Установить плагин в чат
+      description: |
+        Создаёт запись установки плагина для указанного чата.
+
+        Перед установкой сервис:
+        1. Проверяет что пользователь является участником чата (через Integration Service)
+        2. Проверяет что плагин существует и имеет статус active (через Registry Service)
+        3. Проверяет что плагин ещё не установлен в этом чате (иначе 409)
+        4. Проверяет совместимость версии — при наличии предупреждений установка
+           выполняется, но warnings возвращаются в ответе
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ChatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstallRequest'
+      responses:
+        '201':
+          description: Плагин успешно установлен в чат
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installation:
+                    $ref: '#/components/schemas/Installation'
+                  warnings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InstallWarning'
+                    description: Предупреждения о совместимости. Пустой массив если всё ок.
+                required:
+                  - installation
+                  - warnings
+        '400':
+          description: Некорректный запрос — невалидные UUID или отсутствуют обязательные параметры
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Пользователь не является участником чата
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: FORBIDDEN
+                message: "User @maksim:homeserver.org is not a member of !roomid:homeserver.org"
+        '404':
+          description: Плагин или версия не найдены в Registry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: PLUGIN_NOT_FOUND
+                message: "Plugin with id 550e8400-e29b-41d4-a716-446655440000 not found or not active"
+        '409':
+          description: Плагин уже установлен в этом чате
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ALREADY_INSTALLED
+                message: "Plugin 550e8400-e29b-41d4-a716-446655440000 is already installed in this chat. Use PATCH to update version."
+
+    get:
+      tags: [installations]
+      summary: Получить список плагинов установленных в чате
+      description: |
+        Возвращает все установки плагинов для указанного чата с пагинацией.
+        Пользователь должен быть участником чата.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+        - $ref: '#/components/parameters/ChatId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          example: 20
+      responses:
+        '200':
+          description: Список установленных плагинов в чате
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInstallations'
+        '403':
+          description: Пользователь не является участником чата
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /installations/{installation_id}:
+
+    parameters:
+      - $ref: '#/components/parameters/InstallationId'
+
+    get:
+      tags: [installations]
+      summary: Получить детали установки
+      description: |
+        Возвращает полную информацию об одной установке плагина.
+        Пользователь должен быть участником чата к которому относится установка.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+      responses:
+        '200':
+          description: Детали установки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Installation'
+        '403':
+          description: Пользователь не является участником чата
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Установка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [installations]
+      summary: Обновить версию плагина в чате
+      description: |
+        Обновляет версию установленного плагина до указанной.
+        Пользователь должен быть участником чата.
+
+        Сервис проверяет совместимость новой версии перед обновлением.
+        При полной несовместимости возвращает 422 и обновление не выполняется.
+        При наличии предупреждений обновление выполняется, warnings возвращаются в ответе.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstallationRequest'
+      responses:
+        '200':
+          description: Версия плагина успешно обновлена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installation:
+                    $ref: '#/components/schemas/Installation'
+                  warnings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InstallWarning'
+                required:
+                  - installation
+                  - warnings
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Пользователь не является участником чата
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Установка или версия не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Версия несовместима с текущим мессенджером
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: VERSION_INCOMPATIBLE
+                message: "Version 2.0.0 requires messenger 3.0+, current is 2.1"
+
+    delete:
+      tags: [installations]
+      summary: Удалить плагин из чата
+      description: |
+        Физически удаляет запись установки плагина из чата.
+        Пользователь должен быть участником чата.
+        После удаления плагин перестаёт работать в этом чате.
+        Операция необратима.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+      responses:
+        '204':
+          description: Плагин успешно удалён из чата (тело ответа пустое)
+        '403':
+          description: Пользователь не является участником чата
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Установка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
