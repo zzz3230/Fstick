@@ -216,14 +216,6 @@ function SetStateSchema(schema)
     StateSchema = schema
 end
 
-function RegisterReduce(args)
-
-end
-
-function RegisterEvent(args)
-    return {}
-end
-
 Commands = {}
 function RegisterCommand(args)
     Commands[args.name] = args
@@ -294,7 +286,7 @@ local function is_datetime(v)
 end
 
 local function is_user_id(v)
-    return type(v) == "string" or is_int(v)
+    return type(v) == "string"
 end
 
 
