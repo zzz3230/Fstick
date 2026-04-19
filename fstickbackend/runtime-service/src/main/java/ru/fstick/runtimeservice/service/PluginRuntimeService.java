@@ -1,5 +1,6 @@
 package ru.fstick.runtimeservice.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import ru.fstick.runtimeservice.dto.CommandExecutionResult;
@@ -13,6 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 public class PluginRuntimeService {
 
@@ -21,14 +23,17 @@ public class PluginRuntimeService {
     private final PluginRegistryService pluginRegistryService;
     private final StateProviderService stateProviderService;
 
-    public PluginRuntimeService(
-            PluginRegistryService pluginRegistryService,
-            StateProviderService stateProviderService) {
-        this.pluginRegistryService = pluginRegistryService;
-        this.stateProviderService = stateProviderService;
-    }
-
-
+    /**
+     * Выполняет команду плагина с заданными параметрами
+     * 
+     * @param name имя команды для выполнения
+     * @param pluginId уникальный идентификатор плагина
+     * @param userId идентификатор пользователя, запустившего команду
+     * @param chatId идентификатор чата
+     * @param trackId идентификатор трека для отслеживания
+     * @param args аргументы команды
+     * @return результат выполнения команды
+     */
     public CommandExecutionResult executeCommand(String name,
                                                  UUID pluginId,
                                                  String userId,

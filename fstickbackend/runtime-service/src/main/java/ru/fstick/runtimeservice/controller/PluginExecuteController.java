@@ -1,5 +1,6 @@
 package ru.fstick.runtimeservice.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,16 +14,11 @@ import ru.fstick.runtimeservice.dto.CommandStatus;
 import java.util.Map;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @RestController
 public class PluginExecuteController {
 
     private final PluginRuntimeService pluginRuntimeService;
-
-    public PluginExecuteController(PluginRuntimeService pluginRuntimeService) {
-        this.pluginRuntimeService = pluginRuntimeService;
-    }
-
-
 
 
     @PostMapping("/command")
