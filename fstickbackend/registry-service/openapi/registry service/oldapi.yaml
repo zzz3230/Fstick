@@ -1,0 +1,932 @@
+openapi: 3.0.3
+info:
+  title: Plugin Registry API
+  description: |
+    API для сервиса регистрации плагинов.
+
+    ## Статусы плагинов
+    - `active` — активный плагин, доступен для установки
+    - `hidden` — скрытый, не виден в поиске
+    - `archived` — архивный, недоступен для установки
+    - `deleted` — удалённый (soft delete)
+  version: 1.0.0
+  contact:
+    name: Plugin System Team
+servers:
+  - url: https://api.plugins.example.com
+    description: Production server
+  - url: https://api-dev.plugins.example.com
+    description: Development server
+
+tags:
+  - name: Plugins
+    description: Управление плагинами
+
+paths:
+  /api/v1/plugins:
+    get:
+      tags:
+        - Plugins
+      summary: Получить список плагинов
+      description: Возвращает список плагинов с пагинацией и возможностью фильтрации
+      operationId: listPlugins
+      parameters:
+        - name: page
+          in: query
+          description: Номер страницы (начиная с 1)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Количество элементов на странице
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: category
+          in: query
+          description: Фильтр по категории
+          required: false
+          schema:
+            type: string
+            enum:
+              - utility
+              - integration
+              - social
+              - productivity
+              - entertainment
+        - name: search
+          in: query
+          description: Поиск по названию и описанию
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+        - name: sort
+          in: query
+          description: Сортировка результатов
+          required: false
+          schema:
+            type: string
+            enum: [name, created_at, rating, installs]
+            default: created_at
+        - name: order
+          in: query
+          description: Порядок сортировки
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Plugins
+      summary: Создать новый плагин
+      description: |
+        Регистрирует новый плагин в магазине. Требует роль `creator`.
+
+        При создании:
+        - Название должно быть уникальным (3-50 символов)
+        - Описание до 2000 символов
+        - Версия по SemVer (MAJOR.MINOR.PATCH)
+        - Архив с кодом до 50MB (ZIP или TAR.GZ)
+        - Иконка PNG/JPEG (256x256)
+        - Опционально скриншоты (до 10 штук, до 5MB каждый)
+      operationId: createPlugin
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePluginRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePluginRequest'
+      responses:
+        '201':
+          description: Плагин успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/plugins/{pluginId}:
+    get:
+      tags:
+        - Plugins
+      summary: Получить информацию о плагине
+      description: Возвращает полные метаданные плагина
+      operationId: getPlugin
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Plugins
+      summary: Обновить плагин
+      description: |
+        Обновляет метаданные плагина. Доступно только создателю.
+
+        При обновлении версии требуется указать changelog.
+      operationId: updatePlugin
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdatePluginRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePluginRequest'
+      responses:
+        '200':
+          description: Плагин успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Plugins
+      summary: Удалить плагин
+      description: |
+        Удаляет плагин из магазина. Доступно только создателю.
+
+        Поддерживает три режима:
+        - `delete` — немедленное мягкое удаление (данные хранятся 30 дней)
+        - `archive` — архивирование (можно восстановить)
+        - `cancel` — отмена операции
+      operationId: deletePlugin
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+        - name: action
+          in: query
+          description: Действие при удалении
+          required: true
+          schema:
+            type: string
+            enum: [delete, archive, cancel]
+      responses:
+        '200':
+          description: Операция выполнена успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/plugins/{pluginId}/versions:
+    get:
+      tags:
+        - Plugins
+      summary: Получить список версий плагина
+      description: Возвращает историю версий плагина
+      operationId: listPluginVersions
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Plugins
+      summary: Добавить новую версию плагина
+      description: |
+        Создаёт новую версию плагина. Доступно только создателю.
+
+        Требует:
+        - Обновлённый архив с кодом
+        - changelog с описанием изменений
+        - Новая версия должна быть выше текущей
+      operationId: createPluginVersion
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateVersionRequest'
+      responses:
+        '201':
+          description: Версия успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/plugins/{pluginId}/assets:
+    post:
+      tags:
+        - Plugins
+      summary: Загрузить медиафайлы плагина
+      description: |
+        Загружает иконку и/или скриншоты плагина.
+
+        Ограничения:
+        - Иконка: PNG или JPEG, до 5MB, рекомендуется 256x256
+        - Скриншоты: до 10 штук, PNG или JPEG, до 5MB каждый
+      operationId: uploadPluginAssets
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadAssetsRequest'
+      responses:
+        '201':
+          description: Файлы успешно загружены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Plugins
+      summary: Удалить медиафайл
+      description: Удаляет конкретный скриншот плагина
+      operationId: deletePluginAsset
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+        - name: assetId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Файл успешно удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/plugins/{pluginId}/status:
+    put:
+      tags:
+        - Plugins
+      summary: Изменить статус плагина
+      description: |
+        Изменяет статус плагина. Доступно только создателю.
+
+        Возможные переходы:
+        - `active` → `hidden` (скрыть)
+        - `hidden` → `active` (показать)
+        - `active` → `archived` (архивировать)
+        - `archived` → `active` (восстановить)
+      operationId: updatePluginStatus
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+      responses:
+        '200':
+          description: Статус успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/plugins/{pluginId}/code/client:
+    get:
+      tags:
+        - Plugins
+      summary: Получить исходный код для клиента
+      description: |
+        Получить исходный код плагина для клиента.
+
+      operationId: getPluginCodeClient
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Runtime'
+      responses:
+        '200':
+          description: Исходный код успешно получен
+          content:
+            application/text-plain:
+              schema:
+                $ref: '#/components/schemas/PluginCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/plugins/{pluginId}/code/server:
+    get:
+      tags:
+        - Plugins
+      summary: Получить исходный код для сервера.
+      description: |
+        Получить исходный код плагина для сервера.
+
+      operationId: getPluginCodeServer
+      parameters:
+        - $ref: '#/components/parameters/PluginId'
+        - $ref: '#/components/parameters/Version'
+        - $ref: '#/components/parameters/Runtime'
+      responses:
+        '200':
+          description: Исходный код успешно получен
+          content:
+            application/text-plain:
+              schema:
+                $ref: '#/components/schemas/PluginCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+
+components:
+  parameters:
+    PluginId:
+      name: pluginId
+      in: path
+      required: true
+      description: Уникальный идентификатор плагина
+      schema:
+        type: string
+        format: uuid
+    Version:
+      name: version
+      in: query
+      required: true
+      description: Версия плагина
+      schema:
+        type: string
+    Runtime:
+      name: runtime
+      in: query
+      required: true
+      description: Версия плагина
+      schema:
+        type: string
+
+  schemas:
+    # === Запросы ===
+
+    PluginRequest:
+      type: object
+      required:
+        - name
+        - description
+        - version
+        - changelog
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Zа-яА-ЯёЁ0-9\s][a-zA-Zа-яА-ЯёЁ0-9\s]*[a-zA-Zа-яА-ЯёЁ0-9]$'
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          type: string
+          enum: [utility, integration, social, productivity, entertainment]
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 30
+          maxItems: 10
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+        changelog:
+          type: string
+          maxLength: 2000
+
+    CreatePluginRequest:
+      type: object
+      required:
+        - name
+        - description
+        - version
+        - archive
+        - changelog
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/PluginRequest'
+        archive:
+          type: string
+          format: binary
+          description: Архив с кодом плагина (ZIP или TAR.GZ, до 50MB)
+        icon:
+          type: string
+          format: binary
+          description: Иконка плагина (PNG/JPEG, до 5MB)
+        screenshots:
+          type: array
+          items:
+            type: string
+            format: binary
+          maxItems: 10
+          description: Скриншоты плагина (PNG/JPEG, до 5MB каждый)
+
+    UpdatePluginRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 50
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          type: string
+          enum: [utility, integration, social, productivity, entertainment]
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 30
+          maxItems: 10
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+        changelog:
+          type: string
+          maxLength: 2000
+
+    CreateVersionRequest:
+      type: object
+      required:
+        - version
+        - changelog
+        - archive
+      properties:
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+          description: Новая версия (должна быть выше текущей)
+          example: "1.1.0"
+        changelog:
+          type: string
+          maxLength: 2000
+          description: Список изменений
+          example: "- Added dark mode support\n- Fixed alignment issues"
+        archive:
+          type: string
+          format: binary
+          description: Обновлённый архив (ZIP или TAR.GZ, до 50MB)
+
+    UploadAssetsRequest:
+      type: object
+      properties:
+        icon:
+          type: string
+          format: binary
+          description: Новая иконка (PNG/JPEG, до 5MB)
+        screenshots:
+          type: array
+          items:
+            type: string
+            format: binary
+          maxItems: 10
+          description: Новые скриншоты (PNG/JPEG, до 5MB каждый)
+        position:
+          type: array
+          items:
+            type: integer
+          description: Позиции скриншотов для переупорядочивания
+
+    UpdateStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, hidden, archived]
+          description: Новый статус плагина
+
+    # === Ответы ===
+
+    PluginResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор плагина
+        creator_id:
+          type: string
+          format: uuid
+          description: ID создателя
+        name:
+          type: string
+          description: Название плагина
+        description:
+          type: string
+          description: Описание плагина
+        category:
+          type: string
+          description: Категория
+        tags:
+          type: array
+          items:
+            type: string
+        current_version:
+          type: string
+          description: Текущая версия
+        status:
+          type: string
+          enum: [active, hidden, archived, deleted]
+        icon_url:
+          type: string
+          format: uri
+          description: URL иконки плагина
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PluginCodeResponse:
+      type: string
+      properties:
+        code:
+          type: string
+
+
+    PluginDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/PluginResponse'
+        - type: object
+          properties:
+            versions:
+              type: array
+              items:
+                $ref: '#/components/schemas/VersionInfo'
+            screenshots:
+              type: array
+              items:
+                $ref: '#/components/schemas/AssetInfo'
+            compatibility:
+              type: object
+              properties:
+                min_messenger_version:
+                  type: string
+                  example: "2.5.0"
+                max_messenger_version:
+                  type: string
+                  example: "3.0.0"
+                conflicts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      plugin_id:
+                        type: string
+                      plugin_name:
+                        type: string
+                      reason:
+                        type: string
+
+    PluginListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PluginResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    VersionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        plugin_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        changelog:
+          type: string
+        file_url:
+          type: string
+          format: uri
+        file_checksum:
+          type: string
+          description: SHA-256 checksum файла
+        created_at:
+          type: string
+          format: date-time
+
+    VersionListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VersionInfo'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    VersionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        changelog:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AssetsResponse:
+      type: object
+      properties:
+        icon:
+          $ref: '#/components/schemas/AssetInfo'
+        screenshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetInfo'
+
+    AssetInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [icon, screenshot]
+        url:
+          type: string
+          format: uri
+        thumbnails:
+          type: object
+          additionalProperties:
+            type: string
+            format: uri
+        position:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    DeleteResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Plugin successfully deleted"
+        plugin_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [deleted, archived]
+        deletion_date:
+          type: string
+          format: date-time
+          description: Дата физического удаления (для soft delete)
+
+    # === Вспомогательные схемы ===
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Текущая страница
+        limit:
+          type: integer
+          description: Элементов на странице
+        total:
+          type: integer
+          description: Всего элементов
+        total_pages:
+          type: integer
+          description: Всего страниц
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Код ошибки
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: Сообщение об ошибке
+              example: "Invalid plugin name format"
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: "name"
+                  message:
+                    type: string
+                    example: "Name must be 3-50 characters long"
+                  value:
+                    type: string
+                    example: "ab"
+
+    # === Статусы ошибок ===
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/Error'
+
+  responses:
+    BadRequest:
+      description: Неверный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "BAD_REQUEST"
+              message: "Invalid request parameters"
+              details:
+                - field: "page"
+                  message: "Must be a positive integer"
+                  value: "-1"
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Plugin not found"
+
+    Conflict:
+      description: Конфликт (дубликат)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "CONFLICT"
+              message: "Plugin with this name already exists"
+
+    UnprocessableEntity:
+      description: Ошибка валидации
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "Validation failed"
+              details:
+                - field: "version"
+                  message: "Version must follow SemVer format (MAJOR.MINOR.PATCH)"
+                  value: "1.0"
+
+    InternalServerError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred"
