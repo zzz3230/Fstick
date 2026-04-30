@@ -27,7 +27,8 @@ RUN --mount=target=. \
 # Builds the Dendrite image containing all required binaries
 #
 FROM alpine:latest
-RUN apk --update --no-cache add curl
+RUN apk add --no-cache ca-certificates && update-ca-certificates
+RUN apk update && apk --update --no-cache add curl
 LABEL org.opencontainers.image.title="Dendrite"
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/element-hq/dendrite"

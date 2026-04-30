@@ -445,6 +445,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 						)
 					},
 				),
+				FstickEventPosition: withTransaction(
+					syncReq.Since.FstickEventPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.FstickStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
+				),
 			}
 		} else {
 			// Incremental sync
@@ -527,6 +535,15 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 						return rp.streams.PresenceStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
 							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
+						)
+					},
+				),
+				FstickEventPosition: withTransaction(
+					syncReq.Since.FstickEventPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.FstickStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.FstickEventPosition, rp.Notifier.CurrentPosition().FstickEventPosition,
 						)
 					},
 				),

@@ -15,4 +15,5 @@ const (
 	PublicWellKnownPrefix      = "/.well-known/matrix/"
 	DendriteAdminPathPrefix    = "/_dendrite/"
 	SynapseAdminPathPrefix     = "/_synapse/"
+	FstickAPIPathPrefix        = "/fstick/"
 )

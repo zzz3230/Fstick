@@ -258,6 +258,19 @@ func (n *Notifier) OnNewPresence(
 	n._wakeupUsers(sharedUsers, nil, n.currPos)
 }
 
+// OnNewFstickEvent wakes the /sync stream for a single user when a custom
+// fstick event is pushed for them.
+func (n *Notifier) OnNewFstickEvent(
+	userID string,
+	posUpdate types.StreamingToken,
+) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
+	n._wakeupUsers([]string{userID}, nil, n.currPos)
+}
+
 func (n *Notifier) SharedUsers(userID string) []string {
 	n.lock.RLock()
 	defer n.lock.RUnlock()

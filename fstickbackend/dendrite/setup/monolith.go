@@ -12,6 +12,7 @@ import (
 	"github.com/element-hq/dendrite/clientapi/api"
 	"github.com/element-hq/dendrite/federationapi"
 	federationAPI "github.com/element-hq/dendrite/federationapi/api"
+	"github.com/element-hq/dendrite/fstickapi"
 	"github.com/element-hq/dendrite/internal/caching"
 	"github.com/element-hq/dendrite/internal/httputil"
 	"github.com/element-hq/dendrite/internal/sqlutil"
@@ -24,9 +25,11 @@ import (
 	"github.com/element-hq/dendrite/setup/jetstream"
 	"github.com/element-hq/dendrite/setup/process"
 	"github.com/element-hq/dendrite/syncapi"
+	"github.com/element-hq/dendrite/syncapi/streams"
 	userapi "github.com/element-hq/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/fclient"
+	log "github.com/sirupsen/logrus"
 )
 
 // Monolith represents an instantiation of all dependencies required to build
@@ -71,9 +74,18 @@ func (m *Monolith) AddAllPublicRoutes(
 		processCtx, routers, cfg, natsInstance, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI, enableMetrics,
 	)
 	mediaapi.AddPublicRoutes(routers, cm, cfg, m.UserAPI, m.Client, m.FedClient, m.KeyRing)
-	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics)
+
+	// Create the shared fstick event store before initialising syncapi (which wires
+	// the push callback) and fstickapi (which calls Push to deliver events).
+	fstickStore := streams.NewFstickEventStore()
+
+	syncapi.AddPublicRoutes(processCtx, routers, cfg, cm, natsInstance, m.UserAPI, m.RoomserverAPI, caches, enableMetrics, fstickStore)
+
+	fstickapi.AddRoutes(routers, cfg, m.RoomserverAPI, m.UserAPI, fstickStore)
 
 	if m.RelayAPI != nil {
 		relayapi.AddPublicRoutes(routers, cfg, m.KeyRing, m.RelayAPI)
 	}
+
+	log.Info("==================VERSION NEW==================")
 }

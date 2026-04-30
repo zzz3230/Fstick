@@ -115,6 +115,7 @@ type StreamingToken struct {
 	DeviceListPosition       StreamPosition
 	NotificationDataPosition StreamPosition
 	PresencePosition         StreamPosition
+	FstickEventPosition      StreamPosition
 }
 
 // This will be used as a fallback by json.Marshal.
@@ -130,12 +131,12 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
 		t.InvitePosition, t.AccountDataPosition,
 		t.DeviceListPosition, t.NotificationDataPosition,
-		t.PresencePosition,
+		t.PresencePosition, t.FstickEventPosition,
 	)
 	return posStr
 }
@@ -161,12 +162,14 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.PresencePosition > other.PresencePosition:
 		return true
+	case t.FstickEventPosition > other.FstickEventPosition:
+		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition+t.PresencePosition == 0
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition+t.PresencePosition+t.FstickEventPosition == 0
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -209,6 +212,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.PresencePosition > t.PresencePosition {
 		t.PresencePosition = other.PresencePosition
+	}
+	if other.FstickEventPosition > t.FstickEventPosition {
+		t.FstickEventPosition = other.FstickEventPosition
 	}
 }
 
@@ -305,7 +311,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	// s478_0_0_0_0_13.dl-0-2 but we have now removed partitioned stream positions
 	tok = strings.Split(tok, ".")[0]
 	parts := strings.Split(tok[1:], "_")
-	var positions [9]StreamPosition
+	var positions [10]StreamPosition
 	for i, p := range parts {
 		if i >= len(positions) {
 			break
@@ -328,6 +334,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		DeviceListPosition:       positions[6],
 		NotificationDataPosition: positions[7],
 		PresencePosition:         positions[8],
+		FstickEventPosition:      positions[9],
 	}
 	return token, nil
 }
@@ -350,14 +357,22 @@ type ToDeviceResponse struct {
 
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
 type Response struct {
-	NextBatch                           StreamingToken    `json:"next_batch"`
-	AccountData                         *ClientEvents     `json:"account_data,omitempty"`
-	Presence                            *ClientEvents     `json:"presence,omitempty"`
-	Rooms                               *RoomsResponse    `json:"rooms,omitempty"`
-	ToDevice                            *ToDeviceResponse `json:"to_device,omitempty"`
-	DeviceLists                         *DeviceLists      `json:"device_lists,omitempty"`
-	DeviceListsOTKCount                 map[string]int    `json:"device_one_time_keys_count,omitempty"`
-	DeviceListsUnusedFallbackAlgorithms []string          `json:"device_unused_fallback_key_types"`
+	NextBatch                           StreamingToken      `json:"next_batch"`
+	AccountData                         *ClientEvents       `json:"account_data,omitempty"`
+	Presence                            *ClientEvents       `json:"presence,omitempty"`
+	Rooms                               *RoomsResponse      `json:"rooms,omitempty"`
+	ToDevice                            *ToDeviceResponse   `json:"to_device,omitempty"`
+	DeviceLists                         *DeviceLists        `json:"device_lists,omitempty"`
+	DeviceListsOTKCount                 map[string]int      `json:"device_one_time_keys_count,omitempty"`
+	DeviceListsUnusedFallbackAlgorithms []string            `json:"device_unused_fallback_key_types"`
+	FstickEvents                        []FstickClientEvent `json:"fstick_events,omitempty"`
+}
+
+// FstickClientEvent is a custom event pushed via the Fstick plugin API
+// and delivered to clients through the /sync response under "fstick_events".
+type FstickClientEvent struct {
+	Type    string          `json:"type"`
+	Content json.RawMessage `json:"content,omitempty"`
 }
 
 func (r Response) MarshalJSON() ([]byte, error) {
@@ -396,7 +411,8 @@ func (r *Response) HasUpdates() bool {
 		len(r.Rooms.Peek) > 0 ||
 		len(r.ToDevice.Events) > 0 ||
 		len(r.DeviceLists.Changed) > 0 ||
-		len(r.DeviceLists.Left) > 0)
+		len(r.DeviceLists.Left) > 0 ||
+		len(r.FstickEvents) > 0)
 }
 
 // NewResponse creates an empty response with initialised maps.
@@ -433,7 +449,8 @@ func (r *Response) IsEmpty() bool {
 		len(r.Rooms.Leave) == 0 &&
 		len(r.AccountData.Events) == 0 &&
 		len(r.Presence.Events) == 0 &&
-		len(r.ToDevice.Events) == 0
+		len(r.ToDevice.Events) == 0 &&
+		len(r.FstickEvents) == 0
 }
 
 type UnreadNotifications struct {

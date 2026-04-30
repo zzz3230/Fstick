@@ -30,12 +30,12 @@ func (f *FakeRoomserverAPI) QuerySenderIDForUser(ctx context.Context, roomID spe
 
 func TestSyncTokens(t *testing.T) {
 	shouldPass := map[string]string{
-		"s4_0_0_0_0_0_0_0_3": StreamingToken{4, 0, 0, 0, 0, 0, 0, 0, 3}.String(),
-		"s3_1_0_0_0_0_2_0_5": StreamingToken{3, 1, 0, 0, 0, 0, 2, 0, 5}.String(),
-		"s3_1_2_3_5_0_0_0_6": StreamingToken{3, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
-		"t3_1":               TopologyToken{3, 1}.String(),
+		"s4_0_0_0_0_0_0_0_3_0": StreamingToken{4, 0, 0, 0, 0, 0, 0, 0, 3, 0}.String(),
+		"s3_1_0_0_0_0_2_0_5_0": StreamingToken{3, 1, 0, 0, 0, 0, 2, 0, 5, 0}.String(),
+		"s3_1_2_3_5_0_0_0_6_0": StreamingToken{3, 1, 2, 3, 5, 0, 0, 0, 6, 0}.String(),
+		"t3_1":                 TopologyToken{3, 1}.String(),
 		"t9223372036854775807_9223372036854775807": TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}.String(),
-		"s9223372036854775807_1_2_3_5_0_0_0_6":     StreamingToken{math.MaxInt64, 1, 2, 3, 5, 0, 0, 0, 6}.String(),
+		"s9223372036854775807_1_2_3_5_0_0_0_6_0":   StreamingToken{math.MaxInt64, 1, 2, 3, 5, 0, 0, 0, 6, 0}.String(),
 	}
 
 	for a, b := range shouldPass {
