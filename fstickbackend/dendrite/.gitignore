@@ -1,0 +1,84 @@
+.*.swp
+
+# Hidden files
+# .*
+
+# Allow GitHub config
+!.github
+
+.idea
+
+# Downloads
+/.downloads
+
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+
+# Folders
+/kafka
+/bin
+/pkg
+/_obj
+/_test
+/vendor/bin
+/docker/build
+/logs
+/jetstream
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+*.test
+*.prof
+*.wasm
+*.aar
+*.jar
+*.framework
+*.xcframework
+
+# Generated keys
+*.pem
+*.key
+*.crt
+
+# Default configuration file
+# dendrite.yaml
+
+# Database files
+*.db
+*.db-journal
+
+# Log files
+*.log*
+
+# Generated code
+cmd/dendrite-demo-yggdrasil/embed/fs*.go
+
+# Test dependencies
+test/wasm/node_modules
+
+# Ignore complement folder when running locally
+complement/
+
+# Stuff from GitHub Pages
+docs/_site
+
+media_store/
+
+# golang workspaces
+go.work*
+
+# helm chart
+helm/dendrite/charts/

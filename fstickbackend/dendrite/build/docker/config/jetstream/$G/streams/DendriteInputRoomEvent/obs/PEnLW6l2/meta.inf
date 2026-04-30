@@ -1,0 +1,1 @@
+{"Created":"2026-04-30T13:09:28.516035302Z","Name":"PEnLW6l2","name":"PEnLW6l2","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"replay_policy":"instant","max_ack_pending":1000,"headers_only":true,"deliver_subject":"_INBOX.E8qVLKSWzOlckX9WmNx7DU","num_replicas":0,"metadata":{"_nats.req.level":"0"}}
