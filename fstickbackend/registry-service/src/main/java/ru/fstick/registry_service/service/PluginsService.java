@@ -2,6 +2,7 @@ package ru.fstick.registry_service.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
 import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
@@ -34,6 +35,8 @@ public class PluginsService {
 
 
     //получить список плагинов и их пагинацию по критериям
+
+    @Transactional
     public PluginsView getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
         Integer offset = page * limit;
         List<PluginData> pluginsData = pluginsRepository.getPlugins(offset, limit, category, search, sort, order);
@@ -76,6 +79,7 @@ public class PluginsService {
     }
 
     //получить плагин по id
+    @Transactional
     public PluginViewExtend getPlugin(UUID pluginId) {
         PluginData pluginData = pluginsRepository.getPlugin(pluginId);
 
@@ -114,6 +118,7 @@ public class PluginsService {
 
 
     //обновить метаданные плагина
+    @Transactional
     public PluginViewExtend updatePlugin(UUID pluginId, PluginRequest pluginRequest) {
         PluginData pluginData = pluginsRepository.updatePlugin(
                 pluginId,
@@ -132,10 +137,10 @@ public class PluginsService {
                 .build());});
 
         List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> {ScreenshotView.builder()
+        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
                 .screenshotUrl(screenshot.getS3ScreenshotKey())
-                .build();});
+                .build()));
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
@@ -155,17 +160,23 @@ public class PluginsService {
 
 
     //Удалить плагин
+    @Transactional
     public ChangeStatusResponse deletePlugin(UUID pluginId) {
-        PluginData pluginData = pluginsRepository.deletePlugin(pluginId);
+        // Получаем текущие данные плагина до изменения статуса
+        PluginData before = pluginsRepository.getPlugin(pluginId);
+
+        // Помечаем как удалённый
+        pluginsRepository.deletePlugin(pluginId);
 
         return ChangeStatusResponse.builder()
-                .pluginId(pluginData.getId())
+                .pluginId(pluginId)
                 .newStatus(Status.DELETED.getValue())
-                .oldStatus(pluginData.getStatus())
+                .oldStatus(before.getStatus())
                 .build();
     }
 
     //подтвердить создание плагина
+    @Transactional
     public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
 
         commitPluginRequest.getKeys().forEach(key -> {
@@ -211,6 +222,7 @@ public class PluginsService {
                 .build();
     }
 
+    @Transactional
     public AddPluginResponse initPluginUpload(AddPluginRequest request) {
         UUID pluginId = UUID.randomUUID();
 
@@ -267,6 +279,7 @@ public class PluginsService {
                 .build();
     }
 
+    @Transactional
     public AddVersionResponse initPluginVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
         UUID versionId = UUID.randomUUID();
 
@@ -301,6 +314,7 @@ public class PluginsService {
                 .build();
     }
 
+    @Transactional
     public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest commitVersionRequest) {
 
         commitVersionRequest.getKeys().forEach(key -> {
@@ -313,6 +327,7 @@ public class PluginsService {
         return null;
     }
 
+    @Transactional
     public UpdateAssetsResponse updateAssets(UUID pluginId, UpdateAssetsRequest request) {
         List<FileUploadData> uploads = request.getFiles().stream()
                 .map(file -> {
@@ -343,6 +358,7 @@ public class PluginsService {
                 .build();
     }
 
+    @Transactional
     public PluginViewExtend commitAssets(UUID pluginId, CommitAssetsRequest commitAssetsRequest) {
 
         commitAssetsRequest.getKeys().forEach(key -> {
@@ -354,17 +370,20 @@ public class PluginsService {
         return null;
     }
 
+    @Transactional
     public void deleteAsset(UUID pluginId, UUID assetId) {
         String key = pluginsRepository.getAssetKey(assetId);
 
         s3Service.deleteAsset(key);
     }
 
+    @Transactional
     public ChangeStatusResponse changeStatus(UUID pluginId, Status status) {
         //TODO
         return null;
     }
 
+    @Transactional
     public CodeLinksResponse getPluginCodeClient(UUID pluginId, String version, String runtime) {
         List<String> keys = pluginsRepository.getCodeClient();
 
@@ -378,8 +397,9 @@ public class PluginsService {
                 .build();
     }
 
+    @Transactional
     public CodeLinksResponse getPluginCodeServer(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepository.getServerClient();
+        List<String> keys = pluginsRepository.getCodeServer();
 
         List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
                 .downloadUrl(s3Service.generateDownloadUrl(key))

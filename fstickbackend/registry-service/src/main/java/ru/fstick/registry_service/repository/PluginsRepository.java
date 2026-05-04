@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.model.PluginData;
 import ru.fstick.registry_service.dto.model.Screenshot;
@@ -19,13 +18,11 @@ import java.util.*;
 public class PluginsRepository {
     private final JdbcTemplate jdbcTemplate;
     private final PluginRowMapper pluginRowMapper;
-    private final TagRowMapper tagRowMapper;
     private final VersionRowMapper versionRowMapper;
     private final ScreenshotRowMapper screenshotRowMapper;
     private final CategoryRowMapper categoryRowMapper;
 
     //сделать запрос в базу данных на поиск плагинов
-    @Transactional
     public List<PluginData> getPlugins(Integer offset, Integer limit, String category, String search, String sort, String order) {
 
         String sql =
@@ -69,7 +66,6 @@ public class PluginsRepository {
         return jdbcTemplate.query(sql, pluginRowMapper, "%" + category + "%", "%" + search + "%", "%" + search + "%", limit, offset);
     }
 
-    @Transactional
     public void addPlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags, UUID authorId) {
 
         String sqlCategory =
@@ -106,9 +102,7 @@ public class PluginsRepository {
                         ON CONFLICT (name) DO NOTHING;
                     """;
 
-            jdbcTemplate.batchUpdate(sqlTagsInsert, tags, tags.size(), (ps, arg) -> {
-                ps.setString(1, arg);
-            });
+            jdbcTemplate.batchUpdate(sqlTagsInsert, tags, tags.size(), (ps, arg) -> ps.setString(1, arg));
 
             String inSql = String.join(",", Collections.nCopies(tags.size(), "?"));
 
@@ -133,7 +127,6 @@ public class PluginsRepository {
 
 
     //Получить версии плагина
-    @Transactional
     public List<Version> getVersionsOfPlugin(UUID pluginId) {
         String sql =
         """
@@ -150,7 +143,6 @@ public class PluginsRepository {
     }
 
     //Получить скриншоты плагина
-    @Transactional
     public List<Screenshot> getScreenshots(UUID pluginId) {
         String sql =
                 """
@@ -165,7 +157,6 @@ public class PluginsRepository {
     }
 
     //Получить плагин по id
-    @Transactional
     public PluginData getPlugin(UUID pluginId) {
         String sql =
                 """
@@ -196,41 +187,95 @@ public class PluginsRepository {
 
 
     //обновить метаданные плагина
-    @Transactional
     public PluginData updatePlugin(UUID pluginId, @NotBlank String name, @NotBlank String description, String category, List<String> tags) {
-        return PluginData.builder()
-                .id(pluginId)
-                .authorId(UUID.randomUUID())
-                .name(name)
-                .description(description)
-                .category(category)
-                .tags(tags)
-                .status("active").iconUrlKey("iconurls3key")
-                .createdAt(LocalDateTime.now().toString())
-                .updatedAt(LocalDateTime.now().toString())
-                .build();
-        //TODO
+        if (category != null && !category.isBlank()) {
+            String sqlCategory =
+                    """
+                        SELECT categories.category_id as category_id
+                        FROM categories
+                        WHERE categories.name=?;
+                    """;
+
+            List<UUID> categoryTemp = jdbcTemplate.query(sqlCategory, categoryRowMapper, category);
+            UUID categoryId = categoryTemp.isEmpty() ? null : categoryTemp.get(0);
+
+            String sql =
+                    """
+                        UPDATE plugins SET name=?, description=?, category_id=? WHERE plugin_id=?;
+                    """;
+
+            jdbcTemplate.update(sql, name, description, categoryId, pluginId);
+        } else {
+            String sql =
+                    """
+                        UPDATE plugins SET name=?, description=? WHERE plugin_id=?;
+                    """;
+
+            jdbcTemplate.update(sql, name, description, pluginId);
+        }
+
+        if (tags != null) {
+            String deleteTagsSql =
+                    """
+                        DELETE FROM plugins_tags WHERE plugin_id=?;
+                    """;
+
+            jdbcTemplate.update(deleteTagsSql, pluginId);
+
+            if (!tags.isEmpty()) {
+                List<String> distinctTags = tags.stream().distinct().toList();
+
+                String sqlTagsInsert =
+                        """
+                            INSERT INTO tags (name) VALUES (?)
+                            ON CONFLICT (name) DO NOTHING;
+                        """;
+
+                jdbcTemplate.batchUpdate(sqlTagsInsert, distinctTags, distinctTags.size(), (ps, arg) -> ps.setString(1, arg));
+
+                String inSql = String.join(",", Collections.nCopies(distinctTags.size(), "?"));
+
+                String sqlTags =
+                        "SELECT tag_id FROM tags WHERE name IN (" + inSql + ")";
+
+                List<UUID> tagIds = jdbcTemplate.queryForList(sqlTags, UUID.class, distinctTags.toArray());
+
+                String sqlTagsPluginsInsert =
+                        """
+                            INSERT INTO plugins_tags (plugin_id, tag_id) VALUES (?, ?)
+                            ON CONFLICT DO NOTHING;
+                        """;
+
+                jdbcTemplate.batchUpdate(sqlTagsPluginsInsert, tagIds, tagIds.size(), (ps, arg) -> {
+                    ps.setObject(1, pluginId);
+                    ps.setObject(2, arg);
+                });
+            }
+        }
+
+        return getPlugin(pluginId);
     }
 
 
     //удалить плагин
-    @Transactional
     public PluginData deletePlugin(UUID pluginId) {
-        return PluginData.builder()
-                .id(pluginId)
-                .authorId(UUID.randomUUID())
-                .name("test")
-                .description("mock")
-                .category("social")
-                .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
-                .status("active").iconUrlKey("iconurls3key")
-                .createdAt(LocalDateTime.now().toString())
-                .updatedAt(LocalDateTime.now().toString())
-                .build();
-        //TODO
+        String statusSql = """
+                    SELECT statuses.status_id as status_id
+                    FROM statuses
+                    WHERE statuses.name=?;
+                """;
+
+        UUID statusId = jdbcTemplate.queryForObject(statusSql, UUID.class, Status.DELETED.getValue());
+
+        String sql = """
+                    UPDATE plugins SET status_id=? WHERE plugin_id=?;
+                """;
+
+        jdbcTemplate.update(sql, statusId, pluginId);
+
+        return getPlugin(pluginId);
     }
 
-    @Transactional
     public PluginData addPluginVersion(UUID pluginId) {
         return PluginData.builder()
                 .id(pluginId)
@@ -246,25 +291,21 @@ public class PluginsRepository {
         //TODO
     }
 
-    @Transactional
     public String getAssetKey(UUID assetId) {
         //TODO
         return null;
     }
 
-    @Transactional
     public List<String> getCodeClient() {
         //TODO
         return null;
     }
 
-    @Transactional
-    public List<String> getServerClient() {
+    public List<String> getCodeServer() {
         //TODO
         return null;
     }
 
-    @Transactional
     public PluginData addFiles(UUID pluginId, String s, List<String> allScreenshots, List<String> allFiles) {
         return null;
     }
