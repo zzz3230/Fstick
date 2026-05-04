@@ -276,7 +276,22 @@ public class PluginsRepository {
         return getPlugin(pluginId);
     }
 
-    public PluginData addPluginVersion(UUID pluginId) {
+    //создать версию плагина
+    public UUID createVersion(UUID pluginId, String versionNumber, String changelog) {
+        String sql = """
+                    INSERT INTO versions (version_number, changelog, plugin_id)
+                    VALUES (?, ?, ?)
+                    RETURNING version_id;
+                """;
+
+        return jdbcTemplate.queryForObject(sql, UUID.class, versionNumber, changelog, pluginId);
+    }
+
+    public PluginData addPluginVersion(UUID pluginId, List<String> files) {
+
+
+
+
         return PluginData.builder()
                 .id(pluginId)
                 .authorId(UUID.randomUUID())
@@ -306,7 +321,61 @@ public class PluginsRepository {
         return null;
     }
 
-    public PluginData addFiles(UUID pluginId, String s, List<String> allScreenshots, List<String> allFiles) {
-        return null;
+    public PluginData addFiles(UUID pluginId, String icon, List<String> allScreenshots, List<String> allFiles) {
+        // Обновить иконку плагина
+        if (icon != null && !icon.isBlank()) {
+            String sqlUpdateIcon = """
+                        UPDATE plugins SET s3_icon_key = ? WHERE plugin_id = ?;
+                    """;
+            jdbcTemplate.update(sqlUpdateIcon, icon, pluginId);
+        }
+
+        // Добавить скриншоты
+        if (allScreenshots != null && !allScreenshots.isEmpty()) {
+            String sqlInsertScreenshots = """
+                        INSERT INTO screenshots (plugin_id, s3_screenshot_key)
+                        VALUES (?, ?);
+                    """;
+
+            for (String screenshotKey : allScreenshots) {
+                jdbcTemplate.update(sqlInsertScreenshots, pluginId, screenshotKey);
+            }
+        }
+
+        // Добавить файлы кода к последней версии
+        if (allFiles != null && !allFiles.isEmpty()) {
+            String sqlInsertFiles = """
+                        INSERT INTO files (version_id, s3_file_key)
+                        SELECT v.version_id, ? FROM versions v
+                        WHERE v.plugin_id = ?
+                        ORDER BY v.created_at DESC
+                        LIMIT 1;
+                    """;
+
+            for (String fileKey : allFiles) {
+                jdbcTemplate.update(sqlInsertFiles, fileKey, pluginId);
+            }
+        }
+
+        return getPlugin(pluginId);
+    }
+
+    //перегруженный метод для добавления только файлов кода к версии
+    public PluginData addFiles(UUID pluginId, List<String> files) {
+        if (files != null && !files.isEmpty()) {
+            String sqlInsertFiles = """
+                        INSERT INTO files (version_id, s3_file_key)
+                        SELECT v.version_id, ? FROM versions v
+                        WHERE v.plugin_id = ?
+                        ORDER BY v.created_at DESC
+                        LIMIT 1;
+                    """;
+
+            for (String fileKey : files) {
+                jdbcTemplate.update(sqlInsertFiles, fileKey, pluginId);
+            }
+        }
+
+        return getPlugin(pluginId);
     }
 }

@@ -9,4 +9,5 @@ import java.util.List;
 public class AddPluginVersionRequest {
     private List<FileRequest> files;
     private String version;
+    private String changelog;
 }

@@ -53,7 +53,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(pluginData.getIconUrlKey())
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .build()));
@@ -139,7 +139,7 @@ public class PluginsService {
         List<ScreenshotView> screenshotViews = new ArrayList<>();
         screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(screenshot.getS3ScreenshotKey())
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
                 .build()));
 
         return PluginViewExtend.builder()
@@ -150,7 +150,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(pluginData.getIconUrlKey())
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -166,11 +166,11 @@ public class PluginsService {
         PluginData before = pluginsRepository.getPlugin(pluginId);
 
         // Помечаем как удалённый
-        pluginsRepository.deletePlugin(pluginId);
+        PluginData after = pluginsRepository.deletePlugin(pluginId);
 
         return ChangeStatusResponse.builder()
                 .pluginId(pluginId)
-                .newStatus(Status.DELETED.getValue())
+                .newStatus(after.getStatus())
                 .oldStatus(before.getStatus())
                 .build();
     }
@@ -201,10 +201,10 @@ public class PluginsService {
                 .build());});
 
         List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> {ScreenshotView.builder()
+        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(screenshot.getS3ScreenshotKey())
-                .build();});
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .build()));
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
@@ -214,7 +214,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(pluginData.getIconUrlKey())
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -272,6 +272,9 @@ public class PluginsService {
 
         pluginsRepository.addPlugin(pluginId, request.getName(), request.getDescription(), request.getCategory(), request.getTags(), request.getAuthorId());
 
+        // Создаём первую версию плагина
+        pluginsRepository.createVersion(pluginId, request.getVersion(), "Initial release");
+
         return AddPluginResponse.builder()
                 .pluginId(pluginId)
                 .uploads(uploads)
@@ -281,7 +284,7 @@ public class PluginsService {
 
     @Transactional
     public AddVersionResponse initPluginVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
-        UUID versionId = UUID.randomUUID();
+        UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), request.getChangelog());
 
         List<FileUploadData> uploads = request.getFiles().stream()
                 .map(file -> {
@@ -316,15 +319,41 @@ public class PluginsService {
 
     @Transactional
     public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest commitVersionRequest) {
+        // Привязываем файлы кода к версии (используем перегруженный метод addFiles)
+        PluginData pluginData = pluginsRepository.addFiles(
+                pluginId,
+                MinioKeyParser.getAllFiles(commitVersionRequest.getKeys()));
 
-        commitVersionRequest.getKeys().forEach(key -> {
-            String fileName = key.substring(key.lastIndexOf("/") + 1);
-            byte[] file = s3Service.getObject(key);
-            //VALIDATION TODO
-        });
-        //TODO
+        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
 
-        return null;
+        List<VersionView> versionViews = new ArrayList<>();
+        versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .version(version.getVersion())
+                .changelog(version.getChangelog())
+                .build());});
+
+        List<ScreenshotView> screenshotViews = new ArrayList<>();
+        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
+                .screenshotId(screenshot.getScreenshotId())
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .build()));
+
+        return PluginViewExtend.builder()
+                .id(pluginData.getId())
+                .authorId(pluginData.getAuthorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .versions(versionViews)
+                .screenshots(screenshotViews)
+                .build();
+
     }
 
     @Transactional
