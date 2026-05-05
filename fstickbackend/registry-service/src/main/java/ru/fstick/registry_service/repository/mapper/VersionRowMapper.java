@@ -15,6 +15,7 @@ public class VersionRowMapper implements RowMapper<Version> {
     public Version mapRow(ResultSet rs, int rowNum) throws SQLException {
         return Version.builder()
                 .version(rs.getString("version_number"))
+                .runtime(rs.getString("runtime"))
                 .changelog(rs.getString("changelog"))
                 .versionId(rs.getObject("version_id", UUID.class))
                 .createdAt(rs.getString("created_at"))

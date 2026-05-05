@@ -10,7 +10,6 @@ import ru.fstick.registry_service.dto.model.Screenshot;
 import ru.fstick.registry_service.dto.model.Version;
 import ru.fstick.registry_service.repository.mapper.*;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Repository
@@ -134,6 +133,7 @@ public class PluginsRepository {
                    plugin_id as plugin_id,
                    changelog as changelog,
                    version_number as version_number,
+                   runtime as runtime,
                    created_at as created_at
             FROM versions
             WHERE plugin_id=?;
@@ -277,51 +277,39 @@ public class PluginsRepository {
     }
 
     //создать версию плагина
-    public UUID createVersion(UUID pluginId, String versionNumber, String changelog) {
+    public UUID createVersion(UUID pluginId, String versionNumber, String changelog, String runtime) {
         String sql = """
-                    INSERT INTO versions (version_number, changelog, plugin_id)
-                    VALUES (?, ?, ?)
+                    INSERT INTO versions (version_number, changelog, runtime, plugin_id)
+                    VALUES (?, ?, ?, ?)
                     RETURNING version_id;
                 """;
 
-        return jdbcTemplate.queryForObject(sql, UUID.class, versionNumber, changelog, pluginId);
+        return jdbcTemplate.queryForObject(sql, UUID.class, versionNumber, changelog, runtime, pluginId);
     }
 
-    public PluginData addPluginVersion(UUID pluginId, List<String> files) {
+    public String getScreenshotKey(UUID pluginId, UUID screenshotId) {
+        String sql = """
+                    SELECT s3_screenshot_key FROM screenshots
+                    WHERE plugin_id=? AND screenshot_id=?;
+                """;
 
-
-
-
-        return PluginData.builder()
-                .id(pluginId)
-                .authorId(UUID.randomUUID())
-                .name("test")
-                .description("mock")
-                .category("social")
-                .tags(new ArrayList<>(Arrays.asList("tag1", "tag2", "tag3")))
-                .status("active").iconUrlKey("iconurls3key")
-                .createdAt(LocalDateTime.now().toString())
-                .updatedAt(LocalDateTime.now().toString())
-                .build();
-        //TODO
+        return jdbcTemplate.queryForObject(sql, String.class, pluginId, screenshotId);
     }
 
-    public String getAssetKey(UUID assetId) {
-        //TODO
-        return null;
+    public List<String> getCode(UUID pluginId, String version, String runtime) {
+        String getCodeClientSql =
+                """
+                    SELECT s3_file_key FROM files
+                    WHERE version_id = (
+                        SELECT version_id FROM versions
+                        WHERE plugin_id = ? AND version_number = ? AND runtime = ?
+                    );
+                """;
+
+        return jdbcTemplate.queryForList(getCodeClientSql, String.class, pluginId, version, runtime);
     }
 
-    public List<String> getCodeClient() {
-        //TODO
-        return null;
-    }
-
-    public List<String> getCodeServer() {
-        //TODO
-        return null;
-    }
-
-    public PluginData addFiles(UUID pluginId, String icon, List<String> allScreenshots, List<String> allFiles) {
+    public PluginData addFiles(UUID pluginId, UUID versionId, String icon, List<String> allScreenshots, List<String> allFiles) {
         // Обновить иконку плагина
         if (icon != null && !icon.isBlank()) {
             String sqlUpdateIcon = """
@@ -342,40 +330,96 @@ public class PluginsRepository {
             }
         }
 
-        // Добавить файлы кода к последней версии
+        // Добавить файлы кода к конкретной версии
         if (allFiles != null && !allFiles.isEmpty()) {
             String sqlInsertFiles = """
                         INSERT INTO files (version_id, s3_file_key)
-                        SELECT v.version_id, ? FROM versions v
-                        WHERE v.plugin_id = ?
-                        ORDER BY v.created_at DESC
-                        LIMIT 1;
+                        VALUES (?, ?);
                     """;
 
             for (String fileKey : allFiles) {
-                jdbcTemplate.update(sqlInsertFiles, fileKey, pluginId);
+                jdbcTemplate.update(sqlInsertFiles, versionId, fileKey);
             }
         }
 
         return getPlugin(pluginId);
     }
 
-    //перегруженный метод для добавления только файлов кода к версии
-    public PluginData addFiles(UUID pluginId, List<String> files) {
+
+
+    private UUID getVersionId(UUID pluginId, String versionNumber) {
+        String sql = """
+                    SELECT version_id FROM versions
+                    WHERE plugin_id = ? AND version_number = ?;
+                """;
+
+        return jdbcTemplate.queryForObject(sql, UUID.class, pluginId, versionNumber);
+    }
+
+    public PluginData addVersion(UUID pluginId, String versionNumber, List<String> files) {
         if (files != null && !files.isEmpty()) {
+            UUID versionId = getVersionId(pluginId, versionNumber);
+
             String sqlInsertFiles = """
                         INSERT INTO files (version_id, s3_file_key)
-                        SELECT v.version_id, ? FROM versions v
-                        WHERE v.plugin_id = ?
-                        ORDER BY v.created_at DESC
-                        LIMIT 1;
+                        VALUES (?, ?);
                     """;
 
             for (String fileKey : files) {
-                jdbcTemplate.update(sqlInsertFiles, fileKey, pluginId);
+                jdbcTemplate.update(sqlInsertFiles, versionId, fileKey);
             }
         }
 
         return getPlugin(pluginId);
+    }
+
+    public PluginData addScreenshots(UUID pluginId, List<String> screenshots) {
+        if (screenshots != null && !screenshots.isEmpty()) {
+            String sqlInsertScreenshots = """
+                        INSERT INTO screenshots (plugin_id, s3_screenshot_key)
+                        VALUES (?, ?);
+                    """;
+
+            for (String screenshotKey : screenshots) {
+                jdbcTemplate.update(sqlInsertScreenshots, pluginId, screenshotKey);
+            }
+        }
+
+        return getPlugin(pluginId);
+    }
+
+    public void deleteScreenshot(UUID screenshotId) {
+        String deleteScreenshotSql =
+                """
+                DELETE FROM screenshots WHERE screenshot_id = ?;
+                """;
+
+        jdbcTemplate.update(deleteScreenshotSql, screenshotId);
+    }
+
+    public void changeStatus(UUID pluginId, Status status) {
+        String changeStatusSql =
+                """
+                    UPDATE plugins SET status_id = (
+                        SELECT status_id FROM statuses WHERE name = ?
+                    ) WHERE plugin_id = ?;
+                """;
+
+        jdbcTemplate.update(changeStatusSql, status.getValue(), pluginId);
+    }
+
+    public Integer getPluginsTotal(String category, String search) {
+        String pluginsTotalSql =
+                """
+                    SELECT COUNT(DISTINCT p.plugin_id)
+                    FROM plugins p
+                    LEFT JOIN categories c USING(category_id)
+                    LEFT JOIN plugins_tags pt USING(plugin_id)
+                    LEFT JOIN tags t USING(tag_id)
+                    WHERE c.name ILIKE ?
+                      AND (p.name ILIKE ? OR p.description ILIKE ?);
+                """;
+
+        return jdbcTemplate.queryForObject(pluginsTotalSql, Integer.class, "%" + category + "%", "%" + search + "%", "%" + search + "%");
     }
 }

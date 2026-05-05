@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
-import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitScreenshotsRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
 import ru.fstick.registry_service.dto.api.response.*;
@@ -59,7 +59,7 @@ public class PluginsService {
                 .build()));
 
 
-        int pluginsTotal = pluginsData.size();
+        int pluginsTotal = pluginsRepository.getPluginsTotal(category, search);
 
         int totalPages = (int) Math.ceil((double) pluginsTotal / limit);
 
@@ -187,6 +187,7 @@ public class PluginsService {
 
         PluginData pluginData = pluginsRepository.addFiles(
                 pluginId,
+                commitPluginRequest.getVersionId(),
                 MinioKeyParser.getAllIcons(commitPluginRequest.getKeys()).get(0),
                 MinioKeyParser.getAllScreenshots(commitPluginRequest.getKeys()),
                 MinioKeyParser.getAllFiles(commitPluginRequest.getKeys()));
@@ -273,10 +274,11 @@ public class PluginsService {
         pluginsRepository.addPlugin(pluginId, request.getName(), request.getDescription(), request.getCategory(), request.getTags(), request.getAuthorId());
 
         // Создаём первую версию плагина
-        pluginsRepository.createVersion(pluginId, request.getVersion(), "Initial release");
+        UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), "Initial release", request.getRuntime());
 
         return AddPluginResponse.builder()
                 .pluginId(pluginId)
+                .versionId(versionId)
                 .uploads(uploads)
                 .iconUpload(iconUpload)
                 .build();
@@ -284,7 +286,7 @@ public class PluginsService {
 
     @Transactional
     public AddVersionResponse initPluginVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
-        UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), request.getChangelog());
+        UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), request.getChangelog(), request.getRuntime());
 
         List<FileUploadData> uploads = request.getFiles().stream()
                 .map(file -> {
@@ -319,9 +321,9 @@ public class PluginsService {
 
     @Transactional
     public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest commitVersionRequest) {
-        // Привязываем файлы кода к версии (используем перегруженный метод addFiles)
-        PluginData pluginData = pluginsRepository.addFiles(
+        PluginData pluginData = pluginsRepository.addVersion(
                 pluginId,
+                commitVersionRequest.getVersion(),
                 MinioKeyParser.getAllFiles(commitVersionRequest.getKeys()));
 
         List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
@@ -357,7 +359,7 @@ public class PluginsService {
     }
 
     @Transactional
-    public UpdateAssetsResponse updateAssets(UUID pluginId, UpdateAssetsRequest request) {
+    public UpdateScreenshotsResponse updateScreenshots(UUID pluginId, UpdateScreenshotsRequest request) {
         List<FileUploadData> uploads = request.getFiles().stream()
                 .map(file -> {
                     TypeParser.Result resultType = TypeParser.parse(file.getType());
@@ -381,42 +383,78 @@ public class PluginsService {
                 })
                 .toList();
 
-        return UpdateAssetsResponse.builder()
+        return UpdateScreenshotsResponse.builder()
                 .pluginId(pluginId)
                 .uploads(uploads)
                 .build();
     }
 
     @Transactional
-    public PluginViewExtend commitAssets(UUID pluginId, CommitAssetsRequest commitAssetsRequest) {
+    public PluginViewExtend commitScreenshots(UUID pluginId, CommitScreenshotsRequest commitScreenshotsRequest) {
 
-        commitAssetsRequest.getKeys().forEach(key -> {
-            String fileName = key.substring(key.lastIndexOf("/") + 1);
-            byte[] file = s3Service.getObject(key);
-            //VALIDATION TODO
-        });
+        PluginData pluginData = pluginsRepository.addScreenshots(
+                pluginId,
+                MinioKeyParser.getAllFiles(commitScreenshotsRequest.getKeys()));
 
-        return null;
+        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
+        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
+
+        List<VersionView> versionViews = new ArrayList<>();
+        versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .version(version.getVersion())
+                .changelog(version.getChangelog())
+                .build());});
+
+        List<ScreenshotView> screenshotViews = new ArrayList<>();
+        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
+                .screenshotId(screenshot.getScreenshotId())
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .build()));
+
+        return PluginViewExtend.builder()
+                .id(pluginData.getId())
+                .authorId(pluginData.getAuthorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .versions(versionViews)
+                .screenshots(screenshotViews)
+                .build();
     }
 
     @Transactional
-    public void deleteAsset(UUID pluginId, UUID assetId) {
-        String key = pluginsRepository.getAssetKey(assetId);
+    public void deleteScreenshot(UUID pluginId, UUID screenshotId) {
+        String key = pluginsRepository.getScreenshotKey(pluginId, screenshotId);
 
-        s3Service.deleteAsset(key);
+        s3Service.deleteScreenshot(key);
+        pluginsRepository.deleteScreenshot(screenshotId);
     }
 
     @Transactional
     public ChangeStatusResponse changeStatus(UUID pluginId, Status status) {
-        //TODO
-        return null;
+        PluginData before = pluginsRepository.getPlugin(pluginId);
+        pluginsRepository.changeStatus(pluginId, status);
+        PluginData after = pluginsRepository.getPlugin(pluginId);
+        return ChangeStatusResponse.builder()
+                .pluginId(pluginId)
+                .oldStatus(before.getStatus())
+                .newStatus(after.getStatus())
+                .build();
     }
 
     @Transactional
     public CodeLinksResponse getPluginCodeClient(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepository.getCodeClient();
+        List<String> keys = pluginsRepository.getCode(pluginId, version, runtime);
 
-        List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
+        List<String> clientKeys = s3Service.getOnlyClientKeys(keys);
+
+
+        List<FileDownloadData> downloads = clientKeys.stream().map(key -> FileDownloadData.builder()
                 .downloadUrl(s3Service.generateDownloadUrl(key))
                 .build()).toList();
 
@@ -428,9 +466,12 @@ public class PluginsService {
 
     @Transactional
     public CodeLinksResponse getPluginCodeServer(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepository.getCodeServer();
+        List<String> keys = pluginsRepository.getCode(pluginId, version, runtime);
 
-        List<FileDownloadData> downloads = keys.stream().map(key -> FileDownloadData.builder()
+        List<String> serverKeys = s3Service.getOnlyServerKeys(keys);
+
+
+        List<FileDownloadData> downloads = serverKeys.stream().map(key -> FileDownloadData.builder()
                 .downloadUrl(s3Service.generateDownloadUrl(key))
                 .build()).toList();
 

@@ -15,8 +15,8 @@ CREATE TABLE "plugins" (
     "plugin_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "name" VARCHAR(50) NOT NULL,
     "description" VARCHAR(2000),
-    "status_id" UUID NOT NULL REFERENCES statuses(status_id) ON DELETE SET NULL,
-    "category_id" UUID NOT NULL REFERENCES categories(category_id) ON DELETE SET NULL,
+    "status_id" UUID NOT NULL REFERENCES statuses(status_id),
+    "category_id" UUID NOT NULL REFERENCES categories(category_id),
     "author_id" UUID NOT NULL,
     "s3_icon_key" VARCHAR(300) UNIQUE,
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -39,6 +39,7 @@ CREATE TABLE "versions" (
     "version_number" VARCHAR(50) NOT NULL,
     "changelog" VARCHAR(2000) NOT NULL,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    "runtime" VARCHAR(100) NOT NULL,
     "plugin_id" UUID REFERENCES plugins(plugin_id) ON DELETE CASCADE,
     UNIQUE (plugin_id, version_number)
 );
@@ -149,27 +150,32 @@ WHERE (p.name = 'Smart Analytics' AND t.name IN ('AI', 'dashboard'))
 INSERT INTO versions (
     version_number,
     changelog,
+    runtime,
     plugin_id
 )
 VALUES
     (
         '1.0.0',
         'Initial release with core features.',
+        '1.0.0',
         (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics')
     ),
     (
         '1.1.0',
         'Added predictive models.',
+        '1.0.0',
         (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics')
     ),
     (
         '0.1.0',
         'Beta release of automation engine.',
+        '1.0.0',
         (SELECT plugin_id FROM plugins WHERE name = 'Task Automator')
     ),
     (
         '2.0.0',
         'Major security overhaul.',
+        '1.0.0',
         (SELECT plugin_id FROM plugins WHERE name = 'Secure Auth')
     );
 

@@ -11,6 +11,7 @@ public class Version {
     private UUID versionId;
     private UUID pluginId;
     private String version;
+    private String runtime;
     private String changelog;
     private String createdAt;
 }

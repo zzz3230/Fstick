@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
-import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitScreenshotsRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
 import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
 import ru.fstick.registry_service.dto.api.response.*;
@@ -37,7 +37,7 @@ public class PluginsController {
 
     //добавить новый плагин
     @PostMapping
-    public AddPluginResponse addPlugin(@RequestBody AddPluginRequest request) {
+    public AddPluginResponse addPlugin(@RequestBody @Valid AddPluginRequest request) {
 
         return pluginsService.initPluginUpload(request);
     }
@@ -46,7 +46,7 @@ public class PluginsController {
     @PostMapping("/{pluginId}/commit")
     public PluginViewExtend commitPlugin(
             @PathVariable UUID pluginId,
-            @RequestBody CommitPluginRequest request) {
+            @RequestBody @Valid CommitPluginRequest request) {
 
         return pluginsService.commitPlugin(pluginId, request);
     }
@@ -76,7 +76,7 @@ public class PluginsController {
 
     @PostMapping(path = "/{pluginId}/versions")
     public AddVersionResponse addPluginVersion(@PathVariable UUID pluginId,
-                                               @RequestBody AddPluginVersionRequest request) {
+                                               @RequestBody @Valid AddPluginVersionRequest request) {
 
         return pluginsService.initPluginVersionUpload(pluginId, request);
 
@@ -85,30 +85,30 @@ public class PluginsController {
     @PostMapping("/{pluginId}/versions/commit")
     public PluginViewExtend commitVersion(
             @PathVariable UUID pluginId,
-            @RequestBody CommitVersionRequest request) {
+            @RequestBody @Valid CommitVersionRequest request) {
 
         return pluginsService.commitVersion(pluginId, request);
     }
 
-    @PostMapping("/{pluginId}/assets")
-    public UpdateAssetsResponse updateAssets(@PathVariable UUID pluginId,
-                                             @RequestBody UpdateAssetsRequest request) {
+    @PostMapping("/{pluginId}/screenshots")
+    public UpdateScreenshotsResponse updateScreenshots(@PathVariable UUID pluginId,
+                                                       @RequestBody @Valid UpdateScreenshotsRequest request) {
 
-        return pluginsService.updateAssets(pluginId, request);
+        return pluginsService.updateScreenshots(pluginId, request);
     }
 
-    @PostMapping("/{pluginId}/assets/commit")
-    public PluginViewExtend commitAssets(@PathVariable UUID pluginId,
-                                         @RequestBody CommitAssetsRequest request) {
+    @PostMapping("/{pluginId}/screenshots/commit")
+    public PluginViewExtend commitScreenshots(@PathVariable UUID pluginId,
+                                              @RequestBody @Valid CommitScreenshotsRequest request) {
 
-        return pluginsService.commitAssets(pluginId, request);
+        return pluginsService.commitScreenshots(pluginId, request);
     }
 
-    @DeleteMapping("/{pluginId}/assets/{assetId}")
-    public void deleteAssets(@PathVariable UUID pluginId,
-                             @PathVariable UUID assetId) {
+    @DeleteMapping("/{pluginId}/screenshots/{screenshotId}")
+    public void deleteScreenshot(@PathVariable UUID pluginId,
+                                 @PathVariable UUID screenshotId) {
 
-        pluginsService.deleteAsset(pluginId, assetId);
+        pluginsService.deleteScreenshot(pluginId, screenshotId);
     }
 
     @PutMapping("/{pluginId}/status")
