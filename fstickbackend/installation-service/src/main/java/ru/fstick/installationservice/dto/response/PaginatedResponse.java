@@ -1,14 +1,16 @@
 package ru.fstick.installationservice.dto.response;
 
+import lombok.Getter;
+
 import java.util.List;
 
+@Getter
 public class PaginatedResponse<T> {
-
-    private List<T> data;
-    private int page;
-    private int limit;
-    private int totalCount;
-    private boolean hasNext;
+    private final List<T> data;
+    private final int page;
+    private final int limit;
+    private final int totalCount;
+    private final boolean hasNext;
 
     public PaginatedResponse(List<T> data, int page, int limit, int totalCount) {
         this.data = data;
@@ -17,10 +19,4 @@ public class PaginatedResponse<T> {
         this.totalCount = totalCount;
         this.hasNext = (long) page * limit < totalCount;
     }
-
-    public List<T> getData() { return data; }
-    public int getPage() { return page; }
-    public int getLimit() { return limit; }
-    public int getTotalCount() { return totalCount; }
-    public boolean isHasNext() { return hasNext; }
 }
