@@ -136,7 +136,8 @@ public class PluginsRepository {
                    runtime as runtime,
                    created_at as created_at
             FROM versions
-            WHERE plugin_id=?;
+            WHERE plugin_id=?
+            ORDER BY version_number DESC;
         """;
 
         return jdbcTemplate.query(sql, versionRowMapper, pluginId);
@@ -332,13 +333,36 @@ public class PluginsRepository {
 
         // Добавить файлы кода к конкретной версии
         if (allFiles != null && !allFiles.isEmpty()) {
+            // если versionId не был передан, пытаемся извлечь номер версии из ключей
+            UUID resolvedVersionId = versionId;
+
+            if (resolvedVersionId == null) {
+                // Попробуем извлечь версию из первого ключа вида .../versions/{version}/...
+                String firstKey = allFiles.get(0);
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile(".*/versions/([^/]+)/.*").matcher(firstKey);
+                if (m.matches()) {
+                    String versionNumber = m.group(1);
+                    try {
+                        resolvedVersionId = getVersionId(pluginId, versionNumber);
+                    } catch (Exception ex) {
+                        throw new RuntimeException("Failed to resolve version id for version '" + versionNumber + "'", ex);
+                    }
+                } else {
+                    throw new RuntimeException("Unable to resolve version from file key: " + firstKey);
+                }
+            }
+
+            if (resolvedVersionId == null) {
+                throw new RuntimeException("Version id is not provided and could not be resolved from file keys");
+            }
+
             String sqlInsertFiles = """
                         INSERT INTO files (version_id, s3_file_key)
                         VALUES (?, ?);
                     """;
 
             for (String fileKey : allFiles) {
-                jdbcTemplate.update(sqlInsertFiles, versionId, fileKey);
+                jdbcTemplate.update(sqlInsertFiles, resolvedVersionId, fileKey);
             }
         }
 
@@ -356,9 +380,17 @@ public class PluginsRepository {
         return jdbcTemplate.queryForObject(sql, UUID.class, pluginId, versionNumber);
     }
 
-    public PluginData addVersion(UUID pluginId, String versionNumber, List<String> files) {
+    public UUID getVersionPluginId(UUID versionId) {
+        String sql = """
+                    SELECT plugin_id FROM versions
+                    WHERE version_id = ?;
+                """;
+
+        return jdbcTemplate.queryForObject(sql, UUID.class, versionId);
+    }
+
+    public PluginData addVersion(UUID pluginId, UUID versionId, List<String> files) {
         if (files != null && !files.isEmpty()) {
-            UUID versionId = getVersionId(pluginId, versionNumber);
 
             String sqlInsertFiles = """
                         INSERT INTO files (version_id, s3_file_key)

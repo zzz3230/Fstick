@@ -78,7 +78,7 @@ public class PluginsController {
     public AddVersionResponse addPluginVersion(@PathVariable UUID pluginId,
                                                @RequestBody @Valid AddPluginVersionRequest request) {
 
-        return pluginsService.initPluginVersionUpload(pluginId, request);
+        return pluginsService.initVersionUpload(pluginId, request);
 
     }
 

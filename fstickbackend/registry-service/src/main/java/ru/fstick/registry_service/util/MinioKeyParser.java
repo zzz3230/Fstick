@@ -14,7 +14,7 @@ public class MinioKeyParser {
             Pattern.compile(".*/versions/[^/]+/.+");
     public static KeyType resolveType(String key) {
         if (key == null || key.isBlank()) {
-            return KeyType.FILE;
+            return KeyType.UNDEFINED;
         }
 
         if (ICON_PATTERN.matcher(key).matches()) {

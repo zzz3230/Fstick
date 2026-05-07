@@ -579,15 +579,13 @@ components:
             $ref: "#/components/schemas/FileUploadData"
     CommitVersionRequest:
       required:
-      - changelog
       - keys
-      - version
+      - versionId
       type: object
       properties:
-        version:
+        versionId:
           type: string
-        changelog:
-          type: string
+          format: uuid
         keys:
           type: array
           items:

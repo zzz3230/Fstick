@@ -179,16 +179,31 @@ public class PluginsService {
     @Transactional
     public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
 
+        try {
+            UUID versionOwner = pluginsRepository.getVersionPluginId(commitPluginRequest.getVersionId());
+            if (!pluginId.equals(versionOwner)) {
+                throw new RuntimeException("Provided versionId does not belong to plugin");
+            }
+        } catch (Exception ex) {
+            throw new RuntimeException("Invalid versionId: " + commitPluginRequest.getVersionId(), ex);
+        }
+
         commitPluginRequest.getKeys().forEach(key -> {
-            String fileName = key.substring(key.lastIndexOf("/") + 1);
-            byte[] file = s3Service.getObject(key);
-            //VALIDATION TODO
+            try {
+                s3Service.getObject(key);
+                //TODO VALIDATION
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to read object for key: " + key, ex);
+            }
         });
+
+        List<String> icons = MinioKeyParser.getAllIcons(commitPluginRequest.getKeys());
+        String icon = icons.isEmpty() ? null : icons.get(0);
 
         PluginData pluginData = pluginsRepository.addFiles(
                 pluginId,
                 commitPluginRequest.getVersionId(),
-                MinioKeyParser.getAllIcons(commitPluginRequest.getKeys()).get(0),
+                icon,
                 MinioKeyParser.getAllScreenshots(commitPluginRequest.getKeys()),
                 MinioKeyParser.getAllFiles(commitPluginRequest.getKeys()));
 
@@ -285,7 +300,7 @@ public class PluginsService {
     }
 
     @Transactional
-    public AddVersionResponse initPluginVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
+    public AddVersionResponse initVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
         UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), request.getChangelog(), request.getRuntime());
 
         List<FileUploadData> uploads = request.getFiles().stream()
@@ -321,9 +336,14 @@ public class PluginsService {
 
     @Transactional
     public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest commitVersionRequest) {
+        UUID versionOwner = pluginsRepository.getVersionPluginId(commitVersionRequest.getVersionId());
+        if (!pluginId.equals(versionOwner)) {
+            throw new RuntimeException("Provided versionId does not belong to plugin");
+        }
+
         PluginData pluginData = pluginsRepository.addVersion(
                 pluginId,
-                commitVersionRequest.getVersion(),
+                commitVersionRequest.getVersionId(),
                 MinioKeyParser.getAllFiles(commitVersionRequest.getKeys()));
 
         List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
@@ -394,7 +414,7 @@ public class PluginsService {
 
         PluginData pluginData = pluginsRepository.addScreenshots(
                 pluginId,
-                MinioKeyParser.getAllFiles(commitScreenshotsRequest.getKeys()));
+                MinioKeyParser.getAllScreenshots(commitScreenshotsRequest.getKeys()));
 
         List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
         List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
