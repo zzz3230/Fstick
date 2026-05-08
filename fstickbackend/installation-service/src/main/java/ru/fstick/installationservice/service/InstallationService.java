@@ -89,7 +89,7 @@ public class InstallationService {
 
     // Заглушка для Integration Service
     private void checkChatMembership(String userId, String chatId) {
-        // TODO: вызов к Integration Service
+        // TODO: вызов к Integration Service и здесь будем кидать ForbiddenException
     }
 
     private InstallationResponse toResponse(Installation i) {

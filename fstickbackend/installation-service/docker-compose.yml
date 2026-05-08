@@ -1,0 +1,16 @@
+services:
+  installation-db:
+    image: postgres:16
+    container_name: installation-db
+    environment:
+      POSTGRES_DB: installation_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./installation service database/installation service database.sql:/docker-entrypoint-initdb.d/init.sql
+      - installation-db-data:/var/lib/postgresql/data
+
+volumes:
+  installation-db-data:
