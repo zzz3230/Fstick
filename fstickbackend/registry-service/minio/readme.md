@@ -31,6 +31,7 @@ f-stick-plugins/
                     └── lua/ # язык
                         └── 1.0.0/ # версия
                             └── main.lua
+        └── icon.png
 ```
 
 ## 3. Соглашения об именовании (Naming Convention)

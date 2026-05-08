@@ -134,7 +134,7 @@ paths:
         required: false
         schema:
           type: string
-          default: name
+          default: plugin_name
       - name: order
         in: query
         required: false
@@ -215,6 +215,56 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PluginViewExtend"
+  /api/v1/plugins/{pluginId}/screenshots:
+    post:
+      tags:
+      - plugins-controller
+      operationId: updateScreenshots
+      parameters:
+      - name: pluginId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScreenshotsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UpdateScreenshotsResponse"
+  /api/v1/plugins/{pluginId}/screenshots/commit:
+    post:
+      tags:
+      - plugins-controller
+      operationId: commitScreenshots
+      parameters:
+      - name: pluginId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommitScreenshotsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PluginViewExtend"
   /api/v1/plugins/{pluginId}/commit:
     post:
       tags:
@@ -232,56 +282,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CommitPluginRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PluginViewExtend"
-  /api/v1/plugins/{pluginId}/assets:
-    post:
-      tags:
-      - plugins-controller
-      operationId: updateAssets
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateAssetsRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UpdateAssetsResponse"
-  /api/v1/plugins/{pluginId}/assets/commit:
-    post:
-      tags:
-      - plugins-controller
-      operationId: commitAssets
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CommitAssetsRequest"
         required: true
       responses:
         "200":
@@ -348,11 +348,11 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CodeLinksResponse"
-  /api/v1/plugins/{pluginId}/assets/{assetId}:
+  /api/v1/plugins/{pluginId}/screenshots/{screenshotId}:
     delete:
       tags:
       - plugins-controller
-      operationId: deleteAssets
+      operationId: deleteScreenshot
       parameters:
       - name: pluginId
         in: path
@@ -360,7 +360,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: assetId
+      - name: screenshotId
         in: path
         required: true
         schema:
@@ -378,12 +378,20 @@ components:
       type: object
       properties:
         name:
+          maxLength: 50
+          minLength: 0
           type: string
         description:
+          maxLength: 2000
+          minLength: 0
           type: string
         category:
+          maxLength: 50
+          minLength: 0
           type: string
         tags:
+          maxItems: 20
+          minItems: 0
           type: array
           items:
             type: string
@@ -393,7 +401,7 @@ components:
         id:
           type: string
           format: uuid
-        creatorId:
+        authorId:
           type: string
           format: uuid
         name:
@@ -433,7 +441,7 @@ components:
     VersionView:
       type: object
       properties:
-        id:
+        versionId:
           type: string
           format: uuid
         version:
@@ -453,13 +461,55 @@ components:
         oldStatus:
           type: string
     AddPluginRequest:
+      required:
+      - authorId
+      - description
+      - files
+      - icon
+      - name
+      - runtime
+      - version
       type: object
       properties:
+        version:
+          maxLength: 50
+          minLength: 0
+          type: string
+        runtime:
+          maxLength: 100
+          minLength: 0
+          type: string
         files:
           type: array
           items:
             $ref: "#/components/schemas/FileRequest"
+        icon:
+          $ref: "#/components/schemas/FileRequest"
+        name:
+          maxLength: 50
+          minLength: 0
+          type: string
+        description:
+          maxLength: 2000
+          minLength: 0
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        category:
+          maxLength: 50
+          minLength: 0
+          type: string
+        tags:
+          maxItems: 20
+          minItems: 0
+          type: array
+          items:
+            type: string
     FileRequest:
+      required:
+      - fileName
+      - type
       type: object
       properties:
         fileName:
@@ -472,10 +522,15 @@ components:
         pluginId:
           type: string
           format: uuid
+        versionId:
+          type: string
+          format: uuid
         uploads:
           type: array
           items:
             $ref: "#/components/schemas/FileUploadData"
+        iconUpload:
+          $ref: "#/components/schemas/FileUploadData"
     FileUploadData:
       type: object
       properties:
@@ -486,12 +541,29 @@ components:
         uploadUrl:
           type: string
     AddPluginVersionRequest:
+      required:
+      - changelog
+      - files
+      - runtime
+      - version
       type: object
       properties:
         files:
           type: array
           items:
             $ref: "#/components/schemas/FileRequest"
+        version:
+          maxLength: 50
+          minLength: 0
+          type: string
+        changelog:
+          maxLength: 2000
+          minLength: 0
+          type: string
+        runtime:
+          maxLength: 100
+          minLength: 0
+          type: string
     AddVersionResponse:
       type: object
       properties:
@@ -506,43 +578,59 @@ components:
           items:
             $ref: "#/components/schemas/FileUploadData"
     CommitVersionRequest:
-      type: object
-      properties:
-        version:
-          type: string
-        changelog:
-          type: string
-    CommitPluginRequest:
       required:
-      - description
-      - name
+      - keys
+      - versionId
       type: object
       properties:
-        name:
+        versionId:
           type: string
-        description:
-          type: string
-        category:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
+          format: uuid
         keys:
           type: array
           items:
             type: string
-    UpdateAssetsRequest:
+    UpdateScreenshotsRequest:
+      required:
+      - files
       type: object
       properties:
         files:
           type: array
           items:
             $ref: "#/components/schemas/FileRequest"
-    UpdateAssetsResponse:
+    UpdateScreenshotsResponse:
       type: object
-    CommitAssetsRequest:
+      properties:
+        pluginId:
+          type: string
+          format: uuid
+        uploads:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileUploadData"
+    CommitScreenshotsRequest:
+      required:
+      - keys
       type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+    CommitPluginRequest:
+      required:
+      - keys
+      - versionId
+      type: object
+      properties:
+        versionId:
+          type: string
+          format: uuid
+        keys:
+          type: array
+          items:
+            type: string
     PaginationData:
       type: object
       properties:
@@ -568,7 +656,7 @@ components:
         id:
           type: string
           format: uuid
-        creatorId:
+        authorId:
           type: string
           format: uuid
         name:

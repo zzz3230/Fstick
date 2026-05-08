@@ -10,7 +10,8 @@ import java.util.UUID;
 
 @Data
 @Builder
-public class UpdateAssetsResponse {
+public class UpdateScreenshotsResponse {
     private UUID pluginId;
     private List<FileUploadData> uploads;
 }
+

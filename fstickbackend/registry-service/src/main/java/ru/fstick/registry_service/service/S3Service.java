@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.config.MinioProperties;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class S3Service {
@@ -58,7 +60,7 @@ public class S3Service {
         }
     }
 
-    public void deleteAsset(String key) {
+    public void deleteScreenshot(String key) {
         try {
             minioClient.removeObject(
                     RemoveObjectArgs.builder()
@@ -69,5 +71,17 @@ public class S3Service {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public List<String> getOnlyServerKeys(List<String> keys) {
+        return keys.stream()
+                .filter(key -> key.contains("/sv/"))
+                .toList();
+    }
+
+    public List<String> getOnlyClientKeys(List<String> keys) {
+        return keys.stream()
+                .filter(key -> key.contains("/cl/"))
+                .toList();
     }
 }
