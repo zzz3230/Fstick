@@ -1,0 +1,103 @@
+openapi: 3.0.1
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+paths:
+  /api/v1/events/push:
+    post:
+      tags:
+      - events-controller
+      operationId: pushEvent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushEventRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/chats/{chatId}/messages:
+    post:
+      tags:
+      - chats-controller
+      operationId: sendMessage
+      parameters:
+      - name: chatId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/chats/{chatId}/members/{userId}:
+    get:
+      tags:
+      - chats-controller
+      operationId: userInChat
+      parameters:
+      - name: chatId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ChatMemberResponse"
+components:
+  schemas:
+    PushEventRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        pluginId:
+          type: string
+          format: uuid
+        chatId:
+          type: string
+        eventName:
+          type: string
+        eventData:
+          type: object
+          additionalProperties:
+            type: object
+    SendMessageRequest:
+      type: object
+      properties:
+        pluginSenderId:
+          type: string
+          format: uuid
+        message:
+          type: string
+    ChatMemberResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+          enum:
+          - REGULAR
+          - ADMIN
+        member:
+          type: boolean
