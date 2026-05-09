@@ -22,12 +22,14 @@ type Streams struct {
 	DeviceListStreamProvider       StreamProvider
 	NotificationDataStreamProvider StreamProvider
 	PresenceStreamProvider         StreamProvider
+	FstickStreamProvider           StreamProvider
 }
 
 func NewSyncStreamProviders(
 	d storage.Database, userAPI userapi.SyncUserAPI,
 	rsAPI rsapi.SyncRoomserverAPI,
 	eduCache *caching.EDUCache, lazyLoadCache caching.LazyLoadCache, notifier *notifier.Notifier,
+	fstickStore *FstickEventStore,
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
@@ -66,6 +68,11 @@ func NewSyncStreamProviders(
 			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 			notifier:              notifier,
 		},
+		FstickStreamProvider: &FstickStreamProvider{
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			store:                 fstickStore,
+			notifier:              notifier,
+		},
 	}
 
 	ctx := context.TODO()
@@ -85,6 +92,7 @@ func NewSyncStreamProviders(
 	streams.NotificationDataStreamProvider.Setup(ctx, snapshot)
 	streams.DeviceListStreamProvider.Setup(ctx, snapshot)
 	streams.PresenceStreamProvider.Setup(ctx, snapshot)
+	streams.FstickStreamProvider.Setup(ctx, snapshot)
 
 	succeeded = true
 	return streams
@@ -101,5 +109,6 @@ func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 		NotificationDataPosition: s.NotificationDataStreamProvider.LatestPosition(ctx),
 		DeviceListPosition:       s.DeviceListStreamProvider.LatestPosition(ctx),
 		PresencePosition:         s.PresenceStreamProvider.LatestPosition(ctx),
+		FstickEventPosition:      s.FstickStreamProvider.LatestPosition(ctx),
 	}
 }

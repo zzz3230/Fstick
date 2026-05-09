@@ -40,6 +40,7 @@ type Routers struct {
 	Static        *mux.Router
 	DendriteAdmin *mux.Router
 	SynapseAdmin  *mux.Router
+	FstickAPI     *mux.Router
 }
 
 func NewRouters() Routers {
@@ -52,6 +53,7 @@ func NewRouters() Routers {
 		Static:        mux.NewRouter().SkipClean(true).PathPrefix(PublicStaticPath).Subrouter().UseEncodedPath(),
 		DendriteAdmin: mux.NewRouter().SkipClean(true).PathPrefix(DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdmin:  mux.NewRouter().SkipClean(true).PathPrefix(SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+		FstickAPI:     mux.NewRouter().SkipClean(true).PathPrefix(FstickAPIPathPrefix).Subrouter().UseEncodedPath(),
 	}
 	r.configureHTTPErrors()
 	return r
@@ -75,7 +77,7 @@ func (r *Routers) configureHTTPErrors() {
 	for _, router := range []*mux.Router{
 		r.Client, r.Federation, r.Keys,
 		r.Media, r.WellKnown, r.Static,
-		r.DendriteAdmin, r.SynapseAdmin,
+		r.DendriteAdmin, r.SynapseAdmin, r.FstickAPI,
 	} {
 		router.NotFoundHandler = NotFoundCORSHandler
 		router.MethodNotAllowedHandler = NotAllowedHandler

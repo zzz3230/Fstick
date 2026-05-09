@@ -189,6 +189,7 @@ func SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(routers.Media)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(routers.WellKnown)
 	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(routers.Static)
+	externalRouter.PathPrefix(httputil.FstickAPIPathPrefix).Handler(routers.FstickAPI)
 
 	externalRouter.NotFoundHandler = httputil.NotFoundCORSHandler
 	externalRouter.MethodNotAllowedHandler = httputil.NotAllowedHandler
