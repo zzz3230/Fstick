@@ -1,5 +1,7 @@
 package ru.fstick.installationservice.client;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -61,9 +63,9 @@ public class IntegrationClient {
             Map<String, Object> eventData
     ) {}
 
+    @Getter
+    @Setter
     static class ChatMemberResponse {
         private Boolean member;
-        public Boolean getMember() { return member; }
-        public void setMember(Boolean member) { this.member = member; }
     }
 }
