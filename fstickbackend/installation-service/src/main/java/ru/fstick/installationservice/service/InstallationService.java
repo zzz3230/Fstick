@@ -1,14 +1,13 @@
 package ru.fstick.installationservice.service;
 
 import org.springframework.stereotype.Service;
+import ru.fstick.installationservice.client.IntegrationClient;
+import ru.fstick.installationservice.client.RegistryClient;
 import ru.fstick.installationservice.dto.request.InstallRequest;
 import ru.fstick.installationservice.dto.request.UpdateInstallationRequest;
-import ru.fstick.installationservice.dto.response.InstallationResponse;
-import ru.fstick.installationservice.dto.response.InstallationShortResponse;
-import ru.fstick.installationservice.dto.response.PaginatedResponse;
+import ru.fstick.installationservice.dto.response.*;
 import ru.fstick.installationservice.entity.Installation;
-import ru.fstick.installationservice.exception.InstallationNotFoundException;
-import ru.fstick.installationservice.exception.PluginAlreadyInstalledException;
+import ru.fstick.installationservice.exception.*;
 import ru.fstick.installationservice.repository.InstallationRepository;
 
 import java.util.List;
@@ -18,14 +17,24 @@ import java.util.UUID;
 public class InstallationService {
 
     private final InstallationRepository repository;
+    private final IntegrationClient integrationClient;
+    private final RegistryClient registryClient;
 
-    public InstallationService(InstallationRepository repository) {
+    public InstallationService(InstallationRepository repository,
+                               IntegrationClient integrationClient,
+                               RegistryClient registryClient) {
         this.repository = repository;
+        this.integrationClient = integrationClient;
+        this.registryClient = registryClient;
     }
 
-    public InstallationResponse install(InstallRequest request, String chatId, String userId) {
-        // Проверяем что пользователь участник чата (заглушка)
+    public InstallationWithWarningsResponse install(InstallRequest request,
+                                                    String chatId, String userId) {
         checkChatMembership(userId, chatId);
+
+        List<InstallWarning> warnings = checkPluginAndVersion(
+                request.getPluginId(), request.getVersionId()
+        );
 
         if (repository.existsByPluginIdAndChatId(request.getPluginId(), chatId)) {
             throw new PluginAlreadyInstalledException(request.getPluginId().toString(), chatId);
@@ -38,10 +47,20 @@ public class InstallationService {
         installation.setInstalledBy(userId);
 
         Installation saved = repository.save(installation);
-        return toResponse(saved);
+
+        integrationClient.notifyPluginInstalled(
+                userId,
+                saved.getPluginId(),
+                chatId,
+                saved.getVersionId(),
+                saved.getInstallationId()
+        );
+
+        return new InstallationWithWarningsResponse(toResponse(saved), warnings);
     }
 
-    public PaginatedResponse<InstallationShortResponse> getAllByChatId(String chatId, String userId,
+    public PaginatedResponse<InstallationShortResponse> getAllByChatId(String chatId,
+                                                                       String userId,
                                                                        int page, int limit) {
         checkChatMembership(userId, chatId);
 
@@ -65,19 +84,6 @@ public class InstallationService {
         return toResponse(installation);
     }
 
-
-    public InstallationResponse updateVersion(UUID installationId,
-                                              UpdateInstallationRequest request, String userId) {
-        Installation installation = repository.findById(installationId)
-                .orElseThrow(() -> new InstallationNotFoundException(installationId));
-
-        checkChatMembership(userId, installation.getChatId());
-
-        installation.setVersionId(request.getVersionId());
-        Installation updated = repository.update(installation);
-        return toResponse(updated);
-    }
-
     public void uninstall(UUID installationId, String userId) {
         Installation installation = repository.findById(installationId)
                 .orElseThrow(() -> new InstallationNotFoundException(installationId));
@@ -85,11 +91,48 @@ public class InstallationService {
         checkChatMembership(userId, installation.getChatId());
 
         repository.deleteById(installationId);
+
+        integrationClient.notifyPluginUninstalled(
+                userId,
+                installation.getPluginId(),
+                installation.getChatId(),
+                installation.getInstallationId()
+        );
     }
 
-    // Заглушка для Integration Service
     private void checkChatMembership(String userId, String chatId) {
-        // TODO: вызов к Integration Service и здесь будем кидать ForbiddenException
+        if (!integrationClient.isMember(userId, chatId)) {
+            throw new ForbiddenException(userId, chatId);
+        }
+    }
+
+    private List<InstallWarning> checkPluginAndVersion(UUID pluginId, UUID versionId) {
+        RegistryClient.PluginViewExtend plugin = registryClient.getPlugin(pluginId);
+
+        if (plugin == null || !"ACTIVE".equals(plugin.getStatus())) {
+            throw new PluginNotFoundException(pluginId);
+        }
+
+        List<RegistryClient.VersionView> versions = plugin.getVersions();
+
+        boolean versionExists = versions.stream()
+                .anyMatch(v -> versionId.equals(v.getVersionId()));
+
+        if (!versionExists) {
+            throw new VersionNotFoundException(versionId, pluginId);
+        }
+
+        // versions.get(0) — последняя версия (Registry отдаёт в порядке DESC)
+        UUID latestVersionId = versions.get(0).getVersionId();
+        if (!versionId.equals(latestVersionId)) {
+            return List.of(new InstallWarning(
+                    "VERSION_OUTDATED",
+                    "Устанавливается не последняя версия. Последняя: "
+                            + versions.get(0).getVersion()
+            ));
+        }
+
+        return List.of();
     }
 
     private InstallationResponse toResponse(Installation i) {
