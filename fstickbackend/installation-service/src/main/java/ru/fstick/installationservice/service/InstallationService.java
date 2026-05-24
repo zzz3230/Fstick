@@ -4,11 +4,11 @@ import org.springframework.stereotype.Service;
 import ru.fstick.installationservice.client.IntegrationClient;
 import ru.fstick.installationservice.client.RegistryClient;
 import ru.fstick.installationservice.dto.request.InstallRequest;
-import ru.fstick.installationservice.dto.request.UpdateInstallationRequest;
 import ru.fstick.installationservice.dto.response.*;
 import ru.fstick.installationservice.entity.Installation;
 import ru.fstick.installationservice.exception.*;
 import ru.fstick.installationservice.repository.InstallationRepository;
+import ru.fstick.installationservice.store.PendingInstallStore;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,17 +19,19 @@ public class InstallationService {
     private final InstallationRepository repository;
     private final IntegrationClient integrationClient;
     private final RegistryClient registryClient;
+    private final PendingInstallStore pendingInstallStore;
 
     public InstallationService(InstallationRepository repository,
                                IntegrationClient integrationClient,
-                               RegistryClient registryClient) {
+                               RegistryClient registryClient,
+                               PendingInstallStore pendingInstallStore) {
         this.repository = repository;
         this.integrationClient = integrationClient;
         this.registryClient = registryClient;
+        this.pendingInstallStore = pendingInstallStore;
     }
 
-    public InstallationWithWarningsResponse install(InstallRequest request,
-                                                    String chatId, String userId) {
+    public Object install(InstallRequest request, String chatId, String userId) {
         checkChatMembership(userId, chatId);
 
         List<InstallWarning> warnings = checkPluginAndVersion(
@@ -40,6 +42,32 @@ public class InstallationService {
             throw new PluginAlreadyInstalledException(request.getPluginId().toString(), chatId);
         }
 
+        if (!warnings.isEmpty()) {
+            String token = pendingInstallStore.save(request, chatId, userId);
+            return new InstallationPendingResponse(token, warnings);
+        }
+
+        return doInstall(request, chatId, userId);
+    }
+
+    public InstallationWithWarningsResponse confirmInstall(String token, String userId) {
+        PendingInstallStore.PendingInstall pending = pendingInstallStore.get(token);
+
+        if (pending == null) {
+            throw new IllegalArgumentException("Invalid or expired confirmation token");
+        }
+
+        if (!pending.userId().equals(userId)) {
+            throw new ForbiddenException(userId, pending.chatId());
+        }
+
+        pendingInstallStore.remove(token);
+
+        return doInstall(pending.request(), pending.chatId(), pending.userId());
+    }
+
+    private InstallationWithWarningsResponse doInstall(InstallRequest request,
+                                                       String chatId, String userId) {
         Installation installation = new Installation();
         installation.setPluginId(request.getPluginId());
         installation.setVersionId(request.getVersionId());
@@ -49,14 +77,11 @@ public class InstallationService {
         Installation saved = repository.save(installation);
 
         integrationClient.notifyPluginInstalled(
-                userId,
-                saved.getPluginId(),
-                chatId,
-                saved.getVersionId(),
-                saved.getInstallationId()
+                userId, saved.getPluginId(), chatId,
+                saved.getVersionId(), saved.getInstallationId()
         );
 
-        return new InstallationWithWarningsResponse(toResponse(saved), warnings);
+        return new InstallationWithWarningsResponse(toResponse(saved), List.of());
     }
 
     public PaginatedResponse<InstallationShortResponse> getAllByChatId(String chatId,
@@ -122,7 +147,9 @@ public class InstallationService {
             throw new VersionNotFoundException(versionId, pluginId);
         }
 
-        // versions.get(0) — последняя версия (Registry отдаёт в порядке DESC)
+        if (versions == null || versions.isEmpty()) {
+            throw new PluginNotFoundException(pluginId);
+        }
         UUID latestVersionId = versions.get(0).getVersionId();
         if (!versionId.equals(latestVersionId)) {
             return List.of(new InstallWarning(

@@ -1,7 +1,9 @@
 package ru.fstick.installationservice.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.fstick.installationservice.dto.request.ConfirmInstallRequest;
 import ru.fstick.installationservice.dto.request.InstallRequest;
 import ru.fstick.installationservice.dto.response.*;
 import ru.fstick.installationservice.service.InstallationService;
@@ -19,13 +21,13 @@ public class InstallationController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public InstallationWithWarningsResponse install(
+    public ResponseEntity<Object> install(
             @RequestHeader("X-User-Id") String userId,
             @RequestParam("chat_id") String chatId,
             @RequestBody InstallRequest request
     ) {
-        return service.install(request, chatId, userId);
+        Object result = service.install(request, chatId, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @GetMapping
@@ -44,6 +46,15 @@ public class InstallationController {
             @PathVariable UUID installationId
     ) {
         return service.getById(installationId, userId);
+    }
+
+    @PostMapping("/confirm")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InstallationWithWarningsResponse confirmInstall(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestBody ConfirmInstallRequest request
+    ) {
+        return service.confirmInstall(request.getConfirmationToken(), userId);
     }
 
     @DeleteMapping("/{installationId}")

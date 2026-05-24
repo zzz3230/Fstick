@@ -4,11 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
-import java.util.UUID;
-
 @Getter
 @Setter
 @NoArgsConstructor
-public class UpdateInstallationRequest {
-    private UUID versionId;
+public class ConfirmInstallRequest {
+    private String confirmationToken;
 }

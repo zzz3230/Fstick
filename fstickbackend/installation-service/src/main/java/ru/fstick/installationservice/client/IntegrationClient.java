@@ -27,7 +27,8 @@ public class IntegrationClient {
                     .body(ChatMemberResponse.class);
             return response != null && Boolean.TRUE.equals(response.getMember());
         } catch (RestClientResponseException ex) {
-            return false;
+            if (ex.getStatusCode().value() == 404) return false;
+            throw new RuntimeException("Integration Service unavailable", ex);
         }
     }
 
