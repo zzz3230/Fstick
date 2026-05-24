@@ -45,4 +45,22 @@ public class GlobalExceptionHandler {
                 "message", ex.getMessage()
         );
     }
+
+    @ExceptionHandler(PluginNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handlePluginNotFound(PluginNotFoundException ex) {
+        return Map.of("error", "PLUGIN_NOT_FOUND", "message", ex.getMessage());
+    }
+
+    @ExceptionHandler(VersionNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handleVersionNotFound(VersionNotFoundException ex) {
+        return Map.of("error", "VERSION_NOT_FOUND", "message", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> handleIllegalArgument(IllegalArgumentException ex) {
+        return Map.of("error", "INVALID_TOKEN", "message", ex.getMessage());
+    }
 }

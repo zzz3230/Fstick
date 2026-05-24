@@ -66,19 +66,6 @@ public class InstallationRepository {
         return count != null && count > 0;
     }
 
-    public Installation update(Installation installation) {
-        String sql = """
-                UPDATE installations
-                SET version_id = ?, updated_at = NOW()
-                WHERE installation_id = ?
-                RETURNING *
-                """;
-
-        return jdbcTemplate.queryForObject(sql, rowMapper,
-                installation.getVersionId(),
-                installation.getInstallationId());
-    }
-
     public void deleteById(UUID installationId) {
         String sql = "DELETE FROM installations WHERE installation_id = ?";
         jdbcTemplate.update(sql, installationId);

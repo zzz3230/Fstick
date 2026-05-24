@@ -1,4 +1,23 @@
 services:
+  installation-service:
+    build: .
+    container_name: installation-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://installation-db:5432/installation_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: installation-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REGISTRY_SERVICE_URL: http://registry-service:8082
+      INTEGRATION_SERVICE_URL: http://integration-service:8080
+    depends_on:
+      installation-db:
+        condition: service_healthy
+      installation-redis:
+        condition: service_healthy
+
   installation-db:
     image: postgres:16
     container_name: installation-db
@@ -11,6 +30,26 @@ services:
     volumes:
       - ./installation service database/installation service database.sql:/docker-entrypoint-initdb.d/init.sql
       - installation-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d installation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  installation-redis:
+    image: redis:7-alpine
+    container_name: installation-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - installation-redis-data:/data
+    command: redis-server --save 60 1 --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   installation-db-data:
+  installation-redis-data:
