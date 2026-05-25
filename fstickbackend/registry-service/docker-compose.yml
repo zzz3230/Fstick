@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  registry-service:
+    build: .
+    container_name: registry-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: registry-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://registry-db:5432/registry_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: 1
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      MINIO_URL: http://minio:9000
+      MINIO_BUCKET: f-stick-plugins
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: 11111111
+      SERVER_PORT: 8082
+    depends_on:
+      registry-db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - fstick-network
+
+  registry-db:
+    image: postgres:16
+    container_name: registry-db
+    environment:
+      POSTGRES_DB: registry_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 1
+    ports:
+      - "5434:5432"
+    volumes:
+      - registry-db-data:/var/lib/postgresql/data
+      - ./database/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d registry_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: 11111111
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+volumes:
+  registry-db-data:
+  minio-data:
+
+networks:
+  fstick-network:
+    driver: bridge
+

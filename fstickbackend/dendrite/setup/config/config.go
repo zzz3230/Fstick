@@ -58,6 +58,10 @@ type Dendrite struct {
 
 	MSCs MSCs `yaml:"mscs"`
 
+	Fstick struct {
+		GatewayURL string `yaml:"gateway_url"`
+	} `yaml:"fstick"`
+
 	// The config for tracing the dendrite servers.
 	Tracing struct {
 		// Set to true to enable tracer hooks. If false, no tracing is set up.

@@ -3,15 +3,35 @@ services:
         image: minio/minio
         container_name: minio
         ports:
-            - "9000:9000"
-            - "9001:9001"
+            - "9010:9000"
+            - "9011:9001"
         environment:
             MINIO_ROOT_USER: admin
             MINIO_ROOT_PASSWORD: 11111111
         command: server /data --console-address ":9001"
         volumes:
             - minio_data:/data
-    
+        networks:
+            - fstick-network
+
+    createbuckets:
+        image: minio/mc
+        container_name: minio-create-buckets
+        depends_on:
+            - minio
+        entrypoint: >
+            /bin/sh -c "
+            sleep 10;
+            mc alias set local http://minio:9000 admin 11111111;
+            mc mb local/f-stick-plugins --ignore-existing;
+            exit 0;
+            "
+        networks:
+            - fstick-network
 
 volumes:
     minio_data:
+
+networks:
+    fstick-network:
+        external: true

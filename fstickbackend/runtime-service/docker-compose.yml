@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  runtime-service:
+    build: .
+    container_name: runtime-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_APPLICATION_NAME: runtime-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://runtime-db:5432/runtime_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATA_REDIS_HOST: runtime-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REGISTRY_SERVICE_URL: http://registry-service:8082
+      INTEGRATION_SERVICE_URL: http://integration-service:8080
+      GATEWAY_SERVICE_URL: http://gateway-service:8085
+      SERVER_PORT: 8084
+    depends_on:
+      runtime-db:
+        condition: service_healthy
+      runtime-redis:
+        condition: service_healthy
+    networks:
+      - fstick-network
+
+  runtime-db:
+    image: postgres:16
+    container_name: runtime-db
+    environment:
+      POSTGRES_DB: runtime_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - runtime-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d runtime_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  runtime-redis:
+    image: redis:7-alpine
+    container_name: runtime-redis
+    ports:
+      - "6382:6379"
+    volumes:
+      - runtime-redis-data:/data
+    command: redis-server --save 60 1 --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+volumes:
+  runtime-db-data:
+  runtime-redis-data:
+
+networks:
+  fstick-network:
+    driver: bridge
+

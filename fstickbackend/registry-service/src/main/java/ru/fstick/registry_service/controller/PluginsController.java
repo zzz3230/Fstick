@@ -2,7 +2,9 @@ package ru.fstick.registry_service.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
 import ru.fstick.registry_service.dto.api.request.commit.CommitScreenshotsRequest;
@@ -37,9 +39,16 @@ public class PluginsController {
 
     //добавить новый плагин
     @PostMapping
-    public AddPluginResponse addPlugin(@RequestBody @Valid AddPluginRequest request) {
+    public AddPluginResponse addPlugin(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+                                       @RequestBody @Valid AddPluginRequest request) {
 
-        return pluginsService.initPluginUpload(request);
+        UUID authorId = userId != null ? userId : request.getAuthorId();
+
+        if (authorId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing user id");
+        }
+
+        return pluginsService.initPluginUpload(request, authorId);
     }
 
     //подтвердить создание плагина

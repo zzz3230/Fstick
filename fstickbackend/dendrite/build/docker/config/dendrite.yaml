@@ -147,6 +147,11 @@ global:
     cache_size: 256
     cache_lifetime: "5m" # 5 minutes; https://pkg.go.dev/time@master#ParseDuration
 
+# Configuration for the Fstick plugin system.
+# This should point to the gateway-service inside the shared Docker network.
+fstick:
+  gateway_url: "http://gateway-service:8085"
+
 # Configuration for the Appservice API.
 app_service_api:
   # Disable the validation of TLS certificates of appservices. This is

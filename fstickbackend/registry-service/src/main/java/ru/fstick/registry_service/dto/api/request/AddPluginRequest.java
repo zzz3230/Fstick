@@ -31,7 +31,6 @@ public class AddPluginRequest {
     @NotBlank
     @Size(max = 2000)
     private String description;
-    @NotNull
     private UUID authorId;
     @Size(max = 50)
     private String category;
