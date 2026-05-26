@@ -1,0 +1,555 @@
+{
+  "info": {
+    "name": "Installation Service",
+    "_postman_id": "col-installation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Happy Path",
+      "item": [
+        {
+          "name": "1. Install plugin → success",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginId\": \"{{plugin_id}}\",\n  \"versionId\": \"{{version_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "pm.test('has installation + warnings', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('installation');",
+                  "    pm.expect(b.warnings).to.be.an('array').that.is.empty;",
+                  "});",
+                  "const b = pm.response.json();",
+                  "if (b.installation) pm.environment.set('installation_id', b.installation.installationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Install outdated version → pending token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginId\": \"{{plugin_id}}\",\n  \"versionId\": \"{{old_version_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "pm.test('has confirmationToken + VERSION_OUTDATED', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('confirmationToken');",
+                  "    pm.expect(b.warnings[0].code).to.eql('VERSION_OUTDATED');",
+                  "});",
+                  "const b = pm.response.json();",
+                  "if (b.confirmationToken) pm.environment.set('confirmation_token', b.confirmationToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Confirm install",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations/confirm",
+              "host": [
+                "{{installation_url}}/installations/confirm"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations",
+                "confirm"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmationToken\": \"{{confirmation_token}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "pm.test('has installation', () => pm.expect(pm.response.json()).to.have.property('installation'));",
+                  "const b = pm.response.json();",
+                  "if (b.installation) pm.environment.set('installation_id', b.installation.installationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Get all installations in chat",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}&page=1&limit=20",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}&page=1&limit=20"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('pagination fields', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.all.keys('data','page','limit','totalCount','hasNext');",
+                  "    pm.expect(b.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Get installation by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations/{{installation_id}}",
+              "host": [
+                "{{installation_url}}/installations/{{installation_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations",
+                "{{installation_id}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('required fields', () => {",
+                  "    const b = pm.response.json();",
+                  "    ['installationId','pluginId','versionId','chatId','installedBy'].forEach(k => pm.expect(b).to.have.property(k));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Delete installation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations/{{installation_id}}",
+              "host": [
+                "{{installation_url}}/installations/{{installation_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations",
+                "{{installation_id}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error Cases",
+      "item": [
+        {
+          "name": "409 Already installed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginId\": \"{{plugin_id}}\",\n  \"versionId\": \"{{version_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "pm.test('ALREADY_INSTALLED', () => pm.expect(pm.response.json().error).to.eql('ALREADY_INSTALLED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 User not in chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "@stranger:homeserver.org"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginId\": \"{{plugin_id}}\",\n  \"versionId\": \"{{version_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403', () => pm.response.to.have.status(403));",
+                  "pm.test('FORBIDDEN', () => pm.expect(pm.response.json().error).to.eql('FORBIDDEN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 Plugin not found",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginId\": \"00000000-0000-0000-0000-000000000000\",\n  \"versionId\": \"{{version_id}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('PLUGIN_NOT_FOUND', () => pm.expect(pm.response.json().error).to.eql('PLUGIN_NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 Version not found",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations?chat_id={{chat_id}}",
+              "host": [
+                "{{installation_url}}/installations?chat_id={{chat_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations"
+              ],
+              "query": [
+                {
+                  "key": "chat_id",
+                  "value": "{{chat_id}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginId\": \"{{plugin_id}}\",\n  \"versionId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('VERSION_NOT_FOUND', () => pm.expect(pm.response.json().error).to.eql('VERSION_NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 Invalid confirmation token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations/confirm",
+              "host": [
+                "{{installation_url}}/installations/confirm"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations",
+                "confirm"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmationToken\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "pm.test('INVALID_TOKEN', () => pm.expect(pm.response.json().error).to.eql('INVALID_TOKEN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 Installation not found",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{installation_url}}/installations/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{installation_url}}/installations/00000000-0000-0000-0000-000000000000"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installations",
+                "00000000-0000-0000-0000-000000000000"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('INSTALLATION_NOT_FOUND', () => pm.expect(pm.response.json().error).to.eql('INSTALLATION_NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,253 @@
+{
+  "info": {
+    "name": "Integration Service",
+    "_postman_id": "col-integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Chats",
+      "item": [
+        {
+          "name": "Check user in chat → member",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{integration_url}}/chats/{{chat_id}}/members/{{user_id}}",
+              "host": [
+                "{{integration_url}}/chats/{{chat_id}}/members/{{user_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "{{chat_id}}",
+                "members",
+                "{{user_id}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has userId role member', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.all.keys('userId','role','member');",
+                  "    pm.expect(b.member).to.be.true;",
+                  "    pm.expect(['REGULAR','ADMIN']).to.include(b.role);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check user in chat → not member",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{integration_url}}/chats/{{chat_id}}/members/@stranger:homeserver.org",
+              "host": [
+                "{{integration_url}}/chats/{{chat_id}}/members/@stranger:homeserver.org"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "{{chat_id}}",
+                "members",
+                "@stranger:homeserver.org"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('member is false', () => pm.expect(pm.response.json().member).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send message to chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{integration_url}}/chats/{{chat_id}}/messages",
+              "host": [
+                "{{integration_url}}/chats/{{chat_id}}/messages"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chats",
+                "{{chat_id}}",
+                "messages"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pluginSenderId\": \"{{plugin_id}}\",\n  \"message\": \"Hello from plugin!\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Push event → PLUGIN_INSTALLED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{integration_url}}/events/push",
+              "host": [
+                "{{integration_url}}/events/push"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "events",
+                "push"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"pluginId\": \"{{plugin_id}}\",\n  \"chatId\": \"{{chat_id}}\",\n  \"eventName\": \"PLUGIN_INSTALLED\",\n  \"eventData\": {\n    \"versionId\": \"{{version_id}}\",\n    \"installationId\": \"{{installation_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Push event → PLUGIN_UNINSTALLED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{integration_url}}/events/push",
+              "host": [
+                "{{integration_url}}/events/push"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "events",
+                "push"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"pluginId\": \"{{plugin_id}}\",\n  \"chatId\": \"{{chat_id}}\",\n  \"eventName\": \"PLUGIN_UNINSTALLED\",\n  \"eventData\": {\n    \"installationId\": \"{{installation_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Push event → custom",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{integration_url}}/events/push",
+              "host": [
+                "{{integration_url}}/events/push"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "events",
+                "push"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"pluginId\": \"{{plugin_id}}\",\n  \"chatId\": \"{{chat_id}}\",\n  \"eventName\": \"CUSTOM_EVENT\",\n  \"eventData\": {\n    \"key\": \"value\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

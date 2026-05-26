@@ -1,0 +1,650 @@
+{
+  "info": {
+    "name": "Registry Service",
+    "_postman_id": "col-registry",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Plugins",
+      "item": [
+        {
+          "name": "Get all plugins",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{registry_url}}/plugins?page=0&limit=20",
+              "host": [
+                "{{registry_url}}/plugins?page=0&limit=20"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "category",
+                  "value": ""
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "sort",
+                  "value": "plugin_name"
+                },
+                {
+                  "key": "order",
+                  "value": "asc"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('items + pagination', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('items');",
+                  "    pm.expect(b).to.have.property('pagination');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add plugin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins",
+              "host": [
+                "{{registry_url}}/plugins"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Plugin\",\n  \"description\": \"Test description\",\n  \"version\": \"1.0.0\",\n  \"runtime\": \"nodejs18\",\n  \"authorId\": \"{{author_id}}\",\n  \"category\": \"tools\",\n  \"tags\": [\n    \"test\"\n  ],\n  \"files\": [\n    {\n      \"fileName\": \"index.js\",\n      \"type\": \"SERVER\"\n    }\n  ],\n  \"icon\": {\n    \"fileName\": \"icon.png\",\n    \"type\": \"ICON\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has pluginId versionId uploads', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('pluginId');",
+                  "    pm.expect(b).to.have.property('versionId');",
+                  "    pm.expect(b).to.have.property('uploads');",
+                  "});",
+                  "const b = pm.response.json();",
+                  "if (b.pluginId) pm.environment.set('plugin_id', b.pluginId);",
+                  "if (b.versionId) pm.environment.set('version_id', b.versionId);",
+                  "if (b.uploads && b.uploads[0]) pm.environment.set('upload_key', b.uploads[0].key);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get plugin by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has id status versions', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('id');",
+                  "    pm.expect(b).to.have.property('status');",
+                  "    pm.expect(b.versions).to.be.an('array');",
+                  "});",
+                  "const b = pm.response.json();",
+                  "if (b.screenshots && b.screenshots[0]) pm.environment.set('screenshot_id', b.screenshots[0].screenshotId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update plugin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Plugin\",\n  \"description\": \"Updated description\",\n  \"category\": \"productivity\",\n  \"tags\": [\n    \"updated\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('name updated', () => pm.expect(pm.response.json().name).to.eql('Updated Plugin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change plugin status → ACTIVE",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/status",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/status"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "status"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "\"ACTIVE\""
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has newStatus oldStatus', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('newStatus');",
+                  "    pm.expect(b).to.have.property('oldStatus');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete plugin",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has pluginId newStatus', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('pluginId');",
+                  "    pm.expect(b).to.have.property('newStatus');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Versions",
+      "item": [
+        {
+          "name": "Add plugin version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/versions",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/versions"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "versions"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": \"2.0.0\",\n  \"changelog\": \"New features\",\n  \"runtime\": \"nodejs18\",\n  \"files\": [\n    {\n      \"fileName\": \"index.js\",\n      \"type\": \"SERVER\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has pluginId versionId uploads', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.all.keys('pluginId','versionId','uploads');",
+                  "});",
+                  "const b = pm.response.json();",
+                  "if (b.versionId) pm.environment.set('version_id', b.versionId);",
+                  "if (b.uploads && b.uploads[0]) pm.environment.set('upload_key', b.uploads[0].key);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/versions/commit",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/versions/commit"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "versions",
+                "commit"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"versionId\": \"{{version_id}}\",\n  \"keys\": [\n    \"{{upload_key}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has id versions', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('id');",
+                  "    pm.expect(b.versions).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Screenshots",
+      "item": [
+        {
+          "name": "Upload screenshots → get URLs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/screenshots",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/screenshots"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "screenshots"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"files\": [\n    {\n      \"fileName\": \"screen1.png\",\n      \"type\": \"SCREENSHOT\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has uploads', () => pm.expect(pm.response.json()).to.have.property('uploads'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Commit screenshots",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/screenshots/commit",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/screenshots/commit"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "screenshots",
+                "commit"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keys\": [\n    \"{{upload_key}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has screenshots', () => pm.expect(pm.response.json()).to.have.property('screenshots'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete screenshot",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/screenshots/{{screenshot_id}}",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/screenshots/{{screenshot_id}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "screenshots",
+                "{{screenshot_id}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Code Links",
+      "item": [
+        {
+          "name": "Get server code links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/code/server?version=1.0.0&runtime=nodejs18",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/code/server?version=1.0.0&runtime=nodejs18"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "code",
+                "server"
+              ],
+              "query": [
+                {
+                  "key": "version",
+                  "value": "1.0.0"
+                },
+                {
+                  "key": "runtime",
+                  "value": "nodejs18"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('files array', () => pm.expect(pm.response.json().files).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get client code links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/code/client?version=1.0.0&runtime=nodejs18",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/code/client?version=1.0.0&runtime=nodejs18"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "code",
+                "client"
+              ],
+              "query": [
+                {
+                  "key": "version",
+                  "value": "1.0.0"
+                },
+                {
+                  "key": "runtime",
+                  "value": "nodejs18"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('files array', () => pm.expect(pm.response.json().files).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Commit Plugin",
+      "item": [
+        {
+          "name": "Commit plugin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{registry_url}}/plugins/{{plugin_id}}/commit",
+              "host": [
+                "{{registry_url}}/plugins/{{plugin_id}}/commit"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plugins",
+                "{{plugin_id}}",
+                "commit"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"versionId\": \"{{version_id}}\",\n  \"keys\": [\n    \"{{upload_key}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has id status', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('id');",
+                  "    pm.expect(b).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

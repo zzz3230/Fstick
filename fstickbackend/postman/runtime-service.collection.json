@@ -1,0 +1,177 @@
+{
+  "info": {
+    "name": "Runtime Service",
+    "_postman_id": "col-runtime",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Commands",
+      "item": [
+        {
+          "name": "Execute command → ping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{runtime_url}}/command",
+              "host": [
+                "{{runtime_url}}"
+              ],
+              "path": [
+                "command"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ping\",\n  \"plugin_id\": \"{{plugin_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"chat_id\": \"{{chat_id}}\",\n  \"track_id\": \"track-001\",\n  \"args\": {}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has status field', () => pm.expect(pm.response.json()).to.have.property('status'));",
+                  "pm.test('status is valid', () => pm.expect(['OK','UNKNOWN_ERROR','VALIDATION_ERROR','PLUGIN_ERROR']).to.include(pm.response.json().status));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Execute command → with args",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{runtime_url}}/command",
+              "host": [
+                "{{runtime_url}}"
+              ],
+              "path": [
+                "command"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"run\",\n  \"plugin_id\": \"{{plugin_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"chat_id\": \"{{chat_id}}\",\n  \"track_id\": \"track-002\",\n  \"args\": {\n    \"input\": \"test\",\n    \"mode\": \"fast\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has status', () => pm.expect(pm.response.json()).to.have.property('status'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error Cases",
+      "item": [
+        {
+          "name": "Unknown plugin → PLUGIN_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{runtime_url}}/command",
+              "host": [
+                "{{runtime_url}}"
+              ],
+              "path": [
+                "command"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ping\",\n  \"plugin_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"user_id\": \"{{user_id}}\",\n  \"chat_id\": \"{{chat_id}}\",\n  \"track_id\": \"track-err-001\",\n  \"args\": {}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('status is not OK', () => pm.expect(pm.response.json().status).to.not.eql('OK'));",
+                  "pm.test('has error', () => pm.expect(pm.response.json()).to.have.property('error'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Empty command name → VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{runtime_url}}/command",
+              "host": [
+                "{{runtime_url}}"
+              ],
+              "path": [
+                "command"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"plugin_id\": \"{{plugin_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"chat_id\": \"{{chat_id}}\",\n  \"track_id\": \"track-err-002\",\n  \"args\": {}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('has status', () => pm.expect(pm.response.json()).to.have.property('status'));",
+                  "pm.test('error has message when not OK', () => {",
+                  "    const b = pm.response.json();",
+                  "    if (b.status !== 'OK') pm.expect(b.error).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
