@@ -1,5 +1,6 @@
 package ru.fstick.integrationservice.service;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -100,7 +101,6 @@ public class FstickProxyService {
         if (rawRole == null || rawRole.isBlank()) {
             return ChatMemberRole.REGULAR;
         }
-
         try {
             return ChatMemberRole.valueOf(rawRole.toUpperCase());
         } catch (IllegalArgumentException ex) {
@@ -108,6 +108,7 @@ public class FstickProxyService {
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
     private static final class UpstreamChatMemberResponse {
         @JsonProperty("is_member")
         private boolean isMember;

@@ -20,15 +20,28 @@ public class IntegrationClient {
     }
 
     public boolean isMember(String userId, String chatId) {
+        return getMemberInfo(userId, chatId) != null
+                && Boolean.TRUE.equals(getMemberInfo(userId, chatId).getMember());
+    }
+
+    public boolean isAdmin(String userId, String chatId) {
+        ChatMemberResponse info = getMemberInfo(userId, chatId);
+        return info != null && Boolean.TRUE.equals(info.getMember())
+                && "ADMIN".equals(info.getRole());
+    }
+
+    private ChatMemberResponse getMemberInfo(String userId, String chatId) {
         try {
-            ChatMemberResponse response = restClient.get()
+            return restClient.get()
                     .uri("/api/v1/chats/{chatId}/members/{userId}", chatId, userId)
                     .retrieve()
                     .body(ChatMemberResponse.class);
-            return response != null && Boolean.TRUE.equals(response.getMember());
         } catch (RestClientResponseException ex) {
-            if (ex.getStatusCode().value() == 404) return false;
-            throw new RuntimeException("Integration Service unavailable", ex);
+            int status = ex.getStatusCode().value();
+            if (status == 404 || status == 403 || status == 400) return null;
+            throw new RuntimeException("Integration Service unavailable: HTTP " + status, ex);
+        } catch (Exception ex) {
+            throw new RuntimeException("Integration Service unavailable: " + ex.getMessage(), ex);
         }
     }
 
@@ -68,5 +81,6 @@ public class IntegrationClient {
     @Setter
     static class ChatMemberResponse {
         private Boolean member;
+        private String role;
     }
 }

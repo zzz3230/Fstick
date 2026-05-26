@@ -32,7 +32,7 @@ public class InstallationService {
     }
 
     public Object install(InstallRequest request, String chatId, String userId) {
-        checkChatMembership(userId, chatId);
+        checkChatAdmin(userId, chatId);
 
         List<InstallWarning> warnings = checkPluginAndVersion(
                 request.getPluginId(), request.getVersionId()
@@ -113,7 +113,7 @@ public class InstallationService {
         Installation installation = repository.findById(installationId)
                 .orElseThrow(() -> new InstallationNotFoundException(installationId));
 
-        checkChatMembership(userId, installation.getChatId());
+        checkChatAdmin(userId, installation.getChatId());
 
         repository.deleteById(installationId);
 
@@ -127,6 +127,12 @@ public class InstallationService {
 
     private void checkChatMembership(String userId, String chatId) {
         if (!integrationClient.isMember(userId, chatId)) {
+            throw new ForbiddenException(userId, chatId);
+        }
+    }
+
+    private void checkChatAdmin(String userId, String chatId) {
+        if (!integrationClient.isAdmin(userId, chatId)) {
             throw new ForbiddenException(userId, chatId);
         }
     }

@@ -1,0 +1,221 @@
+/*
+Copyright 2026 New Vector Ltd.
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE files in the repository root for full details.
+*/
+
+.mx_MarketplaceCard {
+    --marketplace-upload-bg: var(--cpd-color-bg-canvas-default);
+    --marketplace-input-border: var(--cpd-color-border-interactive-secondary);
+    --marketplace-input-focus-border: var(--cpd-color-border-interactive-primary);
+
+    .mx_MarketplaceCard_tabs {
+        display: flex;
+        padding: var(--cpd-space-3x) 0 0;
+        border-bottom: 2px solid var(--cpd-color-border-interactive-secondary);
+    }
+
+    .mx_MarketplaceCard_tab {
+        flex: 1;
+        padding: var(--cpd-space-2x) var(--cpd-space-2x);
+        border: none;
+        background: transparent;
+        color: var(--cpd-color-text-secondary);
+        font-size: var(--cpd-font-size-body-sm);
+        font-weight: 500;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s ease;
+        font-family: inherit;
+
+        &:hover {
+            color: var(--cpd-color-text-primary);
+            background-color: var(--cpd-color-bg-action-secondary-hovered);
+        }
+
+        &.mx_MarketplaceCard_tab_active {
+            color: var(--cpd-color-text-primary);
+            border-bottom-color: var(--cpd-color-border-interactive-primary);
+            font-weight: 600;
+        }
+    }
+
+    .mx_MarketplaceCard_search {
+        padding: var(--cpd-space-4x) 0;
+        display: flex;
+        gap: var(--cpd-space-2x);
+    }
+
+    .mx_MarketplaceCard_errorState {
+        display: flex;
+        flex-direction: column;
+        gap: var(--cpd-space-3x);
+        padding: var(--cpd-space-4x);
+        border-radius: 8px;
+        background-color: rgba(208, 80, 80, 0.1);
+        border: 1px solid rgba(208, 80, 80, 0.3);
+
+        button { align-self: flex-start; }
+    }
+
+    .mx_MarketplaceCard_list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--cpd-space-3x);
+        padding: var(--cpd-space-4x) 0;
+    }
+
+    .mx_MarketplaceCard_item {
+        display: flex;
+        flex-direction: column;
+        gap: var(--cpd-space-2x);
+        padding: var(--cpd-space-3x);
+        border-radius: 8px;
+        border: 1px solid var(--cpd-color-border-interactive-secondary);
+        background-color: var(--cpd-color-bg-action-secondary-rest);
+        transition: all 0.2s ease;
+
+        &:hover {
+            border-color: var(--cpd-color-border-interactive-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .mx_MarketplaceCard_itemHeader {
+            display: flex;
+            gap: var(--cpd-space-3x);
+            align-items: flex-start;
+        }
+
+        .mx_MarketplaceCard_iconWrapper {
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: var(--cpd-color-bg-canvas-default);
+            border: 1px solid var(--cpd-color-border-interactive-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mx_MarketplaceCard_icon {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .mx_MarketplaceCard_iconFallback {
+            width: 28px;
+            height: 28px;
+            color: var(--cpd-color-icon-tertiary);
+        }
+
+        .mx_MarketplaceCard_itemInfo {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .mx_MarketplaceCard_itemMeta {
+            display: flex;
+            gap: var(--cpd-space-2x);
+            flex-wrap: wrap;
+            color: var(--cpd-color-text-secondary);
+        }
+
+        .mx_MarketplaceCard_description {
+            color: var(--cpd-color-text-secondary);
+            line-height: 1.4;
+        }
+
+        .mx_MarketplaceCard_itemActions {
+            display: flex;
+            gap: var(--cpd-space-2x);
+            padding-top: var(--cpd-space-2x);
+        }
+    }
+
+    .mx_MarketplaceCard_warning {
+        padding: var(--cpd-space-3x);
+        border-radius: 6px;
+        background-color: rgba(255, 200, 0, 0.1);
+        border-left: 3px solid #ffc800;
+        color: var(--cpd-color-text-secondary);
+    }
+
+    .mx_MarketplaceCard_upload {
+        padding: var(--cpd-space-4x) 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--cpd-space-3x);
+
+        .mx_MarketplaceCard_uploadDescription {
+            color: var(--cpd-color-text-secondary);
+        }
+
+        .mx_MarketplaceCard_fileGroup {
+            display: flex;
+            flex-direction: column;
+            gap: var(--cpd-space-2x);
+            padding: var(--cpd-space-3x);
+            border: 1px solid var(--cpd-color-border-interactive-secondary);
+            border-radius: 8px;
+            background-color: var(--cpd-color-bg-action-secondary-rest);
+        }
+
+        input:not([type="file"]) {
+            padding: var(--cpd-space-2x) var(--cpd-space-3x);
+            border: 1px solid var(--marketplace-input-border);
+            border-radius: 6px;
+            background-color: var(--marketplace-upload-bg);
+            color: var(--cpd-color-text-primary);
+            font-size: var(--cpd-font-size-body-sm);
+            font-family: inherit;
+            transition: all 0.2s ease;
+
+            &:focus {
+                outline: none;
+                border-color: var(--marketplace-input-focus-border);
+                box-shadow: 0 0 0 2px rgba(88, 124, 146, 0.15);
+            }
+
+            &::placeholder { color: var(--cpd-color-text-tertiary); }
+        }
+
+        .mx_MarketplaceCard_fileLabel {
+            display: flex;
+            flex-direction: column;
+            gap: var(--cpd-space-1x);
+
+            input[type="file"] {
+                padding: var(--cpd-space-2x);
+                border: 1px solid var(--marketplace-input-border);
+                border-radius: 6px;
+                background-color: var(--marketplace-upload-bg);
+                font-size: var(--cpd-font-size-body-sm);
+                font-family: inherit;
+                cursor: pointer;
+            }
+        }
+
+        button { align-self: flex-start; }
+    }
+
+    .mx_MarketplaceCard_uploadSuccess {
+        padding: var(--cpd-space-2x);
+        border-radius: 6px;
+        background-color: rgba(76, 175, 80, 0.1);
+        border-left: 3px solid #4caf50;
+        color: #2e7d32;
+    }
+
+    .mx_MarketplaceCard_uploadError {
+        padding: var(--cpd-space-2x);
+        border-radius: 6px;
+        background-color: rgba(208, 80, 80, 0.1);
+        border-left: 3px solid #d05050;
+        color: #c62828;
+    }
+}
+

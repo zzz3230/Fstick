@@ -88,6 +88,7 @@ public class PluginsService {
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .versionId(version.getVersionId())
                 .version(version.getVersion())
                 .changelog(version.getChangelog())
                 .build());});
@@ -132,6 +133,7 @@ public class PluginsService {
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .versionId(version.getVersionId())
                 .version(version.getVersion())
                 .changelog(version.getChangelog())
                 .build());});
@@ -212,6 +214,7 @@ public class PluginsService {
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .versionId(version.getVersionId())
                 .version(version.getVersion())
                 .changelog(version.getChangelog())
                 .build());});
@@ -351,6 +354,7 @@ public class PluginsService {
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .versionId(version.getVersionId())
                 .version(version.getVersion())
                 .changelog(version.getChangelog())
                 .build());});
@@ -421,6 +425,7 @@ public class PluginsService {
 
         List<VersionView> versionViews = new ArrayList<>();
         versions.forEach(version -> {versionViews.add(VersionView.builder()
+                .versionId(version.getVersionId())
                 .version(version.getVersion())
                 .changelog(version.getChangelog())
                 .build());});
