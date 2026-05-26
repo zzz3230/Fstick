@@ -42,11 +42,14 @@ services:
         condition: service_healthy
     networks:
       - internal
+      - fstick-network
     restart: unless-stopped
 
 networks:
   internal:
     attachable: true
+  fstick-network:
+    external: true
 
 volumes:
   dendrite_postgres_data:

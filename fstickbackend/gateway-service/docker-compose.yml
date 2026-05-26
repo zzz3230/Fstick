@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  gateway-service:
+    build: .
+    container_name: gateway-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_APPLICATION_NAME: gateway-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://gateway-db:5432/gateway_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVICES_REGISTRY_BASE_URL: http://registry-service:8082
+      SERVICES_INSTALLATION_BASE_URL: http://installation-service:8083
+      INTEGRATION_SERVICE_URL: http://integration-service:8080
+      RUNTIME_SERVICE_URL: http://runtime-service:8084
+      DENDRITE_URL: http://dendrite:8008
+      SERVER_PORT: 8085
+      SPRING_CLOUD_GATEWAY_ROUTES_0_ID: registry
+      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://registry-service:8082
+      SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0: Path=/registry/**
+      SPRING_CLOUD_GATEWAY_ROUTES_1_ID: installation
+      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://installation-service:8083
+      SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0: Path=/installation/**
+      SPRING_CLOUD_GATEWAY_ROUTES_2_ID: integration
+      SPRING_CLOUD_GATEWAY_ROUTES_2_URI: http://integration-service:8080
+      SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0: Path=/integration/**
+      SPRING_CLOUD_GATEWAY_ROUTES_3_ID: runtime
+      SPRING_CLOUD_GATEWAY_ROUTES_3_URI: http://runtime-service:8084
+      SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0: Path=/runtime/**
+    depends_on:
+      gateway-db:
+        condition: service_healthy
+    networks:
+      - fstick-network
+
+  gateway-db:
+    image: postgres:16
+    container_name: gateway-db
+    environment:
+      POSTGRES_DB: gateway_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+    volumes:
+      - gateway-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gateway_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+volumes:
+  gateway-db-data:
+
+networks:
+  fstick-network:
+    driver: bridge
+

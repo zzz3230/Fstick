@@ -1,0 +1,364 @@
+
+services:
+  # ============ Database Services ============
+  registry-db:
+    image: postgres:16
+    container_name: registry-db
+    environment:
+      POSTGRES_DB: registry_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 1
+    ports:
+      - "5434:5432"
+    volumes:
+      - registry-db-data:/var/lib/postgresql/data
+      - ./registry-service/database/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d registry_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  installation-db:
+    image: postgres:16
+    container_name: installation-db
+    environment:
+      POSTGRES_DB: installation_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - installation-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d installation_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  integration-db:
+    image: postgres:16
+    container_name: integration-db
+    environment:
+      POSTGRES_DB: integration_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - integration-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d integration_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  runtime-db:
+    image: postgres:16
+    container_name: runtime-db
+    environment:
+      POSTGRES_DB: runtime_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - runtime-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d runtime_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  gateway-db:
+    image: postgres:16
+    container_name: gateway-db
+    environment:
+      POSTGRES_DB: gateway_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+    volumes:
+      - gateway-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gateway_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  # ============ Cache Services ============
+  installation-redis:
+    image: redis:7-alpine
+    container_name: installation-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - installation-redis-data:/data
+    command: redis-server --save 60 1 --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  integration-redis:
+    image: redis:7-alpine
+    container_name: integration-redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - integration-redis-data:/data
+    command: redis-server --save 60 1 --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  runtime-redis:
+    image: redis:7-alpine
+    container_name: runtime-redis
+    ports:
+      - "6382:6379"
+    volumes:
+      - runtime-redis-data:/data
+    command: redis-server --save 60 1 --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  # ============ Storage Services ============
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: 11111111
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  createbuckets:
+    image: minio/mc
+    container_name: minio-create-buckets
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 admin 11111111;
+      mc mb local/f-stick-plugins --ignore-existing;
+  
+      mc cp /dev/null local/f-stick-plugins/plugins/.keep;
+      mc cp /dev/null local/f-stick-plugins/plugins/example/screenshots/.keep;
+      mc cp /dev/null local/f-stick-plugins/plugins/example/versions/1.0.0/client/js/1.0.0/.keep;
+      mc cp /dev/null local/f-stick-plugins/plugins/example/versions/1.0.0/server/lua/1.0.0/.keep;
+  
+      exit 0;
+      "
+    networks:
+      - fstick-network
+
+  # ============ Application Services ============
+  registry-service:
+    build:
+      context: ./registry-service
+      dockerfile: Dockerfile
+    container_name: registry-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: registry-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://registry-db:5432/registry_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: 1
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      MINIO_URL: http://minio:9000
+      MINIO_BUCKET: f-stick-plugins
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: 11111111
+      SERVER_PORT: 8082
+    depends_on:
+      registry-db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - fstick-network
+
+  installation-service:
+    build:
+      context: ./installation-service
+      dockerfile: Dockerfile
+    container_name: installation-service
+    ports:
+      - "8083:8081"
+    environment:
+      SPRING_APPLICATION_NAME: installation-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://installation-db:5432/installation_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATA_REDIS_HOST: installation-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REGISTRY_SERVICE_URL: http://registry-service:8082
+      INTEGRATION_SERVICE_URL: http://integration-service:8080
+      SERVER_PORT: 8081
+    depends_on:
+      installation-db:
+        condition: service_healthy
+      installation-redis:
+        condition: service_healthy
+      registry-service:
+        condition: service_started
+    networks:
+      - fstick-network
+
+  integration-service:
+    build:
+      context: ./integration-service
+      dockerfile: Dockerfile
+    container_name: integration-service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_APPLICATION_NAME: integration-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://integration-db:5432/integration_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATA_REDIS_HOST: integration-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REGISTRY_SERVICE_URL: http://registry-service:8082
+      RUNTIME_SERVICE_URL: http://runtime-service:8084
+      SERVER_PORT: 8080
+    depends_on:
+      integration-db:
+        condition: service_healthy
+      integration-redis:
+        condition: service_healthy
+      registry-service:
+        condition: service_started
+    networks:
+      - fstick-network
+
+  runtime-service:
+    build:
+      context: ./runtime-service
+      dockerfile: Dockerfile
+    container_name: runtime-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_APPLICATION_NAME: runtime-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://runtime-db:5432/runtime_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATA_REDIS_HOST: runtime-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REGISTRY_SERVICE_URL: http://registry-service:8082
+      INTEGRATION_SERVICE_URL: http://integration-service:8080
+      GATEWAY_SERVICE_URL: http://gateway-service:8085
+      SERVER_PORT: 8084
+    depends_on:
+      runtime-db:
+        condition: service_healthy
+      runtime-redis:
+        condition: service_healthy
+      registry-service:
+        condition: service_started
+    networks:
+      - fstick-network
+
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: gateway-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_APPLICATION_NAME: gateway-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://gateway-db:5432/gateway_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVICES_REGISTRY_BASE_URL: http://registry-service:8082
+      SERVICES_INSTALLATION_BASE_URL: http://installation-service:8083
+      INTEGRATION_SERVICE_URL: http://integration-service:8080
+      RUNTIME_SERVICE_URL: http://runtime-service:8084
+      SERVER_PORT: 8085
+      SPRING_CLOUD_GATEWAY_ROUTES_0_ID: registry
+      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://registry-service:8082
+      SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0: Path=/registry/**
+      SPRING_CLOUD_GATEWAY_ROUTES_0_FILTERS_0: StripPrefix=1
+      SPRING_CLOUD_GATEWAY_ROUTES_1_ID: installation
+      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://installation-service:8083
+      SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0: Path=/installation/**
+      SPRING_CLOUD_GATEWAY_ROUTES_1_FILTERS_0: StripPrefix=1
+      SPRING_CLOUD_GATEWAY_ROUTES_2_ID: integration
+      SPRING_CLOUD_GATEWAY_ROUTES_2_URI: http://integration-service:8080
+      SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0: Path=/integration/**
+      SPRING_CLOUD_GATEWAY_ROUTES_2_FILTERS_0: StripPrefix=1
+      SPRING_CLOUD_GATEWAY_ROUTES_3_ID: runtime
+      SPRING_CLOUD_GATEWAY_ROUTES_3_URI: http://runtime-service:8084
+      SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0: Path=/runtime/**
+      SPRING_CLOUD_GATEWAY_ROUTES_3_FILTERS_0: StripPrefix=1
+    depends_on:
+      gateway-db:
+        condition: service_healthy
+      registry-service:
+        condition: service_started
+    networks:
+      - fstick-network
+
+volumes:
+  # Databases
+  registry-db-data:
+  installation-db-data:
+  integration-db-data:
+  runtime-db-data:
+  gateway-db-data:
+  
+  # Cache
+  installation-redis-data:
+  integration-redis-data:
+  runtime-redis-data:
+  
+  # Storage
+  minio-data:
+
+networks:
+  fstick-network:
+    name: fstick-network
+    driver: bridge

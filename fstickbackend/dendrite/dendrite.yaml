@@ -147,6 +147,10 @@ global:
     cache_size: 256
     cache_lifetime: "5m" # 5 minutes; https://pkg.go.dev/time@master#ParseDuration
 
+# Configuration for the Fstick gateway-service proxy used by /fstick/api/v1/* endpoints.
+fstick:
+  gateway_url: "http://localhost:8085"
+
 # Configuration for the Appservice API.
 app_service_api:
   # Disable the validation of TLS certificates of appservices. This is
@@ -349,9 +353,10 @@ user_api:
   auto_join_rooms:
   #  - "#main:matrix.org"
 
-  # The number of workers to start for the DeviceListUpdater. Defaults to 8.
-  # This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
-  # worker_count: 8
+   # The number of workers to start for the DeviceListUpdater. Defaults to 8.
+   # This only needs updating if the "InputDeviceListUpdate" stream keeps growing indefinitely.
+   worker_count: 8
+
 
 # Configuration for Opentracing.
 # See https://github.com/element-hq/dendrite/tree/master/docs/tracing for information on

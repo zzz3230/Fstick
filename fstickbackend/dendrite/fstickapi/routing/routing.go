@@ -46,4 +46,45 @@ func Setup(
 		"/api/v1/events/push",
 		PushFstickEvent(fstickStore),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	// Plugin list endpoint (registry-namespaced path)
+	router.Handle(
+		"/api/v1/registry/plugins",
+		ListPluginsProxy(cfg),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/registry/plugins/{plugin_id}",
+		GetPluginProxy(cfg),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/registry/plugins",
+		InitPluginUploadProxy(cfg),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/registry/plugins/{plugin_id}/commit",
+		CommitPluginUploadProxy(cfg),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/installations",
+		InstallPluginProxy(cfg),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/installations",
+		ListInstallationsProxy(cfg),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/installations/confirm",
+		ConfirmInstallProxy(cfg),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/installations/{installation_id}",
+		UninstallPluginProxy(cfg),
+	).Methods(http.MethodDelete, http.MethodOptions)
 }

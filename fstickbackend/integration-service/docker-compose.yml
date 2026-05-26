@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  integration-service:
+    build: .
+    container_name: integration-service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_APPLICATION_NAME: integration-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://integration-db:5432/integration_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATA_REDIS_HOST: integration-redis
+      SPRING_DATA_REDIS_PORT: 6379
+      REGISTRY_SERVICE_URL: http://registry-service:8082
+      RUNTIME_SERVICE_URL: http://runtime-service:8084
+      SERVER_PORT: 8080
+    depends_on:
+      integration-db:
+        condition: service_healthy
+      integration-redis:
+        condition: service_healthy
+    networks:
+      - fstick-network
+
+  integration-db:
+    image: postgres:16
+    container_name: integration-db
+    environment:
+      POSTGRES_DB: integration_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - integration-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d integration_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+  integration-redis:
+    image: redis:7-alpine
+    container_name: integration-redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - integration-redis-data:/data
+    command: redis-server --save 60 1 --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fstick-network
+
+volumes:
+  integration-db-data:
+  integration-redis-data:
+
+networks:
+  fstick-network:
+    driver: bridge
+

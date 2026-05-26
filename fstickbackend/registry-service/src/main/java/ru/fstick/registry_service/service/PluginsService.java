@@ -239,7 +239,7 @@ public class PluginsService {
     }
 
     @Transactional
-    public AddPluginResponse initPluginUpload(AddPluginRequest request) {
+    public AddPluginResponse initPluginUpload(AddPluginRequest request, UUID authorId) {
         UUID pluginId = UUID.randomUUID();
 
         List<FileUploadData> uploads = request.getFiles().stream()
@@ -286,7 +286,7 @@ public class PluginsService {
                 .build();
         //--------
 
-        pluginsRepository.addPlugin(pluginId, request.getName(), request.getDescription(), request.getCategory(), request.getTags(), request.getAuthorId());
+        pluginsRepository.addPlugin(pluginId, request.getName(), request.getDescription(), request.getCategory(), request.getTags(), authorId);
 
         // Создаём первую версию плагина
         UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), "Initial release", request.getRuntime());

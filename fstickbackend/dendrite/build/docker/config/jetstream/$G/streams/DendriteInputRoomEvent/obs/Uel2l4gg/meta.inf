@@ -1,0 +1,1 @@
+{"Created":"2026-05-25T19:52:01.807766043Z","Name":"Uel2l4gg","name":"Uel2l4gg","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"replay_policy":"instant","max_ack_pending":1000,"headers_only":true,"deliver_subject":"_INBOX.oQxosDGKdQ6C0EuuL4fRn2","num_replicas":0,"metadata":{"_nats.req.level":"0"}}
