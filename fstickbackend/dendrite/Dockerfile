@@ -26,7 +26,7 @@ RUN --mount=target=. \
 #
 # Builds the Dendrite image containing all required binaries
 #
-FROM alpine:latest
+FROM alpine:3.20
 RUN apk add --no-cache ca-certificates && update-ca-certificates
 RUN apk update && apk --update --no-cache add curl
 LABEL org.opencontainers.image.title="Dendrite"
