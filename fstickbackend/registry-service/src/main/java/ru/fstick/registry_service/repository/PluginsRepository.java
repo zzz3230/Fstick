@@ -77,6 +77,18 @@ public class PluginsRepository {
         List<UUID> categoryTemp = jdbcTemplate.query(sqlCategory, categoryRowMapper, category);
         UUID categoryId = categoryTemp.isEmpty() ? null : categoryTemp.get(0);
 
+        // Fallback: if category not found (empty string or unknown), use the first available category
+        if (categoryId == null) {
+            List<UUID> anyCategory = jdbcTemplate.query(
+                "SELECT category_id FROM categories ORDER BY name LIMIT 1", categoryRowMapper);
+            categoryId = anyCategory.isEmpty() ? null : anyCategory.get(0);
+        }
+
+        if (categoryId == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "No categories available in the system");
+        }
+
         String sqlStatus =
                 """
                     SELECT statuses.status_id as status_id

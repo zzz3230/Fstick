@@ -15,6 +15,7 @@ import ru.fstick.registry_service.dto.api.view.PluginViewExtend;
 import ru.fstick.registry_service.dto.api.view.PluginsView;
 import ru.fstick.registry_service.service.PluginsService;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
@@ -39,16 +40,32 @@ public class PluginsController {
 
     //добавить новый плагин
     @PostMapping
-    public AddPluginResponse addPlugin(@RequestHeader(value = "X-User-Id", required = false) UUID userId,
+    public AddPluginResponse addPlugin(@RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
                                        @RequestBody @Valid AddPluginRequest request) {
 
-        UUID authorId = userId != null ? userId : request.getAuthorId();
+        UUID authorId = resolveAuthorId(userIdHeader, request.getAuthorId());
 
         if (authorId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing user id");
         }
 
         return pluginsService.initPluginUpload(request, authorId);
+    }
+
+    /**
+     * Resolves author UUID from either a raw UUID string or a Matrix user ID
+     * (e.g. "@alice:localhost") by using a deterministic name-based UUID.
+     * Falls back to the authorId from the request body if the header is absent.
+     */
+    private static UUID resolveAuthorId(String userIdHeader, UUID fallback) {
+        if (userIdHeader != null && !userIdHeader.isBlank()) {
+            try {
+                return UUID.fromString(userIdHeader);
+            } catch (IllegalArgumentException e) {
+                return UUID.nameUUIDFromBytes(userIdHeader.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        return fallback;
     }
 
     //подтвердить создание плагина

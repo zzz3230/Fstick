@@ -32,6 +32,7 @@ services:
       - "5435:5432"
     volumes:
       - installation-db-data:/var/lib/postgresql/data
+      - "./installation-service/installation service database/installation service database.sql:/docker-entrypoint-initdb.d/01-init.sql:ro"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d installation_db"]
       interval: 5s
@@ -168,23 +169,24 @@ services:
       - fstick-network
 
   createbuckets:
-    image: minio/mc
+    image: amazon/aws-cli:2.15.0
     container_name: minio-create-buckets
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 admin 11111111;
-      mc mb local/f-stick-plugins --ignore-existing;
-  
-      mc cp /dev/null local/f-stick-plugins/plugins/.keep;
-      mc cp /dev/null local/f-stick-plugins/plugins/example/screenshots/.keep;
-      mc cp /dev/null local/f-stick-plugins/plugins/example/versions/1.0.0/client/js/1.0.0/.keep;
-      mc cp /dev/null local/f-stick-plugins/plugins/example/versions/1.0.0/server/lua/1.0.0/.keep;
-  
-      exit 0;
-      "
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: 11111111
+    volumes:
+      - ./minio-cors.json:/tmp/minio-cors.json:ro
+    entrypoint: ["/bin/sh", "-c", "\
+      set -euo pipefail; \
+      echo Waiting for MinIO; n=0; until curl -fsS http://minio:9000/minio/health/live >/dev/null 2>&1 || [ $n -ge 30 ]; do n=$((n+1)); echo attempt $n; sleep 1; done; \
+      aws --endpoint-url http://minio:9000 s3api create-bucket --bucket f-stick-plugins || true; \
+      aws --endpoint-url http://minio:9000 s3api put-bucket-cors --bucket f-stick-plugins --cors-configuration file:///tmp/minio-cors.json || true; \
+      echo CORS applied || true; \
+      sleep 1; \
+      " ]
     networks:
       - fstick-network
 
@@ -206,6 +208,7 @@ services:
       MINIO_BUCKET: f-stick-plugins
       MINIO_ACCESS_KEY: admin
       MINIO_SECRET_KEY: 11111111
+      MINIO_PUBLIC_URL: http://192.168.31.107:9010
       SERVER_PORT: 8082
     depends_on:
       registry-db:
@@ -249,7 +252,7 @@ services:
       dockerfile: Dockerfile
     container_name: integration-service
     ports:
-      - "8080:8080"
+      - "8086:8080"
     environment:
       SPRING_APPLICATION_NAME: integration-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://integration-db:5432/integration_db
@@ -260,6 +263,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       REGISTRY_SERVICE_URL: http://registry-service:8082
       RUNTIME_SERVICE_URL: http://runtime-service:8084
+      FSTICK_PROXY_BASE_URL: http://host.docker.internal:8008/fstick
       SERVER_PORT: 8080
     depends_on:
       integration-db:
@@ -314,7 +318,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SERVICES_REGISTRY_BASE_URL: http://registry-service:8082
-      SERVICES_INSTALLATION_BASE_URL: http://installation-service:8083
+      SERVICES_INSTALLATION_BASE_URL: http://installation-service:8081
       INTEGRATION_SERVICE_URL: http://integration-service:8080
       RUNTIME_SERVICE_URL: http://runtime-service:8084
       SERVER_PORT: 8085
@@ -323,7 +327,7 @@ services:
       SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0: Path=/registry/**
       SPRING_CLOUD_GATEWAY_ROUTES_0_FILTERS_0: StripPrefix=1
       SPRING_CLOUD_GATEWAY_ROUTES_1_ID: installation
-      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://installation-service:8083
+      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://installation-service:8081
       SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0: Path=/installation/**
       SPRING_CLOUD_GATEWAY_ROUTES_1_FILTERS_0: StripPrefix=1
       SPRING_CLOUD_GATEWAY_ROUTES_2_ID: integration

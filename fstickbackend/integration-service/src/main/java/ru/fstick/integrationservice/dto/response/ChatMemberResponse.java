@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class ChatMemberResponse {
     private String userId;
-    private boolean isMember;
+    private boolean member;
     private ChatMemberRole role;
 }

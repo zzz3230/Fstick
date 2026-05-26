@@ -1,5 +1,6 @@
 package ru.fstick.installationservice.client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +40,7 @@ public class RegistryClient {
 
     @Getter @Setter
     public static class VersionView {
+        @JsonProperty("version_id")
         private UUID versionId;
         private String version;
     }
