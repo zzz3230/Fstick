@@ -1,0 +1,1 @@
+{"Created":"2026-05-21T13:11:59.511796596Z","Name":"zUS01oBp","name":"zUS01oBp","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"replay_policy":"instant","max_ack_pending":1000,"headers_only":true,"deliver_subject":"_INBOX.0ciaQEGtJ9OxREEpnMTtJf","num_replicas":0,"metadata":{"_nats.req.level":"0"}}
