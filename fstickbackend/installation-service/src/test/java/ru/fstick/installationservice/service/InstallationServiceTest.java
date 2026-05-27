@@ -97,7 +97,6 @@ class InstallationServiceTest {
     @Test
     void install_outdatedVersion_returnsPendingToken() {
         UUID latestId = UUID.randomUUID();
-        // latestId первый — значит versionId устарел
         when(integrationClient.isAdmin(userId, chatId)).thenReturn(true);
         when(registryClient.getPlugin(pluginId)).thenReturn(activePlugin(latestId, versionId));
         when(repository.existsByPluginIdAndChatId(pluginId, chatId)).thenReturn(false);
@@ -146,7 +145,6 @@ class InstallationServiceTest {
 
     @Test
     void install_versionNotFound_throwsVersionNotFoundException() {
-        // плагин активный, но versionId не совпадает ни с одной версией
         when(integrationClient.isAdmin(userId, chatId)).thenReturn(true);
         when(registryClient.getPlugin(pluginId)).thenReturn(activePlugin(UUID.randomUUID()));
 
