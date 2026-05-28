@@ -10,7 +10,6 @@ import java.util.UUID;
 
 @Repository
 public class InstallationRepository {
-
     private final JdbcTemplate jdbcTemplate;
     private final InstallationRowMapper rowMapper = new InstallationRowMapper();
 

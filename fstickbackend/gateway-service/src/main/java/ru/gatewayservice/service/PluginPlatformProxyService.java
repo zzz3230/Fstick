@@ -1,5 +1,6 @@
 package ru.gatewayservice.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,11 +22,23 @@ public class PluginPlatformProxyService {
     private final String registryBaseUrl;
     private final String installationBaseUrl;
 
+    @Autowired
     public PluginPlatformProxyService(
             @Value("${services.registry.base-url}") String registryBaseUrl,
             @Value("${services.installation.base-url}") String installationBaseUrl
     ) {
         this.restClient = RestClient.create();
+        this.registryBaseUrl = registryBaseUrl;
+        this.installationBaseUrl = installationBaseUrl;
+    }
+
+    // Для тестов
+    public PluginPlatformProxyService(
+            @Value("${services.registry.base-url}") String registryBaseUrl,
+            @Value("${services.installation.base-url}") String installationBaseUrl,
+            RestClient restClient
+    ) {
+        this.restClient = restClient;
         this.registryBaseUrl = registryBaseUrl;
         this.installationBaseUrl = installationBaseUrl;
     }

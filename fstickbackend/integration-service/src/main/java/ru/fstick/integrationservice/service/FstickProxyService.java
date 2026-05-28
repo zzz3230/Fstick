@@ -2,6 +2,7 @@ package ru.fstick.integrationservice.service;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,8 +23,13 @@ public class FstickProxyService {
 
     private final RestClient restClient;
 
+    @Autowired
     public FstickProxyService(@Value("${fstick.proxy.base-url:http://localhost:8008/fstick}") String baseUrl) {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+    }
+
+    public FstickProxyService(RestClient restClient) {
+        this.restClient = restClient;
     }
 
     public ChatMemberResponse getChatMember(String chatId, String userId) {
@@ -109,14 +115,14 @@ public class FstickProxyService {
     }
 
     @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-    private static final class UpstreamChatMemberResponse {
+    static final class UpstreamChatMemberResponse {
         @JsonProperty("is_member")
-        private boolean isMember;
+        boolean isMember;
 
         @JsonProperty("user_id")
-        private String userId;
+        String userId;
 
         @JsonProperty("role")
-        private String role;
+        String role;
     }
 }
