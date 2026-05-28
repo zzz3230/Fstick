@@ -18,6 +18,12 @@ type ChatMemberResponse struct {
 	Role     string `json:"role"` // "REGULAR" or "ADMIN"
 }
 
+// ChatMembersResponse is the JSON response for GET /api/v1/chats/{chat_id}/members.
+type ChatMembersResponse struct {
+	ChatID  string               `json:"chat_id"`
+	Members []ChatMemberResponse `json:"members"`
+}
+
 // GetChatMember returns an HTTP handler that queries whether a given user is a member
 // of a Matrix room (chat), and what their role is (REGULAR or ADMIN based on power level).
 //
@@ -74,6 +80,62 @@ func GetChatMember(rsAPI roomserverAPI.ClientRoomserverAPI) http.Handler {
 			Role:     role,
 		}
 		writeJSON(w, http.StatusOK, resp)
+	})
+}
+
+// GetChatMembers returns an HTTP handler that lists all joined members of a room.
+//
+// GET /api/v1/chats/{chat_id}/members
+//
+// Response:
+//
+//	{ "chat_id": "!room:server", "members": [{"user_id":"@a:s","is_member":true,"role":"ADMIN"}, ...] }
+func GetChatMembers(rsAPI roomserverAPI.ClientRoomserverAPI) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		chatID := vars["chat_id"]
+		ctx := r.Context()
+
+		// Query all joined members
+		membersRes := &roomserverAPI.QueryMembershipsForRoomResponse{}
+		if err := rsAPI.QueryMembershipsForRoom(ctx, &roomserverAPI.QueryMembershipsForRoomRequest{
+			RoomID:     chatID,
+			JoinedOnly: true,
+		}, membersRes); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to query members")
+			return
+		}
+
+		// Query power levels once for role determination
+		stateRes := &roomserverAPI.QueryCurrentStateResponse{}
+		tuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.power_levels", StateKey: ""}
+		_ = rsAPI.QueryCurrentState(ctx, &roomserverAPI.QueryCurrentStateRequest{
+			RoomID:      chatID,
+			StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+		}, stateRes)
+
+		members := make([]ChatMemberResponse, 0, len(membersRes.JoinEvents))
+		for _, ev := range membersRes.JoinEvents {
+			userID := ev.StateKey
+			if userID == nil {
+				continue
+			}
+			role := "REGULAR"
+			if plEvent, ok := stateRes.StateEvents[tuple]; ok {
+				sid := ev.SenderKey
+				role = determinRole(plEvent.Content(), &sid)
+			}
+			members = append(members, ChatMemberResponse{
+				IsMember: true,
+				UserID:   *userID,
+				Role:     role,
+			})
+		}
+
+		writeJSON(w, http.StatusOK, ChatMembersResponse{
+			ChatID:  chatID,
+			Members: members,
+		})
 	})
 }
 

@@ -1,4 +1,4 @@
-package ru.fstick.runtimeservice.dto;
+    package ru.fstick.runtimeservice.dto;
 
 public enum CommandStatus {
     SUCCESS,

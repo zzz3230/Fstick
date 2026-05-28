@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: OpenAPI definition
+  title: Runtime Service API
   version: v0
 servers:
 - url: http://localhost:8080
@@ -11,6 +11,13 @@ paths:
       tags:
       - plugin-execute-controller
       operationId: handleCommand
+      parameters:
+      - in: header
+        name: X-User-Id
+        required: true
+        schema:
+          type: string
+        description: Идентификатор пользователя, отправившего команду
       requestBody:
         content:
           application/json:
@@ -24,48 +31,90 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommandResponse"
+  /plugins/{pluginId}/state:
+    get:
+      tags:
+      - plugin-execute-controller
+      operationId: getPluginState
+      parameters:
+      - in: path
+        name: pluginId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: chat_id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Текущий стейт плагина для указанного чата
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: true
 components:
   schemas:
     CommandRequest:
       type: object
+      required:
+      - name
+      - pluginId
+      - chatId
       properties:
         name:
           type: string
-        plugin_id:
+          description: Имя команды плагина
+        pluginId:
           type: string
-        user_id:
+          format: uuid
+          description: Идентификатор плагина
+        chatId:
           type: string
-        chat_id:
+          description: Идентификатор чата
+        trackId:
           type: string
-        track_id:
-          type: string
+          description: Идентификатор трека (опционально)
         args:
           type: object
           additionalProperties:
             type: object
+          description: Аргументы команды
     CommandError:
       type: object
       properties:
         message:
           type: string
+          description: Сообщение об ошибке
         code:
-          type: integer
-          format: int32
+          type: string
+          description: Код ошибки (RUNTIME_ERROR, COMMAND_NOT_FOUND, VALIDATION_ERROR)
         details:
           type: string
+          description: Дополнительные детали (стек и т.п.)
     CommandResponse:
       type: object
       properties:
         status:
           type: string
           enum:
-          - OK
-          - UNKNOWN_ERROR
+          - SUCCESS
+          - RUNTIME_ERROR
+          - COMMAND_NOT_FOUND
           - VALIDATION_ERROR
-          - PLUGIN_ERROR
+          description: Статус выполнения команды
         response:
           type: object
           additionalProperties:
             type: object
+          description: Результат выполнения команды (из return хендлера)
         error:
           $ref: "#/components/schemas/CommandError"
+        state:
+          type: object
+          additionalProperties:
+            type: object
+          description: Актуальный стейт плагина после выполнения команды (null, если не изменился)
