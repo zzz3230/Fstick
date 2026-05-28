@@ -45,6 +45,13 @@ Types.object = function(schema)
     }
 end
 
+Types.user_scoped = function(fields)
+    return {
+        __type = "user_scoped",
+        fields = fields
+    }
+end
+
 
 
 
@@ -139,6 +146,10 @@ function wrapNode(root, path, schema)
     elseif t == "object" then
         return ObjectNode(root, path, schema.schema)
 
+    elseif t == "user_scoped" then
+        -- user_scoped acts as a map from userId → object(fields)
+        return MapNode(root, path, Types.object(schema.fields))
+
     elseif t == "enum" then
         -- пока как value, но можно потом добавить проверку
         return ValueNode(root, path)
@@ -194,11 +205,17 @@ local function generate_minimal_data(schema, is_top)
         return {}
     end
 
+    -- user_scoped: empty map (userId → data)
+    if t == "user_scoped" then
+        return {}
+    end
+
     -- object
     if t == "object" or is_top then
         local obj = {}
-
-        for key, field_schema in pairs(schema.schema) do
+        -- top-level schema is a plain table {field=Type, ...}; wrapped Types.object uses schema.schema
+        local fields = (t == "object") and schema.schema or schema
+        for key, field_schema in pairs(fields) do
             obj[key] = generate_minimal_data(field_schema, false)
         end
 
@@ -386,6 +403,18 @@ local function validate(value, schema, path)
         return true
     end
 
+    -- ===== user_scoped =====
+    if t == "user_scoped" then
+        if type(value) ~= "table" then return false, path .. " expected user_scoped table" end
+        for userId, userVal in pairs(value) do
+            if userVal ~= nil then
+                local ok, err = validate(userVal, { __type = "object", schema = schema.fields }, path .. "[" .. tostring(userId) .. "]")
+                if not ok then return false, err end
+            end
+        end
+        return true
+    end
+
     -- ===== object =====
     if t == "object" then
         if type(value) ~= "table" then return false, path .. " expected object" end
@@ -457,6 +486,10 @@ end
 
 -- retruns {status=OK|COMMAND_NOT_FOUND|VALIDATION_ERROR|RUNTIME_ERROR, result={}|nil, error={}|nil}
 function ExecuteCommandHandler(commandName, payload)
+    -- Auto-sync: if plugin declares state_schema as a global, use it
+    if state_schema ~= nil then
+        StateSchema = state_schema
+    end
     if Commands[commandName] == nil then
         return make_error(CommandStatus.COMMAND_NOT_FOUND, commandName .. " not found")
     end

@@ -38,6 +38,34 @@ public class PluginMarketplaceController {
         return proxyService.commitPluginUpload(pluginId, requestBody, userId);
     }
 
+    @GetMapping("/plugins/{pluginId}/state")
+    public ResponseEntity<String> getPluginState(
+            @PathVariable String pluginId,
+            @RequestParam("chat_id") String chatId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId
+    ) {
+        return proxyService.getPluginState(pluginId, chatId, userId);
+    }
+
+    @PostMapping("/plugins/{pluginId}/command")
+    public ResponseEntity<String> executeCommand(
+            @PathVariable String pluginId,
+            @RequestParam(required = false) String chat_id,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestBody String requestBody
+    ) {
+        return proxyService.executePluginCommand(pluginId, chat_id, userId, requestBody);
+    }
+
+    @GetMapping("/plugins/{pluginId}/code/client")
+    public ResponseEntity<String> getPluginCodeClient(
+            @PathVariable String pluginId,
+            @RequestParam(required = false) String version,
+            @RequestParam(required = false) String runtime
+    ) {
+        return proxyService.getPluginCodeClient(pluginId, version, runtime);
+    }
+
     @PostMapping("/installations")
     public ResponseEntity<String> installPlugin(
             @RequestHeader("X-User-Id") String userId,

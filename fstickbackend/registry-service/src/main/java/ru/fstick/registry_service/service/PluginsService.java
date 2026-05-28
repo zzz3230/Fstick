@@ -90,6 +90,7 @@ public class PluginsService {
         versions.forEach(version -> {versionViews.add(VersionView.builder()
                 .versionId(version.getVersionId())
                 .version(version.getVersion())
+                .runtime(version.getRuntime())
                 .changelog(version.getChangelog())
                 .build());});
 
@@ -135,6 +136,7 @@ public class PluginsService {
         versions.forEach(version -> {versionViews.add(VersionView.builder()
                 .versionId(version.getVersionId())
                 .version(version.getVersion())
+                .runtime(version.getRuntime())
                 .changelog(version.getChangelog())
                 .build());});
 
@@ -216,6 +218,7 @@ public class PluginsService {
         versions.forEach(version -> {versionViews.add(VersionView.builder()
                 .versionId(version.getVersionId())
                 .version(version.getVersion())
+                .runtime(version.getRuntime())
                 .changelog(version.getChangelog())
                 .build());});
 
@@ -356,6 +359,7 @@ public class PluginsService {
         versions.forEach(version -> {versionViews.add(VersionView.builder()
                 .versionId(version.getVersionId())
                 .version(version.getVersion())
+                .runtime(version.getRuntime())
                 .changelog(version.getChangelog())
                 .build());});
 
@@ -427,6 +431,7 @@ public class PluginsService {
         versions.forEach(version -> {versionViews.add(VersionView.builder()
                 .versionId(version.getVersionId())
                 .version(version.getVersion())
+                .runtime(version.getRuntime())
                 .changelog(version.getChangelog())
                 .build());});
 
@@ -499,7 +504,7 @@ public class PluginsService {
         List<FileDownloadData> downloads = serverKeys.stream().map(key -> FileDownloadData.builder()
                 .downloadUrl(s3Service.generateDownloadUrl(key))
                 .build()).toList();
-
+        
 
         return CodeLinksResponse.builder()
                 .files(downloads)

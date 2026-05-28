@@ -38,6 +38,11 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	router.Handle(
+		"/api/v1/chats/{chat_id}/members",
+		GetChatMembers(rsAPI),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	router.Handle(
 		"/api/v1/chats/{chat_id}/messages",
 		SendChatMessage(cfg, rsAPI, userAPI),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -50,41 +55,56 @@ func Setup(
 	// Plugin list endpoint (registry-namespaced path)
 	router.Handle(
 		"/api/v1/registry/plugins",
-		ListPluginsProxy(cfg),
+		ListPluginsProxy(cfg, userAPI),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	router.Handle(
 		"/api/v1/registry/plugins/{plugin_id}",
-		GetPluginProxy(cfg),
+		GetPluginProxy(cfg, userAPI),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	router.Handle(
 		"/api/v1/registry/plugins",
-		InitPluginUploadProxy(cfg),
+		InitPluginUploadProxy(cfg, userAPI),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	router.Handle(
 		"/api/v1/registry/plugins/{plugin_id}/commit",
-		CommitPluginUploadProxy(cfg),
+		CommitPluginUploadProxy(cfg, userAPI),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/registry/plugins/{plugin_id}/code/client",
+		GetPluginCodeClientProxy(cfg, userAPI),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/plugins/{plugin_id}/command",
+		PluginCommandProxy(cfg, userAPI),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/plugins/{plugin_id}/state",
+		PluginStateProxy(cfg, userAPI),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	router.Handle(
+		"/api/v1/installations",
+		InstallPluginProxy(cfg, userAPI),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	router.Handle(
 		"/api/v1/installations",
-		InstallPluginProxy(cfg),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/installations",
-		ListInstallationsProxy(cfg),
+		ListInstallationsProxy(cfg, userAPI),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	router.Handle(
 		"/api/v1/installations/confirm",
-		ConfirmInstallProxy(cfg),
+		ConfirmInstallProxy(cfg, userAPI),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	router.Handle(
 		"/api/v1/installations/{installation_id}",
-		UninstallPluginProxy(cfg),
+		UninstallPluginProxy(cfg, userAPI),
 	).Methods(http.MethodDelete, http.MethodOptions)
 }
