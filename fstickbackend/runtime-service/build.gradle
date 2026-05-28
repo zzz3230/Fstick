@@ -41,9 +41,6 @@ dependencies {
 
     implementation 'org.mock-server:mockserver-netty:5.15.0'
     implementation "org.mock-server:mockserver-client-java:5.15.0"
-    implementation 'io.projectreactor.netty:reactor-netty'
-
-    implementation 'com.fasterxml.jackson.core:jackson-annotations'
 }
 
 dependencyManagement {

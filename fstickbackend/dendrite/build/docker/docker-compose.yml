@@ -30,9 +30,6 @@ services:
     command: [
       "-really-enable-open-registration"
     ]
-    dns_search: []
-    dns_opt:
-      - ndots:1
     volumes:
       - ./config:/etc/dendrite
       # The following volumes use docker volumes, change this
