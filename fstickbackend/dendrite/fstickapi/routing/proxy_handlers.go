@@ -1,25 +1,16 @@
 package routing
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
-	"github.com/element-hq/dendrite/clientapi/auth"
 	"github.com/element-hq/dendrite/setup/config"
-	userapi "github.com/element-hq/dendrite/userapi/api"
 )
-
-// gatewayHTTPClient is a shared HTTP client with a generous timeout for gateway proxy calls.
-var gatewayHTTPClient = &http.Client{
-	Timeout: 30 * time.Second,
-}
 
 // corsMiddleware wraps an HTTP handler to add CORS headers to responses.
 // This allows browser-based clients to make cross-origin requests to the fstick API.
@@ -61,23 +52,7 @@ func gatewayURL(cfg *config.Dendrite) *url.URL {
 	return u
 }
 
-// authenticateAndGetUserID validates the Matrix access token from the request
-// and returns the full Matrix user ID (e.g. @alice:localhost).
-// On failure it writes an error response and returns "".
-func authenticateAndGetUserID(w http.ResponseWriter, r *http.Request, uAPI userapi.QueryAcccessTokenAPI) string {
-	device, jsonErr := auth.VerifyUserFromRequest(r, uAPI)
-	if jsonErr != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(jsonErr.Code)
-		if data, err := json.Marshal(jsonErr.JSON); err == nil {
-			_, _ = w.Write(data)
-		}
-		return ""
-	}
-	return device.UserID
-}
-
-func proxyToGateway(w http.ResponseWriter, r *http.Request, base *url.URL, targetPath string, userID string) {
+func proxyToGateway(w http.ResponseWriter, r *http.Request, base *url.URL, targetPath string) {
 	if base == nil {
 		http.Error(w, "gateway-service is not configured", http.StatusServiceUnavailable)
 		return
@@ -99,37 +74,19 @@ func proxyToGateway(w http.ResponseWriter, r *http.Request, base *url.URL, targe
 	}
 
 	for name, vals := range r.Header {
-		if strings.EqualFold(name, "Host") || strings.EqualFold(name, "X-User-Id") {
+		if strings.EqualFold(name, "Host") {
 			continue
 		}
 		for _, val := range vals {
 			req.Header.Add(name, val)
 		}
 	}
-	// Inject the authenticated user ID so backend services can trust it.
-	if userID != "" {
-		req.Header.Set("X-User-Id", userID)
-	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// Retry once — helps with transient Docker DNS failures on startup
-		logrus.WithError(err).Warn("gateway proxy request failed, retrying once")
-		time.Sleep(500 * time.Millisecond)
-		req2, _ := http.NewRequest(r.Method, target.String(), nil)
-		if req2 != nil {
-			for name, vals := range req.Header {
-				for _, val := range vals {
-					req2.Header.Add(name, val)
-				}
-			}
-			resp, err = http.DefaultClient.Do(req2)
-		}
-		if err != nil {
-			logrus.WithError(err).Error("gateway proxy request failed after retry")
-			http.Error(w, "failed to proxy request", http.StatusBadGateway)
-			return
-		}
+		logrus.WithError(err).Error("gateway proxy request failed")
+		http.Error(w, "failed to proxy request", http.StatusBadGateway)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -145,119 +102,54 @@ func proxyToGateway(w http.ResponseWriter, r *http.Request, base *url.URL, targe
 	_, _ = io.Copy(w, resp.Body)
 }
 
-func ListPluginsProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func ListPluginsProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins")
 	})
 }
 
-func GetPluginProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func GetPluginProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
 		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID), userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID))
 	})
 }
 
-func InitPluginUploadProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func InitPluginUploadProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins")
 	})
 }
 
-func CommitPluginUploadProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func CommitPluginUploadProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
 		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/commit", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/commit")
 	})
 }
 
-func GetPluginCodeClientProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func InstallPluginProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/code/client", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations")
 	})
 }
 
-func PluginCommandProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func ListInstallationsProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/command", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations")
 	})
 }
 
-func PluginStateProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func ConfirmInstallProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/state", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations/confirm")
 	})
 }
 
-func InstallPluginProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+func UninstallPluginProxy(cfg *config.Dendrite) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations", userID)
-	})
-}
-
-func ListInstallationsProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations", userID)
-	})
-}
-
-func ConfirmInstallProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations/confirm", userID)
-	})
-}
-
-func UninstallPluginProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
 		installationID := mux.Vars(r)["installation_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations/"+url.PathEscape(installationID), userID)
+		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations/"+url.PathEscape(installationID))
 	})
 }
 

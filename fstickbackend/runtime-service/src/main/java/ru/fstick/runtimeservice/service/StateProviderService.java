@@ -10,23 +10,43 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Service
 public class StateProviderService {
-
     private final RedisTemplate<String, Object> redisTemplate;
 
-    /** Shared state — один на весь чат (для коллаборативных плагинов) */
+    /**
+     * Получает состояние плагина из хранилища Redis
+     * 
+     * @param pluginId идентификатор плагина
+     * @param chatId идентификатор чата
+     * @return объект состояния плагина
+     */
     public PluginRuntimeState getState(UUID pluginId, String chatId) {
-        Object value = redisTemplate.opsForValue().get(stateKey(pluginId, chatId));
-        return new PluginRuntimeState(value, pluginId, chatId);
+        Object stateValue = redisTemplate.opsForValue().get(makeKey(pluginId, chatId));
+        return new PluginRuntimeState(stateValue, pluginId, chatId);
     }
 
-    public void commitState(PluginRuntimeState state) {
+    /**
+     * Сохраняет состояние плагина в хранилище Redis
+     * 
+     * @param pluginRuntimeState объект состояния плагина для сохранения
+     */
+    public void commitState(PluginRuntimeState pluginRuntimeState) {
         redisTemplate.opsForValue().set(
-                stateKey(state.getOwnerPluginId(), state.getOwnerChatId()),
-                state.getValue()
+                makeKey(
+                        pluginRuntimeState.getOwnerPluginId(),
+                        pluginRuntimeState.getOwnerChatId()
+                ),
+                pluginRuntimeState.getValue()
         );
     }
 
-    static String stateKey(UUID pluginId, String chatId) {
+    /**
+     * Формирует ключ для хранения состояния в Redis
+     * 
+     * @param pluginId идентификатор плагина
+     * @param chatId идентификатор чата
+     * @return сформированный ключ
+     */
+    private String makeKey(UUID pluginId, String chatId) {
         return "state:" + pluginId + ":" + chatId;
     }
 }

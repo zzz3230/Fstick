@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/runtime-service.iml" filepath="$PROJECT_DIR$/.idea/runtime-service.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/runtime-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/runtime-service.main.iml" />
     </modules>
   </component>
 </project>

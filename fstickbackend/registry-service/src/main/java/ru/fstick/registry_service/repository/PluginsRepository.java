@@ -310,36 +310,16 @@ public class PluginsRepository {
     }
 
     public List<String> getCode(UUID pluginId, String version, String runtime) {
-        // если runtime не задан или передан как строка "undefined" — ищем только по pluginId + version
-        boolean noRuntime = runtime == null || runtime.isBlank() || "undefined".equalsIgnoreCase(runtime);
-
-        if (noRuntime) {
-            String sql =
-                    """
-                        SELECT s3_file_key FROM files
-                        WHERE version_id = (
-                            SELECT version_id FROM versions
-                            WHERE plugin_id = ? AND version_number = ?
-                            ORDER BY created_at DESC
-                            LIMIT 1
-                        );
-                    """;
-            return jdbcTemplate.queryForList(sql, String.class, pluginId, version);
-        }
-
         String getCodeClientSql =
                 """
                     SELECT s3_file_key FROM files
                     WHERE version_id = (
                         SELECT version_id FROM versions
-                        WHERE plugin_id = ? AND version_number = ?
-                          AND (runtime = ? OR (runtime IS NULL AND ? IS NULL))
-                        ORDER BY created_at DESC
-                        LIMIT 1
+                        WHERE plugin_id = ? AND version_number = ? AND runtime = ?
                     );
                 """;
 
-        return jdbcTemplate.queryForList(getCodeClientSql, String.class, pluginId, version, runtime, runtime);
+        return jdbcTemplate.queryForList(getCodeClientSql, String.class, pluginId, version, runtime);
     }
 
     public PluginData addFiles(UUID pluginId, UUID versionId, String icon, List<String> allScreenshots, List<String> allFiles) {

@@ -9,7 +9,6 @@ import java.util.UUID;
 public class VersionView {
     private UUID versionId;
     private String version;
-    private String runtime;
     private String changelog;
     private String createdAt;
 }
