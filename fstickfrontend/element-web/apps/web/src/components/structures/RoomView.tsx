@@ -82,6 +82,7 @@ import RoomPreviewCard from "../views/rooms/RoomPreviewCard";
 import RoomUpgradeWarningBar from "../views/rooms/RoomUpgradeWarningBar";
 import AuxPanel from "../views/rooms/AuxPanel";
 import RoomHeader from "../views/rooms/RoomHeader/RoomHeader";
+import { DslTopBarSlot } from "../../fstick/DslTopBarSlot";
 import { type IOOBData, type IThreepidInvite } from "../../stores/ThreepidInviteStore";
 import EffectsOverlay from "../views/elements/EffectsOverlay";
 import { containsEmoji } from "../../effects/utils";
@@ -2720,6 +2721,13 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
             if (b) extraButtons.push(b);
         }
 
+        const dslPluginPanel = this.state.room && this.context.client ? (
+            <DslTopBarSlot
+                roomId={this.state.room.roomId}
+                userId={this.context.client.getSafeUserId()}
+            />
+        ) : null;
+
         return (
             <ScopedRoomContextProvider {...this.state} roomViewStore={this.roomViewStore}>
                 <div
@@ -2751,6 +2759,7 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
                                         extraButtons={<>{extraButtons}</>}
                                     />
                                 )}
+                                {dslPluginPanel}
                                 {mainSplitBody}
                             </div>
                         </MainSplit>

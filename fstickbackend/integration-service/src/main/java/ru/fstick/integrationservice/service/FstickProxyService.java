@@ -4,18 +4,23 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
+import ru.fstick.integrationservice.dto.request.BroadcastPluginStateRequest;
 import ru.fstick.integrationservice.dto.request.PushEventRequest;
 import ru.fstick.integrationservice.dto.request.SendMessageRequest;
 import ru.fstick.integrationservice.dto.response.ChatMemberResponse;
 import ru.fstick.integrationservice.dto.response.ChatMemberRole;
+import ru.fstick.integrationservice.dto.response.ChatMembersResponse;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -28,8 +33,79 @@ public class FstickProxyService {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
     }
 
-    public FstickProxyService(RestClient restClient) {
-        this.restClient = restClient;
+    public void broadcastPluginState(BroadcastPluginStateRequest req) {
+        Map<String, Object> stateContent = new HashMap<>();
+        stateContent.put("plugin_id", req.getPluginId());
+        stateContent.put("chat_id", req.getChatId());
+        stateContent.put("state", req.getState() != null ? req.getState() : Map.of());
+
+        if (req.getUserId() != null) {
+            // User-scoped: push only to this one user
+            pushStateEvent(req.getUserId(), stateContent);
+        } else {
+            // Broadcast: resolve all chat members and push to each
+            ChatMembersResponse members = getChatMembers(req.getChatId());
+            for (ChatMemberResponse member : members.getMembers()) {
+                try {
+                    pushStateEvent(member.getUserId(), stateContent);
+                } catch (Exception ex) {
+                    // Log and continue — don't abort the whole broadcast
+                }
+            }
+        }
+    }
+
+    private void pushStateEvent(String userId, Map<String, Object> content) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("user_id", userId);
+        body.put("type", "fstick.plugin.state");
+        body.put("content", content);
+
+        try {
+            restClient.post()
+                    .uri("/api/v1/events/push")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException ex) {
+            throw new ResponseStatusException(ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
+        } catch (RestClientException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to push plugin state event", ex);
+        }
+    }
+
+    public ChatMembersResponse getChatMembers(String chatId) {
+        try {
+            UpstreamChatMembersResponse upstream = restClient.get()
+                    .uri("/api/v1/chats/" + chatId + "/members")
+                    .retrieve()
+                    .body(UpstreamChatMembersResponse.class);
+
+            if (upstream == null || upstream.members == null) {
+                ChatMembersResponse empty = new ChatMembersResponse();
+                empty.setChatId(chatId);
+                empty.setMembers(List.of());
+                return empty;
+            }
+
+            List<ChatMemberResponse> members = new ArrayList<>();
+            for (UpstreamChatMemberResponse m : upstream.members) {
+                ChatMemberResponse r = new ChatMemberResponse();
+                r.setUserId(m.userId);
+                r.setMember(m.isMember);
+                r.setRole(parseRole(m.role));
+                members.add(r);
+            }
+
+            ChatMembersResponse response = new ChatMembersResponse();
+            response.setChatId(upstream.chatId != null ? upstream.chatId : chatId);
+            response.setMembers(members);
+            return response;
+        } catch (RestClientResponseException ex) {
+            throw new ResponseStatusException(ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
+        } catch (RestClientException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to call fstick API", ex);
+        }
     }
 
     public ChatMemberResponse getChatMember(String chatId, String userId) {
@@ -124,5 +200,14 @@ public class FstickProxyService {
 
         @JsonProperty("role")
         String role;
+    }
+
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    private static final class UpstreamChatMembersResponse {
+        @JsonProperty("chat_id")
+        private String chatId;
+
+        @JsonProperty("members")
+        private List<UpstreamChatMemberResponse> members;
     }
 }

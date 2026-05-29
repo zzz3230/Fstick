@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClient.RequestHeadersSpec;
 import org.springframework.web.util.UriComponentsBuilder;
 
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -21,15 +22,18 @@ public class PluginPlatformProxyService {
     private final RestClient restClient;
     private final String registryBaseUrl;
     private final String installationBaseUrl;
+    private final String runtimeBaseUrl;
 
     @Autowired
     public PluginPlatformProxyService(
             @Value("${services.registry.base-url}") String registryBaseUrl,
-            @Value("${services.installation.base-url}") String installationBaseUrl
+            @Value("${services.installation.base-url}") String installationBaseUrl,
+            @Value("${services.runtime.base-url}") String runtimeBaseUrl
     ) {
         this.restClient = RestClient.create();
         this.registryBaseUrl = registryBaseUrl;
         this.installationBaseUrl = installationBaseUrl;
+        this.runtimeBaseUrl = runtimeBaseUrl;
     }
 
     // Для тестов
@@ -82,6 +86,48 @@ public class PluginPlatformProxyService {
                 .toUriString();
 
         return forward(HttpMethod.POST, uri, body, userId);
+    }
+
+    public ResponseEntity<String> getPluginState(String pluginId, String chatId, String userId) {
+        String uri = UriComponentsBuilder
+                .fromUriString(runtimeBaseUrl)
+                .path("/plugins/{pluginId}/state")
+                .queryParam("chat_id", chatId)
+                .buildAndExpand(pluginId)
+                .toUriString();
+        return forward(HttpMethod.GET, uri, null, userId);
+    }
+
+    public ResponseEntity<String> executePluginCommand(String pluginId, String chatId, String userId, String body) {
+        // Inject plugin_id and chat_id into request body (runtime-service uses SNAKE_CASE)
+        String safePluginId = pluginId != null ? pluginId.replace("\"", "\\\"") : "";
+        String injection = "\"plugin_id\":\"" + safePluginId + "\"";
+        if (chatId != null) {
+            injection += ",\"chat_id\":\"" + chatId.replace("\"", "\\\"") + "\"";
+        }
+        String enrichedBody;
+        if (body != null && body.trim().startsWith("{")) {
+            int pos = body.indexOf('{') + 1;
+            enrichedBody = body.substring(0, pos) + injection + "," + body.substring(pos);
+        } else {
+            enrichedBody = "{" + injection + "}";
+        }
+        String uri = UriComponentsBuilder
+                .fromUriString(runtimeBaseUrl)
+                .path("/command")
+                .build(true)
+                .toUriString();
+        return forward(HttpMethod.POST, uri, enrichedBody, userId);
+    }
+
+    public ResponseEntity<String> getPluginCodeClient(String pluginId, String version, String runtime) {
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString(registryBaseUrl)
+                .path("/api/v1/plugins/{pluginId}/code/client");
+        if (version != null) builder.queryParam("version", version);
+        if (runtime != null) builder.queryParam("runtime", runtime);
+        String uri = builder.buildAndExpand(pluginId).toUriString();
+        return forward(HttpMethod.GET, uri, null, null);
     }
 
     public ResponseEntity<String> installPlugin(String chatId, String userId, String body) {

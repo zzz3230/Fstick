@@ -7,6 +7,7 @@ Please see LICENSE files in the repository root for full details.
 import { useEffect, useMemo, useState } from "react";
 
 import SdkConfig from "../../../SdkConfig";
+import { MatrixClientPeg } from "../../../MatrixClientPeg";
 
 export interface MarketplacePlugin {
     id: string;
@@ -133,16 +134,19 @@ function ensureOk(response: Response, message: string): void {
     if (!response.ok) throw new Error(`${message} (${response.status})`);
 }
 
-function buildHeaders(userId?: string, extra?: Record<string, string>): Record<string, string> {
-    const headers: Record<string, string> = { Accept: "application/json", ...(extra ?? {}) };
-    if (userId) headers["X-User-Id"] = userId;
-    return headers;
+function buildHeaders(accessToken: string, extra?: Record<string, string>): Record<string, string> {
+    return {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        ...(extra ?? {}),
+    };
 }
 
 export function useMarketplaceCardViewModel(roomId?: string, userId?: string): MarketplaceCardViewModelState {
     const endpoint = SdkConfig.get("fstick_marketplace_api_url" as Parameters<typeof SdkConfig.get>[0]);
     const hasEndpoint = typeof endpoint === "string" && endpoint.length > 0;
     const apiBase = hasEndpoint ? resolveApiBase(endpoint as string) : "";
+    const accessToken = MatrixClientPeg.get()?.getAccessToken() ?? "";
 
     const [query, setQuery] = useState("");
     const [allPlugins, setAllPlugins] = useState<MarketplacePlugin[]>([]);
@@ -172,7 +176,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
 
                 const pluginsResponse = await fetch(pluginsUrl.toString(), {
                     signal: controller.signal,
-                    headers: buildHeaders(userId),
+                    headers: buildHeaders(accessToken),
                 });
                 ensureOk(pluginsResponse, "Marketplace request failed");
                 setAllPlugins(normalizePlugins(await pluginsResponse.json()));
@@ -182,7 +186,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
                     installsUrl.searchParams.set("chat_id", roomId);
                     const installsResponse = await fetch(installsUrl.toString(), {
                         signal: controller.signal,
-                        headers: buildHeaders(userId),
+                        headers: buildHeaders(accessToken),
                     });
                     if (installsResponse.ok) {
                         const payload = (await installsResponse.json()) as InstallationListResponse;
@@ -208,7 +212,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
             window.clearTimeout(timeout);
             controller.abort();
         };
-    }, [apiBase, hasEndpoint, query, reloadToken, roomId, userId]);
+    }, [apiBase, accessToken, hasEndpoint, query, reloadToken, roomId, userId]);
 
     const visiblePlugins = useMemo(() => {
         if (!query.trim()) return allPlugins;
@@ -232,7 +236,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
         setActionByPlugin((prev) => ({ ...prev, [pluginId]: true }));
         try {
             const detailsResponse = await fetch(`${apiBase}/registry/plugins/${encodeURIComponent(pluginId)}`, {
-                headers: buildHeaders(userId),
+                headers: buildHeaders(accessToken),
             });
             ensureOk(detailsResponse, "Failed to load plugin details");
             const detailsPayload = (await detailsResponse.json()) as { versions?: PluginVersionView[] };
@@ -246,7 +250,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
 
             const installResponse = await fetch(`${apiBase}/installations?chat_id=${encodeURIComponent(roomId)}`, {
                 method: "POST",
-                headers: buildHeaders(userId, { "Content-Type": "application/json" }),
+                headers: buildHeaders(accessToken, { "Content-Type": "application/json" }),
                 body: JSON.stringify({ pluginId, versionId: selected.version_id }),
             });
             const installPayload = installResponse.headers.get("content-type")?.includes("application/json")
@@ -258,11 +262,13 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
             if (token) {
                 const confirmResponse = await fetch(`${apiBase}/installations/confirm`, {
                     method: "POST",
-                    headers: buildHeaders(userId, { "Content-Type": "application/json" }),
+                    headers: buildHeaders(accessToken, { "Content-Type": "application/json" }),
                     body: JSON.stringify({ confirmationToken: token }),
                 });
                 ensureOk(confirmResponse, "Install confirm failed");
             }
+            // Notify DslTopBarSlot (and any other listeners) to reload plugins immediately
+            window.dispatchEvent(new CustomEvent("fstick:plugin-installed", { detail: { roomId, pluginId } }));
             setReloadToken((v) => v + 1);
         } finally {
             setActionByPlugin((prev) => ({ ...prev, [pluginId]: false }));
@@ -277,7 +283,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
         try {
             const response = await fetch(`${apiBase}/installations/${encodeURIComponent(installationId)}`, {
                 method: "DELETE",
-                headers: buildHeaders(userId),
+                headers: buildHeaders(accessToken),
             });
             if (!response.ok) throw new Error(`Uninstall failed (${response.status})`);
             setReloadToken((v) => v + 1);
@@ -293,7 +299,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
         try {
             const initResponse = await fetch(`${apiBase}/registry/plugins`, {
                 method: "POST",
-                headers: buildHeaders(userId, { "Content-Type": "application/json" }),
+                headers: buildHeaders(accessToken, { "Content-Type": "application/json" }),
                 body: JSON.stringify({
                     name: payload.name,
                     description: payload.description,
@@ -341,7 +347,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
             ensureOk(
                 await fetch(`${apiBase}/registry/plugins/${encodeURIComponent(initPayload.plugin_id)}/commit`, {
                     method: "POST",
-                    headers: buildHeaders(userId, { "Content-Type": "application/json" }),
+                    headers: buildHeaders(accessToken, { "Content-Type": "application/json" }),
                     body: JSON.stringify({ version_id: initPayload.version_id, keys: commitKeys }),
                 }),
                 "Upload commit failed",

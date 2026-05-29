@@ -17,7 +17,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U admin -d registry_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     networks:
       - fstick-network
 
@@ -319,6 +320,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SERVICES_REGISTRY_BASE_URL: http://registry-service:8082
       SERVICES_INSTALLATION_BASE_URL: http://installation-service:8081
+      SERVICES_RUNTIME_BASE_URL: http://runtime-service:8084
       INTEGRATION_SERVICE_URL: http://integration-service:8080
       RUNTIME_SERVICE_URL: http://runtime-service:8084
       SERVER_PORT: 8085
