@@ -4,6 +4,7 @@ import SdkConfig from "../SdkConfig";
 import { MatrixClientPeg } from "../MatrixClientPeg";
 import { loadPluginsForChat, type PluginEntry } from "./dsl/loader";
 import { runDsl, type DslRunResult } from "./dsl/runner";
+import { makeRef, type StateRef } from "./dsl/state";
 import { DslRenderer } from "./dsl/Renderer";
 import DSL_LIB_CODE from "./dsl/libCode";
 import { FSTICK_SYNC_EVENT, type FstickSyncEventDetail } from "./syncInterceptor";
@@ -22,9 +23,8 @@ interface RunningPlugin {
 
 function resolveApiBase(): string {
     const raw =
-        (SdkConfig.get("fstick_marketplace_api_url" as Parameters<typeof SdkConfig.get>[0]) as
-            | string
-            | undefined) ?? "";
+        (SdkConfig.get("fstick_marketplace_api_url" as Parameters<typeof SdkConfig.get>[0]) as string | undefined) ??
+        "";
     return raw.replace(/\/(plugins|registry).*$/, "");
 }
 
@@ -41,14 +41,13 @@ export function DslTopBarSlot({ roomId, userId }: Props): React.ReactElement | n
     const startHeight = useRef<number>(80);
 
     const onResizeStart = useCallback(
-        (installationId: string, currentHeight: number) =>
-            (e: React.MouseEvent) => {
-                e.preventDefault();
+        (installationId: string, currentHeight: number) => (e: React.MouseEvent) => {
+            e.preventDefault();
 
-                setResizingId(installationId);
-                startY.current = e.clientY;
-                startHeight.current = currentHeight;
-            },
+            setResizingId(installationId);
+            startY.current = e.clientY;
+            startHeight.current = currentHeight;
+        },
         [],
     );
 
@@ -205,7 +204,7 @@ export function DslTopBarSlot({ roomId, userId }: Props): React.ReactElement | n
                                     overflow: "auto",
                                 }}
                             >
-                                <DslRenderer node={result.tree} />
+                                <DslRenderer node={result.tree} state={makeRef(result.store, "")} />
                             </div>
                         </div>
 

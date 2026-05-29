@@ -53,7 +53,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .build()));
@@ -97,10 +97,10 @@ public class PluginsService {
         List<ScreenshotView> screenshotViews = new ArrayList<>();
         screenshots.forEach(screenshot -> {screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
                 .build());});
 
-        String iconUrl = s3Service.generateDownloadUrl(pluginData.getIconUrlKey());
+        String iconUrl = s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true);
 
         return PluginViewExtend.builder()
                 .id(pluginData.getId())
@@ -143,7 +143,7 @@ public class PluginsService {
         List<ScreenshotView> screenshotViews = new ArrayList<>();
         screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
                 .build()));
 
         return PluginViewExtend.builder()
@@ -154,7 +154,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -225,7 +225,7 @@ public class PluginsService {
         List<ScreenshotView> screenshotViews = new ArrayList<>();
         screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
                 .build()));
 
         return PluginViewExtend.builder()
@@ -236,7 +236,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -366,7 +366,7 @@ public class PluginsService {
         List<ScreenshotView> screenshotViews = new ArrayList<>();
         screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
                 .build()));
 
         return PluginViewExtend.builder()
@@ -377,7 +377,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -438,7 +438,7 @@ public class PluginsService {
         List<ScreenshotView> screenshotViews = new ArrayList<>();
         screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
                 .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey()))
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
                 .build()));
 
         return PluginViewExtend.builder()
@@ -449,7 +449,7 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey()))
+                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .versions(versionViews)
@@ -485,7 +485,7 @@ public class PluginsService {
 
 
         List<FileDownloadData> downloads = clientKeys.stream().map(key -> FileDownloadData.builder()
-                .downloadUrl(s3Service.generateDownloadUrl(key))
+                .downloadUrl(s3Service.generateDownloadUrl(key, true))
                 .build()).toList();
 
 
@@ -502,7 +502,7 @@ public class PluginsService {
 
 
         List<FileDownloadData> downloads = serverKeys.stream().map(key -> FileDownloadData.builder()
-                .downloadUrl(s3Service.generateDownloadUrl(key))
+                .downloadUrl(s3Service.generateDownloadUrl(key, false))
                 .build()).toList();
         
 

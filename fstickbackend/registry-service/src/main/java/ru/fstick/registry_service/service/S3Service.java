@@ -17,14 +17,17 @@ public class S3Service {
 
     private final MinioClient minioClient;
     private final MinioClient presignMinioClient;
+    private final MinioClient presignMinioClientInternal;
     private final MinioProperties props;
 
     public S3Service(
             MinioClient minioClient,
             @Qualifier("presignMinioClient") MinioClient presignMinioClient,
+            @Qualifier("presignMinioClientInternal") MinioClient presignMinioClientInternal,
             MinioProperties props) {
         this.minioClient = minioClient;
         this.presignMinioClient = presignMinioClient;
+        this.presignMinioClientInternal = presignMinioClientInternal;
         this.props = props;
     }
 
@@ -55,7 +58,7 @@ public class S3Service {
         }
     }
 
-    public String generateDownloadUrl(String key) {
+    public String generateDownloadUrl(String key, boolean isPublic) {
         log.info("[S3] generateDownloadUrl called");
         log.info("[S3] bucket = {}", props.getBucket());
         log.info("[S3] key = [{}]", key);
@@ -66,7 +69,8 @@ public class S3Service {
         }
 
         try {
-            String url = presignMinioClient.getPresignedObjectUrl(
+            String url = (isPublic ? presignMinioClient : presignMinioClientInternal)
+                    .getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(props.getBucket())

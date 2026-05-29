@@ -10,6 +10,7 @@ import ru.fstick.runtimeservice.dto.CommandExecutionResult;
 import ru.fstick.runtimeservice.dto.CommandStatus;
 import ru.fstick.runtimeservice.lang.PluginRuntimeContext;
 import ru.fstick.runtimeservice.utils.FileUtils;
+import ru.fstick.runtimeservice.externalservice.IntegrationServiceClient;
 
 import java.util.*;
 
@@ -63,6 +64,14 @@ public class LuaPluginEngine {
         // Inject request context as Lua globals so plugins don't need them in payload
         globals.set("_user_id", LuaValue.valueOf(newContext.getSenderId() != null ? newContext.getSenderId() : ""));
         globals.set("_chat_id", LuaValue.valueOf(newContext.getChatId()    != null ? newContext.getChatId()    : ""));
+
+        globals.set("_sendMessage", new OneArgFunction() {
+            @Override
+            public LuaValue call(LuaValue arg) {
+                IntegrationServiceClient.instance.sendMessage(newContext.getPluginId(), newContext.getChatId(), arg.tojstring());
+                return LuaValue.NIL;
+            }
+        });
     }
 
     public boolean isStateDirty()  { return stateDirty; }

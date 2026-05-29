@@ -2,9 +2,9 @@ const castVote  = backend.makeCommand('vote.cast');
 const resetVote = backend.makeCommand('vote.reset');
 
 const LABELS = {
-    yes: '👍 Да',
-    no: '👎 Нет',
-    abstain: '🤷 Воздержался',
+    yes: '👍 Да!',
+    no: '👎 Нет!',
+    abstain: '🤷 Воздержался!',
 };
 
 const OPTIONS = [
@@ -47,6 +47,20 @@ DSL_CONTEXT.exports.__app = Column({ gap: 16 }, [
         font_size: 'title',
     }),
 
+    IfBlock(() => state.user_choices.choice.value === "yes", [
+        Text('Yes!')
+    ]),
+    IfBlock(() => state.user_choices.choice.value === "no", [
+        Text('No!')
+    ]),
+    IfBlock(() => state.user_choices.choice.value === "abstain", [
+        Text('Abstain!')
+    ]),
+
+    OnUpdate(state.user_choices.choice, [
+            Text("Rnd " + Math.random())
+    ]),
+
     Row({ gap: 8 }, OPTIONS.map(opt =>
         VoteBtn({
             label: opt.label,
@@ -76,3 +90,7 @@ DSL_CONTEXT.exports.__app = Column({ gap: 16 }, [
     }),
 
 ]);
+
+/*
+у меня есть система плагинов с кодом фронта и бэка, идея ее в том что состояние автоматически синхронизируется с клиентом + формируется индивидуально. Изучи систему и напиши нормальный плагин, где можно будет создавать 
+*/

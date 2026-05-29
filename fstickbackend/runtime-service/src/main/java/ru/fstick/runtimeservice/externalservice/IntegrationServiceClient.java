@@ -21,10 +21,13 @@ public class IntegrationServiceClient {
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public static IntegrationServiceClient instance;
+
     public IntegrationServiceClient(
             @Value("${integration.service.url:http://localhost:8080}") String baseUrl
     ) {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        IntegrationServiceClient.instance = this;
     }
 
     /**
@@ -53,6 +56,23 @@ public class IntegrationServiceClient {
                     .toBodilessEntity();
         } catch (Exception e) {
             System.err.println("[IntegrationServiceClient] broadcast failed: " + e.getMessage());
+        }
+    }
+
+    public void sendMessage(UUID pluginId, String chatId, String message){
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("plugin_sender_id", pluginId.toString());
+            body.put("message", message);
+
+            restClient.post()
+                    .uri("/api/v1/chats/" + chatId + "/messages")
+                    .header("Content-Type", "application/json")
+                    .body(objectMapper.writeValueAsString(body))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            System.err.println("[IntegrationServiceClient] send message failed: " + e.getMessage());
         }
     }
 }

@@ -17,5 +17,6 @@ public class MinioProperties {
     private String bucket;
     /** Public-facing URL used in presigned URLs returned to the browser (e.g. http://localhost:9010) */
     private String publicUrl;
+    private String internalUrl;
 
 }

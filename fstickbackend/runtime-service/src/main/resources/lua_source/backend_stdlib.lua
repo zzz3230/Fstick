@@ -463,7 +463,10 @@ local function execute_given_command_handler(command, payload)
 
     local wrapped_state = createState(StateSchema, state_data)
 
-    local ok, result = pcall(command.handler, {state=wrapped_state}, payload)
+    local ok, result = pcall(command.handler, {
+        state=wrapped_state,
+        send_message=function(msg) _sendMessage(msg) end
+        }, payload)
     if not ok then
         return make_error(CommandStatus.RUNTIME_ERROR, "Error while handler: " .. result)
     end

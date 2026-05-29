@@ -26,6 +26,7 @@ export type DslRunResult = {
     tree: DslNode;
     store: StateStore;
     backend: BackendService;
+    inputValues: Record<string, string>;
 };
 
 export function runDsl(libCode: string, appCode: string, options: DslRunOptions = {}): DslRunResult {
@@ -35,7 +36,9 @@ export function runDsl(libCode: string, appCode: string, options: DslRunOptions 
 
     const DSL_CONTEXT = {
         exports: {} as Record<string, unknown>,
+        __inputValues: {},
     };
+    DSL_CONTEXT.__inputValues = {};
 
     const runLib = new Function("DSL_CONTEXT", libCode);
     runLib(DSL_CONTEXT);
@@ -49,5 +52,5 @@ export function runDsl(libCode: string, appCode: string, options: DslRunOptions 
         throw new Error("[DSL Runner] App must set DSL_CONTEXT.exports.__app to a valid node.");
     }
 
-    return { tree, store, backend };
+    return { tree, store, backend, inputValues: DSL_CONTEXT.__inputValues as Record<string, string> };
 }

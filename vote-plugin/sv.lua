@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-global
 require("backend_stdlib")
 
 --[[
@@ -79,6 +80,8 @@ RegisterCommand({
         -- Добавляем новый голос
         local c = ctx.state.counts:get(choice):get() or 0
         ctx.state.counts:get(choice):set(c + 1)
+
+        ctx.send_message("User " .. uid ..  " vote to " .. choice)
 
         -- Сохраняем выбор через MapNode.set (инициализирует запись если её нет)
         ctx.state.user_choices:set(uid, { choice = choice })

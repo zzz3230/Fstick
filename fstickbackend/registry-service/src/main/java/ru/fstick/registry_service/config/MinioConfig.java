@@ -67,4 +67,33 @@ public class MinioConfig {
 
         return builder.build();
     }
+
+    @Bean("presignMinioClientInternal")
+    public MinioClient presignMinioClientInternal() {
+        String endpoint = props.getInternalUrl() != null && !props.getInternalUrl().isBlank()
+                ? props.getInternalUrl() : props.getUrl();
+
+        MinioClient.Builder builder = MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(props.getAccessKey(), props.getSecretKey());
+
+        if (endpoint != null && (endpoint.contains("localhost") || endpoint.contains("127.0.0.1"))) {
+            OkHttpClient ok = new OkHttpClient.Builder()
+                    .dns(hostname -> {
+                        if ("localhost".equals(hostname) || "127.0.0.1".equals(hostname)) {
+                            try {
+                                List<InetAddress> addrs = Dns.SYSTEM.lookup("host.docker.internal");
+                                if (!addrs.isEmpty()) return addrs;
+                            } catch (Exception ignored) {
+                                // host.docker.internal not available — fall through
+                            }
+                        }
+                        return Dns.SYSTEM.lookup(hostname);
+                    })
+                    .build();
+            builder.httpClient(ok);
+        }
+
+        return builder.build();
+    }
 }

@@ -1,0 +1,1 @@
+{"Created":"2026-05-29T04:10:13.056974257Z","Name":"lfRJzGtY","name":"lfRJzGtY","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"replay_policy":"instant","max_ack_pending":1000,"headers_only":true,"deliver_subject":"_INBOX.CwWYLbHb1y7vMfPa9ZgkiW","num_replicas":0,"metadata":{"_nats.req.level":"0"}}

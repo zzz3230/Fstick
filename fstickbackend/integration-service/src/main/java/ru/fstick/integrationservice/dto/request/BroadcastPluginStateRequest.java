@@ -8,5 +8,6 @@ public class BroadcastPluginStateRequest {
     private String chatId;
     /** null → shared (broadcast to all members), non-null → push only to this user */
     private String userId;
+    private String[] userScopedFields;
     private Object state;
 }

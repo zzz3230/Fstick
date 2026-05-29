@@ -12,13 +12,15 @@ import { isReactive, type StateRef } from "./state.ts";
 
 type RendererProps = {
     node: DslNode;
+    state?: StateRef;
+    inputValues?: Record<string, string>;
 };
 
-export function DslRenderer({ node }: RendererProps): React.ReactElement {
-    return renderNode(node);
+export function DslRenderer({ node, state, inputValues }: RendererProps): React.ReactElement {
+    return renderNode(node, state, inputValues);
 }
 
-function renderNode(node: DslNode): React.ReactElement {
+function renderNode(node: DslNode, state?: StateRef, inputValues?: Record<string, string>): React.ReactElement {
     switch (node.type) {
         case "Column":
             return (
@@ -32,7 +34,7 @@ function renderNode(node: DslNode): React.ReactElement {
                     }}
                 >
                     {(node.children as DslNode[]).map((child, i) => (
-                        <React.Fragment key={i}>{renderNode(child)}</React.Fragment>
+                        <React.Fragment key={i}>{renderNode(child, state, inputValues)}</React.Fragment>
                     ))}
                 </div>
             );
@@ -49,7 +51,7 @@ function renderNode(node: DslNode): React.ReactElement {
                     }}
                 >
                     {(node.children as DslNode[]).map((child, i) => (
-                        <React.Fragment key={i}>{renderNode(child)}</React.Fragment>
+                        <React.Fragment key={i}>{renderNode(child, state, inputValues)}</React.Fragment>
                     ))}
                 </div>
             );
@@ -87,16 +89,68 @@ function renderNode(node: DslNode): React.ReactElement {
                 </button>
             );
 
-        case "Input":
+        case "Input": {
+            const inputId = (node.props.id as string) ?? "";
+            const [localValue, setLocalValue] = React.useState(inputValues?.[inputId] ?? "");
+
             return (
                 <input
-                    id={(node.props.id as string) ?? undefined}
+                    id={inputId || undefined}
+                    value={localValue}
                     placeholder={(node.props.placeholder as string) ?? ""}
+                    onChange={(e) => {
+                        const newValue = e.target.value;
+                        setLocalValue(newValue);
+                        if (inputValues) {
+                            inputValues[inputId] = newValue;
+                        }
+                    }}
                     style={{
                         flex: node.props.weight ? (node.props.weight as number) : undefined,
                     }}
                 />
             );
+        }
+
+        case "IfBlock": {
+            const condition = node.condition as () => boolean;
+            // Subscribe to root path to catch ALL state changes, forcing re-render
+            if (!state) {
+                console.warn("[DslRenderer] IfBlock requires state prop");
+                return <></>;
+            }
+            // eslint-disable-next-line react-hooks/rules-of-hooks
+            useSyncExternalStore(
+                (cb) => state.subscribe(cb),
+                () => condition(),
+            );
+
+            if (condition()) {
+                return (
+                    <>
+                        {(node.children as DslNode[]).map((child, i) => (
+                            <React.Fragment key={i}>{renderNode(child, state, inputValues)}</React.Fragment>
+                        ))}
+                    </>
+                );
+            }
+            return <></>;
+        }
+
+        case "OnUpdate": {
+            const field = node.watch as StateRef;
+            useSyncExternalStore(
+                (cb) => field.subscribe(cb),
+                () => field.value,
+            );
+            return (
+                <>
+                    {(node.children as DslNode[]).map((child, i) => (
+                        <React.Fragment key={i}>{renderNode(child, state, inputValues)}</React.Fragment>
+                    ))}
+                </>
+            );
+        }
 
         default:
             console.warn(`[DslRenderer] Unknown node type: "${node.type}"`);
@@ -111,5 +165,3 @@ function ReactiveText({ ref_, style }: { ref_: StateRef; style: React.CSSPropert
     );
     return <p style={style}>{String(value ?? "")}</p>;
 }
-
-

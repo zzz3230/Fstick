@@ -61,8 +61,8 @@ export async function loadPluginsForChat(
     const installations: Installation[] = Array.isArray(installBody)
         ? (installBody as Installation[])
         : Array.isArray((installBody as Record<string, unknown>)?.data)
-          ? ((installBody as Record<string, unknown>).data as Installation[])
-          : [];
+            ? ((installBody as Record<string, unknown>).data as Installation[])
+            : [];
     if (installations.length === 0) {
         console.log(`${LOG} no installations found for room=${roomId}`);
         return [];

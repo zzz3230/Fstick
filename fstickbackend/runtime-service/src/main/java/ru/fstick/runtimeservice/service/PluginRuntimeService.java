@@ -61,7 +61,7 @@ public class PluginRuntimeService {
                 stateProviderService.getState(pluginId, chatId);
 
         engine.changeContext(
-                new PluginRuntimeContext(state, chatId, userId)
+                new PluginRuntimeContext(pluginId, state, chatId, userId)
         );
 
         var result = engine.executeCommand(name, args);

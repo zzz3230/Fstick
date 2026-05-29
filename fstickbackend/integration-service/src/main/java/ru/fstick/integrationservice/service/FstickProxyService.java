@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 
 @Service
 public class FstickProxyService {
@@ -35,22 +36,68 @@ public class FstickProxyService {
         Map<String, Object> stateContent = new HashMap<>();
         stateContent.put("plugin_id", req.getPluginId());
         stateContent.put("chat_id", req.getChatId());
-        stateContent.put("state", req.getState() != null ? req.getState() : Map.of());
+
+        // Базовое состояние из запроса
+        Object rawState = req.getState();
+        Map<String, Object> baseState = (rawState instanceof Map)
+                ? new HashMap<>((Map<String, Object>) rawState)
+                : new HashMap<>();
 
         if (req.getUserId() != null) {
-            // User-scoped: push only to this one user
+            // 1. Адресная отправка конкретному пользователю
+            stateContent.put("state", prepareStateForUser(baseState, req.getUserId(), req.getUserScopedFields()));
             pushStateEvent(req.getUserId(), stateContent);
         } else {
-            // Broadcast: resolve all chat members and push to each
+            // 2. Бродкаст всем участникам чата
             ChatMembersResponse members = getChatMembers(req.getChatId());
             for (ChatMemberResponse member : members.getMembers()) {
                 try {
-                    pushStateEvent(member.getUserId(), stateContent);
+                    String targetUserId = member.getUserId();
+
+                    // Для каждого пользователя собираем его персональный stateContent
+                    Map<String, Object> userSpecificContent = new HashMap<>(stateContent);
+                    userSpecificContent.put("state", prepareStateForUser(baseState, targetUserId, req.getUserScopedFields()));
+
+                    pushStateEvent(targetUserId, userSpecificContent);
                 } catch (Exception ex) {
                     // Log and continue — don't abort the whole broadcast
                 }
             }
         }
+    }
+
+    /**
+     * Метод адаптирует переданный state под конкретного userId,
+     * схлопывая поля из userScopedFields до приватных данных этого пользователя.
+     */
+    private Map<String, Object> prepareStateForUser(Map<String, Object> baseState, String userId, String[] userScopedFields) {
+        if (baseState.isEmpty()) {
+            return baseState;
+        }
+
+        // Создаем глубокую/поверхностную копию верхнего уровня, чтобы не портить исходный baseState
+        Map<String, Object> filteredState = new HashMap<>(baseState);
+
+        if (userScopedFields == null || userScopedFields.length == 0) {
+            return filteredState;
+        }
+
+        for (String field : userScopedFields) {
+            if (filteredState.containsKey(field)) {
+                Object fieldContent = filteredState.get(field);
+
+                if (fieldContent instanceof Map) {
+                    Map<String, Object> usersMap = (Map<String, Object>) fieldContent;
+                    // Достаем данные конкретного пользователя. Если их нет — можно вернуть null или пустой Map
+                    Object userPrivateData = usersMap.get(userId);
+
+                    // Заменяем мапу со всеми юзерами на объект конкретного юзера
+                    filteredState.put(field, userPrivateData);
+                }
+            }
+        }
+
+        return filteredState;
     }
 
     private void pushStateEvent(String userId, Map<String, Object> content) {

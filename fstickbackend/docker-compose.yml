@@ -209,7 +209,8 @@ services:
       MINIO_BUCKET: f-stick-plugins
       MINIO_ACCESS_KEY: admin
       MINIO_SECRET_KEY: 11111111
-      MINIO_PUBLIC_URL: http://192.168.31.107:9010
+      MINIO_PUBLIC_URL: http://localhost:9010
+      MINIO_INTERNAL_URL: http://minio:9000
       SERVER_PORT: 8082
     depends_on:
       registry-db:

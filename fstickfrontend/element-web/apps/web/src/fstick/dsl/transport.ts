@@ -97,7 +97,7 @@ export class BackendService {
         }
 
         if (serverState) {
-            this.store.applyFull(serverState);
+            //this.store.applyFull(serverState);
         }
     }
 
