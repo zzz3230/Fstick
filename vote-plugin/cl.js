@@ -57,9 +57,6 @@ DSL_CONTEXT.exports.__app = Column({ gap: 16 }, [
         Text('Abstain!')
     ]),
 
-    OnUpdate(state.user_choices.choice, [
-            Text("Rnd " + Math.random())
-    ]),
 
     Row({ gap: 8 }, OPTIONS.map(opt =>
         VoteBtn({
