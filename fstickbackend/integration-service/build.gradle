@@ -18,6 +18,10 @@ repositories {
     mavenCentral()
 }
 
+test {
+    jvmArgs '--add-opens', 'java.base/java.lang=ALL-UNNAMED'
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
     compileOnly 'org.projectlombok:lombok'
