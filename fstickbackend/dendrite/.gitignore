@@ -49,9 +49,9 @@ _testmain.go
 *.xcframework
 
 # Generated keys
-*.pem
-*.key
-*.crt
+#*.pem
+#*.key
+#*.crt
 
 # Default configuration file
 # dendrite.yaml

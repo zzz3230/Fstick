@@ -45,6 +45,7 @@ public class PluginPlatformProxyService {
         this.restClient = restClient;
         this.registryBaseUrl = registryBaseUrl;
         this.installationBaseUrl = installationBaseUrl;
+        this.runtimeBaseUrl = null; //TODO: добавил чтобы компилировалось, разобраться
     }
 
     public ResponseEntity<String> listPlugins(MultiValueMap<String, String> queryParams) {

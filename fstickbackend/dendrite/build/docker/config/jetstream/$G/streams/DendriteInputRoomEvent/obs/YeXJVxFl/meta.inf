@@ -1,0 +1,1 @@
+{"Created":"2026-09-03T16:13:19.97445605Z","Name":"YeXJVxFl","name":"YeXJVxFl","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"replay_policy":"instant","max_ack_pending":1000,"headers_only":true,"deliver_subject":"_INBOX.IT9fvqgaeLr7hA7rULyIKv","num_replicas":0,"metadata":{"_nats.req.level":"0"}}
