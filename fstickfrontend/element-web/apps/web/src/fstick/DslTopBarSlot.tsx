@@ -131,8 +131,8 @@ export function DslTopBarSlot({ roomId, userId }: Props): React.ReactElement | n
             loadPlugins(true);
         };
 
-        window.addEventListener("fstick:plugin-installed", handler);
-        return () => window.removeEventListener("fstick:plugin-installed", handler);
+        window.addEventListener("fstick:plugins-changed", handler);
+        return () => window.removeEventListener("fstick:plugins-changed", handler);
     }, [roomId, loadPlugins]);
 
     useEffect(() => {

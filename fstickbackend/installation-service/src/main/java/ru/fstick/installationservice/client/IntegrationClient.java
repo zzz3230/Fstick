@@ -1,5 +1,6 @@
 package ru.fstick.installationservice.client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,11 +71,11 @@ public class IntegrationClient {
     }
 
     record PushEventRequest(
-            String userId,
-            UUID pluginId,
-            String chatId,
-            String eventName,
-            Map<String, Object> eventData
+            @JsonProperty("user_id") String userId,
+            @JsonProperty("plugin_id") UUID pluginId,
+            @JsonProperty("chat_id") String chatId,
+            @JsonProperty("event_name") String eventName,
+            @JsonProperty("event_data") Map<String, Object> eventData
     ) {}
 
     @Getter

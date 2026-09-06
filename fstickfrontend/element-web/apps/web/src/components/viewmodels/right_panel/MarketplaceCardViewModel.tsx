@@ -268,7 +268,7 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
                 ensureOk(confirmResponse, "Install confirm failed");
             }
             // Notify DslTopBarSlot (and any other listeners) to reload plugins immediately
-            window.dispatchEvent(new CustomEvent("fstick:plugin-installed", { detail: { roomId, pluginId } }));
+            window.dispatchEvent(new CustomEvent("fstick:plugins-changed", { detail: { roomId, pluginId } }));
             setReloadToken((v) => v + 1);
         } finally {
             setActionByPlugin((prev) => ({ ...prev, [pluginId]: false }));
@@ -286,6 +286,8 @@ export function useMarketplaceCardViewModel(roomId?: string, userId?: string): M
                 headers: buildHeaders(accessToken),
             });
             if (!response.ok) throw new Error(`Uninstall failed (${response.status})`);
+            // Notify DslTopBarSlot (and any other listeners) to drop the removed plugin's widget immediately
+            window.dispatchEvent(new CustomEvent("fstick:plugins-changed", { detail: { roomId, pluginId } }));
             setReloadToken((v) => v + 1);
         } finally {
             setActionByPlugin((prev) => ({ ...prev, [pluginId]: false }));
