@@ -4,9 +4,15 @@ SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Com
 Please see LICENSE files in the repository root for full details.
 */
 
-import React, { type JSX, useMemo, useState } from "react";
-import { Button, Form, Search, Separator, Text } from "@vector-im/compound-web";
+import React, { type JSX, useEffect, useMemo, useState } from "react";
+import { Badge, Button, Form, Search, Separator, Text } from "@vector-im/compound-web";
 import ExtensionsIcon from "@vector-im/compound-design-tokens/assets/web/icons/extensions";
+import CheckIcon from "@vector-im/compound-design-tokens/assets/web/icons/check";
+import DeleteIcon from "@vector-im/compound-design-tokens/assets/web/icons/delete";
+import CloudIcon from "@vector-im/compound-design-tokens/assets/web/icons/cloud";
+import FilesIcon from "@vector-im/compound-design-tokens/assets/web/icons/files";
+import ImageIcon from "@vector-im/compound-design-tokens/assets/web/icons/image";
+import CloseIcon from "@vector-im/compound-design-tokens/assets/web/icons/close";
 import { type Room } from "matrix-js-sdk/src/matrix";
 
 import BaseCard from "./BaseCard";
@@ -24,6 +30,13 @@ interface Props {
 }
 
 type TabId = "marketplace" | "installed" | "upload";
+
+function onDropFiles(setter: (files: File[]) => void): (e: React.DragEvent<HTMLLabelElement>) => void {
+    return (e) => {
+        e.preventDefault();
+        setter(Array.from(e.dataTransfer.files ?? []));
+    };
+}
 
 const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
     const cli = useMatrixClientContext();
@@ -45,6 +58,13 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
     const [clientFiles, setClientFiles] = useState<File[]>([]);
     const [iconFile, setIconFile] = useState<File | null>(null);
     const [uploadHint, setUploadHint] = useState<string | null>(null);
+
+    const iconPreviewUrl = useMemo(() => (iconFile ? URL.createObjectURL(iconFile) : null), [iconFile]);
+    useEffect(() => {
+        return () => {
+            if (iconPreviewUrl) URL.revokeObjectURL(iconPreviewUrl);
+        };
+    }, [iconPreviewUrl]);
 
     const allCodeFiles = useMemo<CodeFileEntry[]>(
         () => [
@@ -103,31 +123,44 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
                             <ExtensionsIcon className="mx_MarketplaceCard_iconFallback" />
                         )}
                     </div>
-                    <div className="mx_MarketplaceCard_itemInfo">
-                        <Text size="md" weight="semibold">{plugin.name}</Text>
-                        <div className="mx_MarketplaceCard_itemMeta">
-                            {plugin.author && <Text size="sm">By {plugin.author}</Text>}
-                            {plugin.version && <Text size="sm">v{plugin.version}</Text>}
-                        </div>
+                    <Text size="lg" weight="semibold" className="mx_MarketplaceCard_itemName">{plugin.name}</Text>
+                    <div className="mx_MarketplaceCard_tags">
+                        {plugin.tags?.map((tag) => (
+                            <span className="mx_MarketplaceCard_tag" key={tag}>{tag}</span>
+                        ))}
                     </div>
                 </div>
-                {plugin.description && (
-                    <Text size="sm" className="mx_MarketplaceCard_description">{plugin.description}</Text>
-                )}
-                {plugin.tags?.length ? <Text size="sm">Tags: {plugin.tags.join(", ")}</Text> : null}
-                {isAdmin && (
-                    <div className="mx_MarketplaceCard_itemActions">
-                        {showInstall && !installed ? (
-                            <Button disabled={busy} onClick={() => void vm.installPlugin(plugin.id)}>
-                                {busy ? "Installing..." : "Install in chat"}
-                            </Button>
-                        ) : (
-                            <Button kind="secondary" disabled={busy} onClick={() => void vm.uninstallPlugin(plugin.id)}>
-                                {busy ? "Removing..." : "Remove from chat"}
-                            </Button>
-                        )}
-                    </div>
-                )}
+                <div className="mx_MarketplaceCard_itemBody">
+                    {plugin.description && (
+                        <Text size="sm" className="mx_MarketplaceCard_description">{plugin.description}</Text>
+                    )}
+                    {isAdmin && (
+                        <div className="mx_MarketplaceCard_itemActions">
+                            {showInstall && !installed ? (
+                                <Button size="lg" disabled={busy} onClick={() => void vm.installPlugin(plugin.id)}>
+                                    {busy ? "Installing..." : "Install"}
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="sm"
+                                    kind="tertiary"
+                                    destructive={!showInstall}
+                                    Icon={showInstall ? CheckIcon : DeleteIcon}
+                                    disabled={busy}
+                                    onClick={() => void vm.uninstallPlugin(plugin.id)}
+                                >
+                                    {busy ? "Removing..." : showInstall ? "Installed" : "Remove"}
+                                </Button>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <div className="mx_MarketplaceCard_itemMeta">
+                    {plugin.author && (
+                        <Text size="xs" className="mx_MarketplaceCard_itemAuthor">By {plugin.author}</Text>
+                    )}
+                    {plugin.version && <Text size="xs">v{plugin.version}</Text>}
+                </div>
             </article>
         );
     };
@@ -151,7 +184,13 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
             </div>
         );
     } else if (vm.plugins.length === 0) {
-        marketplaceBody = <Text size="sm">No plugins matched your search.</Text>;
+        marketplaceBody = (
+            <EmptyState
+                Icon={ExtensionsIcon}
+                title="No plugins found"
+                description="Try a different search term."
+            />
+        );
     } else {
         marketplaceBody = (
             <div className="mx_MarketplaceCard_list">
@@ -172,7 +211,18 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
     } else if (vm.isLoading && vm.installedPlugins.length === 0) {
         installedBody = <Text size="sm">Loading installed plugins...</Text>;
     } else if (vm.installedPlugins.length === 0) {
-        installedBody = <Text size="sm">No plugins installed in this chat yet.</Text>;
+        installedBody = (
+            <div className="mx_MarketplaceCard_empty">
+                <EmptyState
+                    Icon={ExtensionsIcon}
+                    title="No plugins installed"
+                    description="Plugins you install for this chat will appear here."
+                />
+                <Button kind="secondary" size="sm" onClick={() => setActiveTab("marketplace")}>
+                    Browse marketplace
+                </Button>
+            </div>
+        );
     } else {
         installedBody = (
             <div className="mx_MarketplaceCard_list">
@@ -184,15 +234,17 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
     return (
         <BaseCard header="Plugins" className="mx_MarketplaceCard" onClose={onClose}>
             <div className="mx_MarketplaceCard_tabs">
-                {(["marketplace", "installed", "upload"] as TabId[]).map((tab) => (
-                    <button
-                        key={tab}
-                        className={`mx_MarketplaceCard_tab${activeTab === tab ? " mx_MarketplaceCard_tab_active" : ""}`}
-                        onClick={() => setActiveTab(tab)}
-                    >
-                        {tab === "marketplace" ? "Marketplace" : tab === "installed" ? "Installed" : "Upload"}
-                    </button>
-                ))}
+                <div className="mx_MarketplaceCard_tabsTrack">
+                    {(["marketplace", "installed", "upload"] as TabId[]).map((tab) => (
+                        <button
+                            key={tab}
+                            className={`mx_MarketplaceCard_tab${activeTab === tab ? " mx_MarketplaceCard_tab_active" : ""}`}
+                            onClick={() => setActiveTab(tab)}
+                        >
+                            {tab === "marketplace" ? "Marketplace" : tab === "installed" ? "Installed" : "Upload"}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <Separator />
@@ -222,56 +274,189 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
                     <Text size="sm" className="mx_MarketplaceCard_uploadDescription">
                         Upload a new plugin to the system registry. Fields marked * are required.
                     </Text>
-                    <input value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="Plugin name *" />
-                    <input value={description} onChange={(e) => setDescription(e.currentTarget.value)} placeholder="Description *" />
-                    <input value={tags} onChange={(e) => setTags(e.currentTarget.value)} placeholder="Tags (comma separated)" />
 
-                    <label className="mx_MarketplaceCard_selectLabel">
-                        <Text size="sm">Category *</Text>
-                        <select value={category} onChange={(e) => setCategory(e.currentTarget.value)} className="mx_MarketplaceCard_select">
-                            <option value="Analytics">Analytics</option>
-                            <option value="Productivity">Productivity</option>
-                            <option value="Security">Security</option>
-                        </select>
-                    </label>
-                    <input value={tags} onChange={(e) => setTags(e.currentTarget.value)} placeholder="Tags (comma separated)" />
+                    <Form.Root className="mx_MarketplaceCard_uploadForm" onSubmit={(e) => e.preventDefault()}>
+                        <div className="mx_MarketplaceCard_section">
+                            <Text size="sm" weight="semibold">Basic details</Text>
 
-                    <div className="mx_MarketplaceCard_fileGroup">
-                        <Text size="sm" weight="semibold">Server-side code *</Text>
-                        <input
-                            value={serverRuntime}
-                            onChange={(e) => setServerRuntime(e.currentTarget.value)}
-                            placeholder="Runtime (e.g. sv.lua@1.0.0)"
-                        />
-                        <label className="mx_MarketplaceCard_fileLabel">
-                            <Text size="sm">Code files *</Text>
-                            <input type="file" multiple onChange={(e) => setServerFiles(Array.from(e.currentTarget.files ?? []))} />
-                        </label>
+                            <Form.Field name="pluginName">
+                                <Form.Label>Name *</Form.Label>
+                                <Form.TextControl
+                                    value={name}
+                                    onChange={(e) => setName(e.currentTarget.value)}
+                                    placeholder="e.g. Meeting Notes"
+                                />
+                            </Form.Field>
+
+                            <Form.Field name="pluginDescription">
+                                <Form.Label>Description *</Form.Label>
+                                <textarea
+                                    className="mx_MarketplaceCard_textarea"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.currentTarget.value)}
+                                    placeholder="What does this plugin do?"
+                                />
+                            </Form.Field>
+
+                            <label className="mx_MarketplaceCard_selectLabel">
+                                <Text size="sm">Category *</Text>
+                                <select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.currentTarget.value)}
+                                    className="mx_MarketplaceCard_select"
+                                >
+                                    <option value="Analytics">Analytics</option>
+                                    <option value="Productivity">Productivity</option>
+                                    <option value="Security">Security</option>
+                                </select>
+                            </label>
+
+                            <Form.Field name="pluginTags">
+                                <Form.Label>Tags</Form.Label>
+                                <Form.TextControl
+                                    value={tags}
+                                    onChange={(e) => setTags(e.currentTarget.value)}
+                                    placeholder="e.g. ai, summary, notes"
+                                />
+                            </Form.Field>
+                            <Text size="sm" className="mx_MarketplaceCard_hint">Separate with commas</Text>
+                        </div>
+
+                        <div className="mx_MarketplaceCard_section">
+                            <div className="mx_MarketplaceCard_sectionHeader">
+                                <Text size="sm" weight="semibold">Server-side runtime</Text>
+                                <Badge kind="grey">Required</Badge>
+                            </div>
+
+                            <Form.Field name="serverRuntime">
+                                <Form.Label>Runtime</Form.Label>
+                                <Form.TextControl
+                                    value={serverRuntime}
+                                    onChange={(e) => setServerRuntime(e.currentTarget.value)}
+                                    placeholder="sv.lua@1.0.0"
+                                />
+                            </Form.Field>
+
+                            {serverFiles.length > 0 && (
+                                <div className="mx_MarketplaceCard_fileList">
+                                    {serverFiles.map((file, index) => (
+                                        <div className="mx_MarketplaceCard_fileChip" key={`${file.name}-${index}`}>
+                                            <FilesIcon width="14px" height="14px" />
+                                            <span className="mx_MarketplaceCard_fileChipName">{file.name}</span>
+                                            <button
+                                                type="button"
+                                                className="mx_MarketplaceCard_fileChipRemove"
+                                                onClick={() => setServerFiles((files) => files.filter((_, i) => i !== index))}
+                                            >
+                                                <CloseIcon width="12px" height="12px" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <label
+                                className="mx_MarketplaceCard_dropzone"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={onDropFiles(setServerFiles)}
+                            >
+                                <CloudIcon />
+                                <Text size="sm" className="mx_MarketplaceCard_dropzoneText">Drop files or click to browse</Text>
+                                <Text size="sm" className="mx_MarketplaceCard_dropzoneHint">Code files *</Text>
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={(e) => setServerFiles(Array.from(e.currentTarget.files ?? []))}
+                                />
+                            </label>
+                        </div>
+
+                        <div className="mx_MarketplaceCard_section">
+                            <div className="mx_MarketplaceCard_sectionHeader">
+                                <Text size="sm" weight="semibold">Client-side runtime</Text>
+                                <Badge kind="grey">Optional</Badge>
+                            </div>
+
+                            <Form.Field name="clientRuntime">
+                                <Form.Label>Runtime</Form.Label>
+                                <Form.TextControl
+                                    value={clientRuntime}
+                                    onChange={(e) => setClientRuntime(e.currentTarget.value)}
+                                    placeholder="cl.js@1.0.0"
+                                />
+                            </Form.Field>
+
+                            {clientFiles.length > 0 && (
+                                <div className="mx_MarketplaceCard_fileList">
+                                    {clientFiles.map((file, index) => (
+                                        <div className="mx_MarketplaceCard_fileChip" key={`${file.name}-${index}`}>
+                                            <FilesIcon width="14px" height="14px" />
+                                            <span className="mx_MarketplaceCard_fileChipName">{file.name}</span>
+                                            <button
+                                                type="button"
+                                                className="mx_MarketplaceCard_fileChipRemove"
+                                                onClick={() => setClientFiles((files) => files.filter((_, i) => i !== index))}
+                                            >
+                                                <CloseIcon width="12px" height="12px" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <label
+                                className="mx_MarketplaceCard_dropzone"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={onDropFiles(setClientFiles)}
+                            >
+                                <CloudIcon />
+                                <Text size="sm" className="mx_MarketplaceCard_dropzoneText">Drop files or click to browse</Text>
+                                <Text size="sm" className="mx_MarketplaceCard_dropzoneHint">Code files</Text>
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={(e) => setClientFiles(Array.from(e.currentTarget.files ?? []))}
+                                />
+                            </label>
+                        </div>
+
+                        <div className="mx_MarketplaceCard_section">
+                            <Text size="sm" weight="semibold">Icon *</Text>
+                            <div className="mx_MarketplaceCard_iconRow">
+                                <label
+                                    className="mx_MarketplaceCard_dropzone mx_MarketplaceCard_iconDropzone"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const file = e.dataTransfer.files?.[0];
+                                        if (file) setIconFile(file);
+                                    }}
+                                >
+                                    {iconPreviewUrl ? (
+                                        <img className="mx_MarketplaceCard_iconPreview" src={iconPreviewUrl} alt="Icon preview" />
+                                    ) : (
+                                        <ImageIcon />
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setIconFile(e.currentTarget.files?.[0] ?? null)}
+                                    />
+                                </label>
+                                <Text size="sm" className="mx_MarketplaceCard_dropzoneHint">
+                                    PNG or JPG, at least 128×128px, up to 2MB
+                                </Text>
+                            </div>
+                        </div>
+                    </Form.Root>
+
+                    <div className="mx_MarketplaceCard_uploadFooter">
+                        {vm.uploadError && <Text size="sm" className="mx_MarketplaceCard_uploadError">{vm.uploadError}</Text>}
+                        {uploadHint && <Text size="sm" className="mx_MarketplaceCard_uploadSuccess">{uploadHint}</Text>}
+                        <Button onClick={() => void onUploadClick()} disabled={!canUpload || vm.isUploading}>
+                            {vm.isUploading ? "Uploading..." : "Upload plugin"}
+                        </Button>
                     </div>
-
-                    <div className="mx_MarketplaceCard_fileGroup">
-                        <Text size="sm" weight="semibold">Client-side code (optional)</Text>
-                        <input
-                            value={clientRuntime}
-                            onChange={(e) => setClientRuntime(e.currentTarget.value)}
-                            placeholder="Runtime (e.g. cl.js@1.0.0)"
-                        />
-                        <label className="mx_MarketplaceCard_fileLabel">
-                            <Text size="sm">Code files</Text>
-                            <input type="file" multiple onChange={(e) => setClientFiles(Array.from(e.currentTarget.files ?? []))} />
-                        </label>
-                    </div>
-
-                    <label className="mx_MarketplaceCard_fileLabel">
-                        <Text size="sm">Icon *</Text>
-                        <input type="file" accept="image/*" onChange={(e) => setIconFile(e.currentTarget.files?.[0] ?? null)} />
-                    </label>
-
-                    <Button onClick={() => void onUploadClick()} disabled={!canUpload || vm.isUploading}>
-                        {vm.isUploading ? "Uploading..." : "Upload plugin"}
-                    </Button>
-                    {vm.uploadError && <Text size="sm" className="mx_MarketplaceCard_uploadError">{vm.uploadError}</Text>}
-                    {uploadHint && <Text size="sm" className="mx_MarketplaceCard_uploadSuccess">{uploadHint}</Text>}
                 </div>
             )}
         </BaseCard>
@@ -279,10 +464,3 @@ const MarketplaceCard: React.FC<Props> = ({ room, onClose }) => {
 };
 
 export default MarketplaceCard;
-
-
-
-
-
-
-
