@@ -328,6 +328,7 @@
   .pill--review { color: var(--s-review); background: var(--s-review-bg); }
   .pill--released { color: var(--s-released); background: var(--s-released-bg); }
   .pill--rejected { color: var(--s-rejected); background: var(--s-rejected-bg); }
+  .pill--cancelled { color: var(--ink-soft); background: var(--surface-2); border: 1px dashed var(--border-strong); padding: 1px 7px; }
 
   .method {
     display: inline-block;
@@ -446,8 +447,8 @@
     <div class="meta-row">
       <span><strong>Status:</strong> design agreed, not implemented</span>
       <span><strong>Branch model:</strong> content-addressed, git-shaped</span>
-      <span><strong>Identity:</strong> internal UUID + MXID mapper</span>
-      <span><strong>Date:</strong> 2026-09-08</span>
+      <span><strong>Identity:</strong> UUID core · mapper in integration</span>
+      <span><strong>Updated:</strong> 2026-09-09</span>
     </div>
   </header>
 
@@ -640,10 +641,10 @@
     <!-- 3 -->
     <section id="identity">
       <div class="sec-head">
-        <span class="eyebrow">Decision · UUID + mapper</span>
+        <span class="eyebrow">Decision · mapper in integration-service</span>
         <h2><span class="num">3</span>Identity model</h2>
       </div>
-      <p class="prose-lead">The Fstick overlay stores <strong>one pure UUID</strong> per user and nothing else. A mapper bridges it to the Matrix MXID. The frontend shows <code>@localpart</code> &mdash; the MXID with <code>:domain</code> stripped.</p>
+      <p class="prose-lead">The core stores <strong>one pure UUID</strong> per user and nothing else. The <code>uuid&nbsp;↔&nbsp;mxid</code> mapper lives in <strong>integration-service</strong> &mdash; the one component that already speaks Matrix. An MXID appears on exactly two hops: inbound (Dendrite&nbsp;→&nbsp;Gateway) and outbound (integration&nbsp;→&nbsp;Dendrite).</p>
 
       <p>The <code>:domain</code> suffix cannot leave the Matrix wire protocol without forking away from federation &mdash; it is structural (event <code>sender</code>, room membership, routing). The domain is fixed to one constant and simply not rendered; Element already speaks MXIDs, so showing <code>@user_id</code> is a trim, not a new identifier.</p>
 
@@ -651,29 +652,92 @@
         <div class="idcard">
           <h4>internal_uuid</h4>
           <div class="ex">9f3c1a2e-…</div>
-          <div class="mut">the only id in the overlay</div>
-          <p>The foreign key in every Fstick service: <code>plugins.author_id</code>, <code>installations.installed_by</code>, branch owner. Never leaves the backend.</p>
+          <div class="mut">the only id in the core</div>
+          <p>The foreign key in every Fstick service: <code>plugins.author_id</code>, <code>installations.installed_by</code>, branch owner. Never leaves the backend, never reaches Dendrite.</p>
         </div>
         <div class="idcard">
           <h4>MXID</h4>
           <div class="ex">@ilya:fstick.local → @ilya</div>
           <div class="mut">Matrix's own id</div>
-          <p>Used by Dendrite: <code>sender</code>, membership, tokens, event push. Frontend renders the localpart only; the domain is one fixed constant.</p>
+          <p>Dendrite's: <code>sender</code>, membership, tokens, event push. Frontend renders the localpart only; the domain is one fixed constant. The Matrix display name is untouched &mdash; a label, not an identifier.</p>
         </div>
       </div>
-      <p>The Matrix <strong>display name</strong> is untouched &mdash; a free-form label, not an identifier.</p>
 
-      <h3>What to build</h3>
+      <figure class="fig-scroll">
+        <svg viewBox="0 0 820 330" role="img" aria-label="Identity flows: Dendrite authenticates a request and passes the MXID to the Gateway; the Gateway swaps it to internal_uuid via integration-service (cached) and every core service sees only internal_uuid; on the way out a core service hands integration an internal_uuid, integration maps it back to an MXID and pushes through Dendrite to the client's sync stream.">
+          <defs>
+            <marker id="i-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
+            </marker>
+            <marker id="i-ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" fill="var(--ink)" text-anchor="middle">
+            <g><rect x="30" y="42" width="104" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="82" y="67">Client</text></g>
+            <g><rect x="196" y="42" width="116" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="254" y="63">Dendrite</text><text x="254" y="77" font-size="9" font-weight="400" fill="var(--ink-faint)">authenticates</text></g>
+            <g><rect x="374" y="42" width="116" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="432" y="63">Gateway</text><text x="432" y="77" font-size="9" font-weight="400" fill="var(--ink-faint)">swaps id</text></g>
+            <g><rect x="556" y="42" width="234" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="673" y="63">Registry · Runtime · Installation</text><text x="673" y="77" font-size="9" font-weight="400" fill="var(--ink-faint)">internal_uuid only</text></g>
+            <g><rect x="392" y="238" width="230" height="52" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" /><text x="507" y="260" fill="var(--accent-ink)">integration-service</text><text x="507" y="277" font-size="9.5" font-weight="400" fill="var(--ink-soft)">owns the uuid ↔ mxid table</text></g>
+          </g>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-soft)">
+            <!-- inbound -->
+            <line x1="134" y1="57" x2="194" y2="57" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="164" y="50" text-anchor="middle">token</text>
+
+            <line x1="312" y1="55" x2="372" y2="55" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#i-ah-a)" />
+            <text x="342" y="37" text-anchor="middle" fill="var(--accent)">X-User-Id</text>
+            <text x="342" y="48" text-anchor="middle" fill="var(--accent)">= @mxid</text>
+
+            <line x1="490" y1="63" x2="554" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="522" y="56" text-anchor="middle">= uuid</text>
+
+            <!-- resolve lookup -->
+            <path d="M432 84 Q432 150 440 236" fill="none" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#i-ah)" />
+            <text x="360" y="150" text-anchor="middle" fill="var(--ink-faint)">identity/resolve</text>
+            <text x="360" y="163" text-anchor="middle" fill="var(--ink-faint)">(cached in Gateway)</text>
+
+            <!-- core to integration -->
+            <path d="M660 84 Q650 165 610 234" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="672" y="150" text-anchor="middle">push { author uuid }</text>
+
+            <!-- integration back to dendrite -->
+            <path d="M392 262 Q300 240 262 86" fill="none" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#i-ah-a)" />
+            <text x="250" y="180" text-anchor="middle" fill="var(--accent)">/events/push</text>
+            <text x="250" y="193" text-anchor="middle" fill="var(--accent)">@mxid</text>
+
+            <!-- dendrite to client -->
+            <line x1="194" y1="73" x2="136" y2="73" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="164" y="90" text-anchor="middle">/sync</text>
+          </g>
+        </svg>
+        <figcaption>The MXID lives only on the accented hops &mdash; Dendrite&nbsp;→&nbsp;Gateway inbound and integration&nbsp;→&nbsp;Dendrite outbound. Everything between them is <code>internal_uuid</code>. Dendrite already authenticates and injects <code>X-User-Id</code> today (<code>authenticateAndGetUserID</code>); the only new step is the Gateway swap.</figcaption>
+      </figure>
+
+      <h3>The mapper</h3>
       <ul>
-        <li>A <strong>mapper</strong>: bidirectional <code>internal_uuid ↔ mxid</code>. Nothing else &mdash; no handle, no profile layer.</li>
-        <li>Gateway resolves <code>Matrix access token → MXID → internal_uuid</code> via the mapper and injects <code>X-User-Id: &lt;internal_uuid&gt;</code>. Remove <code>resolveAuthorId()</code> / <code>nameUUIDFromBytes</code> from downstreams.</li>
-        <li>Gateway also injects <code>X-User-Matrix-Id</code> for the downstreams that push events through Dendrite (Runtime, Integration).</li>
-        <li><code>registry.plugins.author_id</code> = <code>internal_uuid</code> (the column is already <code>UUID</code>).</li>
+        <li>Table in <strong>integration-service</strong>: <code>internal_uuid</code> (PK) ↔ <code>mxid</code> (unique). Bidirectional. No handle, no profile layer.</li>
+        <li><span class="method method--post">POST</span> <code>/api/v1/identity/resolve</code> &nbsp;<code>{ mxid } → { internal_uuid }</code> &mdash; create-or-return, idempotent. This is where a user's <code>internal_uuid</code> is <strong>minted</strong>, on first contact.</li>
+        <li><span class="method method--get">GET</span> <code>/api/v1/identity/{internal_uuid}</code> &nbsp;<code>→ { mxid }</code> &mdash; the reverse, for outbound push. Batch variant for member lists.</li>
+        <li>Gateway calls <code>resolve</code> to turn the <code>X-User-Id</code> Dendrite gave it (an MXID) into <code>internal_uuid</code>, then forwards that. Result cached in-process &mdash; the binding never changes, so the cache is an LRU with no invalidation. <code>X-User-Matrix-Id</code> is <em>not</em> propagated; nothing past the Gateway needs it.</li>
+        <li><code>registry.plugins.author_id</code> = <code>internal_uuid</code> (column is already <code>UUID</code>). Delete <code>resolveAuthorId()</code> / <code>nameUUIDFromBytes</code>.</li>
       </ul>
 
+      <h3>Why Postgres, not just Redis</h3>
+      <p>Gateway keeps a Redis or in-process <em>cache</em> either way. The question is the system of record, and that has to be Postgres:</p>
+      <ul>
+        <li><strong>It is source of truth, not derived data.</strong> Every <code>plugins.author_id</code> and <code>installations.installed_by</code> FK is an <code>internal_uuid</code> that only has meaning through this table. A cache you can rebuild from upstream; this table <em>is</em> upstream. Lose it to an eviction or a flush and every ownership record is orphaned.</li>
+        <li><strong>Durability.</strong> Redis persistence (RDB/AOF) is lossy by design &mdash; snapshot intervals, fsync windows. Postgres gives real ACID + WAL: a committed identity stays committed.</li>
+        <li><strong>Atomic idempotency.</strong> <code>resolve</code> must mint exactly one <code>internal_uuid</code> even when the same new user fires two requests in parallel. <code>UNIQUE(mxid)</code> + <code>INSERT … ON CONFLICT DO NOTHING RETURNING</code> does this in one statement. In Redis it is a hand-rolled <code>SETNX</code>/Lua dance with edge cases.</li>
+        <li><strong>Queries.</strong> First-seen audit, admin lookups, batch member resolution, later handle history if it ever comes back &mdash; all relational. Redis answers exact-key GET and nothing else without hand-built secondary indexes.</li>
+      </ul>
+      <p>So: <strong>Postgres is the system of record; Redis (or the Gateway's own map) is an optional read cache in front of it</strong> &mdash; invalidation-free, because the mapping is immutable.</p>
+
       <div class="note">
-        <span class="k">Enables</span>
-        <p>Author-targeted console push (&sect;8) resolves <code>internal_uuid → mxid</code> through the same mapper. The current <code>nameUUIDFromBytes</code> derivation is one-way and must go &mdash; the mapper replaces it.</p>
+        <span class="k">Cost</span>
+        <p>integration-service is stateless today (a pure Dendrite ACL &mdash; no datasource). This gives it its first table. And the Gateway now depends on integration to authorise any <em>uncached</em> request: cached users survive an integration outage, brand-new users get <code>503</code>. integration is already on the critical path (installation-service calls it for membership), so this is not a new failure class &mdash; but it is a wider blast radius. See &sect;13.</p>
       </div>
     </section>
 
@@ -683,7 +747,7 @@
         <span class="eyebrow">Decision · git-shaped model</span>
         <h2><span class="num">4</span>Versioning: branches &amp; content-addressed blobs</h2>
       </div>
-      <p class="prose-lead">A plugin's code lives on <strong>branches</strong>. A save writes an immutable, content-addressed <strong>blob</strong>. Publishing forks a candidate branch. <code>REJECTED</code> is a branch status, not a global state.</p>
+      <p class="prose-lead">A plugin's code lives on <strong>branches</strong>. A save writes an immutable, content-addressed <strong>blob</strong>. Publishing forks a candidate branch. <code>REJECTED</code> and <code>CANCELLED</code> are branch statuses, not global states.</p>
 
       <div class="table-wrap">
         <table>
@@ -692,7 +756,7 @@
             <tr><td>working branch (<code>dev</code>)</td><td>the plugin's debug copy &mdash; one per plugin, owned by the author</td></tr>
             <tr><td>commit</td><td>each editor save / hot-reload <span class="pill pill--dev">phase&nbsp;2</span></td></tr>
             <tr><td>create a candidate branch</td><td><code>POST /plugins/{id}/publish</code> &mdash; snapshots the dev branch's current blob pair</td></tr>
-            <tr><td>branch status</td><td><span class="pill pill--wait">WAITING_APPROVE</span> <span class="pill pill--review">APPROVING</span> <span class="pill pill--released">RELEASED</span> <span class="pill pill--rejected">REJECTED</span> &mdash; on the branch</td></tr>
+            <tr><td>branch status</td><td><span class="pill pill--wait">WAITING_APPROVE</span> <span class="pill pill--review">APPROVING</span> <span class="pill pill--released">RELEASED</span> <span class="pill pill--rejected">REJECTED</span> <span class="pill pill--cancelled">CANCELLED</span> &mdash; on the branch</td></tr>
             <tr><td><code>main</code> / release tag</td><td>a branch with status <span class="pill pill--released">RELEASED</span>; installs resolve to the highest SemVer among them</td></tr>
           </tbody>
         </table>
@@ -702,12 +766,13 @@
       <pre><code><span class="tok-c">-- one row per plugin</span>
 branches (
   id, plugin_id,
-  status            <span class="tok-c">-- WORKING (dev) | WAITING_APPROVE | APPROVING | RELEASED | REJECTED</span>
+  status            <span class="tok-c">-- WORKING (dev) | WAITING_APPROVE | APPROVING | RELEASED | REJECTED | CANCELLED</span>
   semver            <span class="tok-c">-- null on the dev branch</span>
   client_blob_sha, server_blob_sha,
   runtime_client, runtime_server   <span class="tok-c">-- e.g. cl.js@1.0.0 / sv.lua@1.0.0 (stdlib version)</span>
   base_branch_id,   <span class="tok-c">-- dev branch a candidate was cut from</span>
-  reject_reason, created_at, updated_at
+  reject_reason,    <span class="tok-c">-- set on REJECTED only; null for CANCELLED</span>
+  created_at, updated_at
 )
 
 <span class="tok-c">-- content-addressed, immutable, deduplicated</span>
@@ -730,56 +795,58 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <span class="eyebrow">Decision · explicit actions</span>
         <h2><span class="num">5</span>Moderation lifecycle</h2>
       </div>
-      <p>The author works on the dev branch. Publishing cuts a candidate branch into a review queue. A rejection is a dead branch plus a notification &mdash; the author goes straight back to the dev branch and publishes again.</p>
+      <p>The author works on the dev branch. Publishing cuts a candidate branch into a review queue. A rejection (moderator) or a cancellation (author) leaves a dead branch &mdash; the author goes back to the dev branch and publishes again.</p>
 
       <figure class="fig-scroll">
-        <svg viewBox="0 0 820 250" role="img" aria-label="State flow: the dev branch publishes to WAITING_APPROVE; a moderator claims it to APPROVING; approve moves it to RELEASED, reject moves it to REJECTED. From REJECTED the author returns to the dev branch and publishes a new candidate.">
+        <svg viewBox="0 0 820 300" role="img" aria-label="State flow: the dev branch publishes to WAITING_APPROVE; a moderator claims it to APPROVING; approve moves it to RELEASED, reject to REJECTED. The author can cancel from either WAITING_APPROVE or APPROVING, moving the branch to CANCELLED. REJECTED and CANCELLED are retained tombstones and both dead-end; the author returns to the dev branch and publishes a new candidate.">
           <defs>
             <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
             </marker>
+            <marker id="m2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--accent)" />
+            </marker>
           </defs>
           <g font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle">
-            <!-- dev -->
-            <rect x="24" y="96" width="120" height="44" rx="8" fill="var(--s-dev-bg)" stroke="var(--border-strong)" />
-            <text x="84" y="115" fill="var(--s-dev)" font-weight="600">dev branch</text>
-            <text x="84" y="131" fill="var(--ink-faint)" font-size="10">WORKING</text>
+            <rect x="24" y="118" width="120" height="44" rx="8" fill="var(--s-dev-bg)" stroke="var(--border-strong)" />
+            <text x="84" y="137" fill="var(--s-dev)" font-weight="600">dev branch</text>
+            <text x="84" y="153" fill="var(--ink-faint)" font-size="10">WORKING</text>
 
-            <!-- waiting -->
-            <rect x="214" y="96" width="150" height="44" rx="8" fill="var(--s-wait-bg)" stroke="var(--border-strong)" />
-            <text x="289" y="121" fill="var(--s-wait)" font-weight="600">WAITING_APPROVE</text>
+            <rect x="206" y="118" width="150" height="44" rx="8" fill="var(--s-wait-bg)" stroke="var(--border-strong)" />
+            <text x="281" y="143" fill="var(--s-wait)" font-weight="600">WAITING_APPROVE</text>
 
-            <!-- approving -->
-            <rect x="430" y="96" width="130" height="44" rx="8" fill="var(--s-review-bg)" stroke="var(--border-strong)" />
-            <text x="495" y="121" fill="var(--s-review)" font-weight="600">APPROVING</text>
+            <rect x="422" y="118" width="130" height="44" rx="8" fill="var(--s-review-bg)" stroke="var(--border-strong)" />
+            <text x="487" y="143" fill="var(--s-review)" font-weight="600">APPROVING</text>
 
-            <!-- released -->
-            <rect x="640" y="30" width="150" height="44" rx="8" fill="var(--s-released-bg)" stroke="var(--border-strong)" />
-            <text x="715" y="55" fill="var(--s-released)" font-weight="600">RELEASED</text>
+            <rect x="642" y="44" width="150" height="44" rx="8" fill="var(--s-released-bg)" stroke="var(--border-strong)" />
+            <text x="717" y="69" fill="var(--s-released)" font-weight="600">RELEASED</text>
 
-            <!-- rejected -->
-            <rect x="640" y="162" width="150" height="44" rx="8" fill="var(--s-rejected-bg)" stroke="var(--border-strong)" />
-            <text x="715" y="187" fill="var(--s-rejected)" font-weight="600">REJECTED</text>
+            <rect x="642" y="118" width="150" height="44" rx="8" fill="var(--s-rejected-bg)" stroke="var(--border-strong)" />
+            <text x="717" y="143" fill="var(--s-rejected)" font-weight="600">REJECTED</text>
+
+            <rect x="358" y="234" width="150" height="44" rx="8" fill="var(--s-dev-bg)" stroke="var(--border-strong)" stroke-dasharray="5 3" />
+            <text x="433" y="259" fill="var(--ink-soft)" font-weight="600">CANCELLED</text>
           </g>
 
           <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-soft)" stroke="none">
-            <line x1="144" y1="118" x2="208" y2="118" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
-            <text x="176" y="110" text-anchor="middle">publish</text>
+            <line x1="144" y1="140" x2="204" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="174" y="132" text-anchor="middle">publish</text>
 
-            <line x1="364" y1="118" x2="424" y2="118" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
-            <text x="394" y="110" text-anchor="middle">claim</text>
+            <line x1="356" y1="140" x2="420" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="388" y="132" text-anchor="middle">claim</text>
 
-            <path d="M560 108 Q610 80 636 66" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
-            <text x="610" y="82" text-anchor="middle">approve</text>
+            <path d="M552 130 Q602 92 640 82" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="600" y="98" text-anchor="middle">approve</text>
 
-            <path d="M560 130 Q610 160 636 174" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
-            <text x="606" y="160" text-anchor="middle">reject{reason}</text>
+            <line x1="552" y1="140" x2="640" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="596" y="132" text-anchor="middle">reject {reason}</text>
 
-            <path d="M715 162 Q715 250 150 236 Q90 232 84 146" fill="none" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#m2)" />
-            <text x="400" y="248" text-anchor="middle" fill="var(--ink-faint)">author edits dev branch, publishes a new candidate</text>
+            <path d="M268 162 Q246 205 396 232" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#m2-a)" />
+            <path d="M472 162 Q474 204 456 232" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#m2-a)" />
+            <text x="352" y="202" text-anchor="middle" fill="var(--accent)">cancel (author)</text>
           </g>
         </svg>
-        <figcaption>Candidate-branch lifecycle. <code>WAITING_APPROVE → REJECTED</code> directly is also allowed (reject before claim). The rejected branch is retained as a tombstone; there is no <code>resubmit</code>.</figcaption>
+        <figcaption>Candidate-branch lifecycle. <code>WAITING_APPROVE → REJECTED</code> directly is also allowed (reject before claim). <span class="diag-accent">Cancel</span> is the author withdrawing their own submission. <code>REJECTED</code> and <code>CANCELLED</code> are retained tombstones and both dead-end &mdash; there is no <code>resubmit</code>; the author edits the dev branch and publishes a new candidate.</figcaption>
       </figure>
 
       <h3>On reject</h3>
@@ -790,9 +857,17 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <li>A message is sent to the author in a system room (&ldquo;Fstick Developer&rdquo;) via Integration &mdash; delivery, not the record of truth.</li>
       </ul>
 
+      <h3>On cancel</h3>
+      <ul>
+        <li>The author withdraws their own candidate from <code>WAITING_APPROVE</code> <em>or</em> <code>APPROVING</code>: <code>POST /plugins/{id}/branches/{bid}/cancel</code>.</li>
+        <li>Branch <code>status = CANCELLED</code>, retained as a tombstone (hidden, not in the queue, not installable).</li>
+        <li>No <code>last_rejection</code>, no bot-room message &mdash; nothing was wrong. A <code>plugin_moderation_log</code> row is still appended for the trail.</li>
+        <li>If a moderator had already claimed it (<code>APPROVING</code>), it just disappears from their queue.</li>
+      </ul>
+
       <div class="note">
         <span class="k">Guard</span>
-        <p><code>POST /publish</code> returns <code>409</code> if the plugin already has a non-terminal candidate (<code>WAITING_APPROVE</code> or <code>APPROVING</code>). One open candidate at a time.</p>
+        <p><code>POST /publish</code> returns <code>409</code> if the plugin already has a non-terminal candidate (<code>WAITING_APPROVE</code> or <code>APPROVING</code>). One open candidate at a time &mdash; a rejection <em>or</em> a cancellation clears it, so the next <code>/publish</code> succeeds.</p>
       </div>
     </section>
 
@@ -805,11 +880,31 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <ul>
         <li><strong>Content-addressed blobs</strong>: <code>plugins/{pluginId}/blobs/{sha256}</code>. Immutable, never overwritten, deduplicated. The sha <em>is</em> the identifier the editor and Runtime pass around.</li>
         <li><strong>Exactly two files</strong> per branch &mdash; one client, one server. No multi-file plugins. This removes the <code>files[0]</code> ambiguity for good.</li>
-        <li>The editor <strong>never receives a presigned URL</strong>. Code (a few KB of text) travels inline through Registry, so authorisation is checked per request and there is no TTL to race.</li>
+        <li>The editor <strong>never receives a presigned URL</strong>. Code travels inline through Registry, so authorisation is checked per request and there is no TTL to race.</li>
         <li>The presigned two-phase upload stays &mdash; but only for icons, screenshots, and any future release bundles, where files are larger and uploaded once.</li>
-        <li>Per-file limit: <strong>8&nbsp;MB</strong> → <code>413</code>.</li>
       </ul>
       <p>The sha-based identifier also settles two earlier questions at once: the "one-time link" question disappears (no link), and the optimistic-concurrency check on save (&sect;10) is just a sha comparison.</p>
+
+      <h3>File size &amp; request compression</h3>
+      <p>Limit: <strong>500&nbsp;KB &mdash; 500&nbsp;000 bytes of UTF-8 &mdash; per file</strong>, measured on the decoded <code>text</code> string after any transfer decoding. Over &rarr; <code>413 { "error": "file_too_large", "side": "server", "limit": 500000, "actual": 812345 }</code>.</p>
+      <ul>
+        <li><strong>The limit is on decompressed content, not wire bytes.</strong> The client may send <code>Content-Encoding: gzip</code> (or <code>br</code>); Gateway and Registry decode first, then measure. Compression shrinks the upload &mdash; it does not raise the ceiling.</li>
+        <li><strong>Decompression is itself bounded</strong> to defuse a zip bomb: the request is rejected with <code>413</code> as soon as the decoded stream passes <strong>1.2&nbsp;MB</strong> (two 500&nbsp;KB files + <code>base_sha</code> + JSON framing + headroom), whatever <code>Content-Length</code> claims, and a decoded/encoded ratio over ~200 trips the same guard.</li>
+        <li>The editor shows a live byte counter per pane and blocks Save locally at the limit; the <code>413</code> is the server-side backstop.</li>
+      </ul>
+
+      <h4>What 500&nbsp;KB actually buys</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Content</th><th>Bytes / char</th><th>≈ characters</th><th>≈ lines</th></tr></thead>
+          <tbody>
+            <tr><td>ASCII code (typical)</td><td class="tnum">1</td><td class="tnum">500&nbsp;000</td><td class="tnum">8&nbsp;000 &ndash; 16&nbsp;000</td></tr>
+            <tr><td>heavy Cyrillic comments / strings</td><td class="tnum">2</td><td class="tnum">~250&nbsp;000</td><td class="tnum">4&nbsp;000 &ndash; 8&nbsp;000</td></tr>
+            <tr><td>emoji-dense</td><td class="tnum">4</td><td class="tnum">~125&nbsp;000</td><td class="tnum">&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Line counts assume 30&ndash;60 characters per line including indentation and the newline. For reference, a large single source file in Element itself runs 2&nbsp;000&ndash;3&nbsp;000 lines &mdash; a 500&nbsp;KB Lua or JS file is far outside anything the two-pane editor targets. On the wire, source text gzips ~3&ndash;5&times; (Brotli ~4&ndash;6&times;), so a file at the limit uploads as roughly <strong>100&ndash;150&nbsp;KB</strong>.</p>
     </section>
 
     <!-- 7 -->
@@ -832,17 +927,25 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
     <!-- 8 -->
     <section id="console">
       <div class="sec-head">
-        <span class="eyebrow">Decision · Variant A</span>
+        <span class="eyebrow">Decision</span>
         <h2><span class="num">8</span>Console streaming</h2>
       </div>
-      <p>The <code>print</code> hook fires inside command execution, where Runtime knows <code>pluginId</code>, <code>branchId</code>, <code>chatId</code>, and the calling <code>userId</code> &mdash; but not the author. The console line must be pushed only to the author.</p>
+      <p>The <code>print</code> hook fires inside command execution, where Runtime knows <code>pluginId</code>, <code>branchId</code>, <code>chatId</code>, and the calling user &mdash; all as <code>internal_uuid</code>. The console line must reach the plugin author, and no one else.</p>
 
-      <h3>Who resolves the author &mdash; Runtime (chosen)</h3>
-      <p>Runtime already calls <code>GET registry /plugins/{id}</code> to load source. Add <code>author_matrix_id</code> to that response (Registry fills it from the mapper); Runtime caches it in the engine entry (keyed by <code>(pluginId, shas)</code>) and stamps <code>author_user_id</code> onto the console event. Integration stays a dumb forwarder. One resolve per engine load, zero extra calls per line.</p>
-      <p>The alternative &mdash; Integration resolving the author on every console event &mdash; keeps author identity out of Runtime but adds a lookup (or its own cache) per line. Rejected.</p>
+      <h3>Path &mdash; batched</h3>
+      <ol>
+        <li>Runtime takes the author's <code>internal_uuid</code> straight from <code>GET registry /plugins/{id}</code> (the <code>author_id</code> field &mdash; no MXID anywhere) and caches it in the engine entry, keyed by <code>(pluginId, shas)</code>.</li>
+        <li>Runtime <strong>buffers</strong> <code>print</code> lines and <code>POST</code>s them in batches to <code>integration /api/v1/plugin-console</code> as <code>{ author_id, msgs: [ … ] }</code> &mdash; flushed on a ~100&nbsp;ms timer, when the buffer hits 64 lines, or when the command returns, whichever is first.</li>
+        <li>integration resolves <code>internal_uuid → mxid</code> <em>once</em>, wraps the array into a single <code>fstick.plugin.console</code> event <code>{ msgs: [ … ] }</code>, and calls Dendrite <code>/events/push</code>. The client appends every <code>msgs[]</code> entry to the console pane in order.</li>
+      </ol>
+      <p>Kept separate from <code>broadcastPluginState</code> &mdash; console traffic is bursty and single-recipient. One resolve, one push, N lines. This is why the mapper sits in integration: the one service that already turns internal ids into Matrix pushes does the resolution, and Runtime never handles an MXID.</p>
 
-      <h3>Delivery</h3>
-      <p>New Integration endpoint <code>POST /api/v1/plugin-console</code> → forwards to Dendrite <code>/events/push</code> addressed to the author's MXID. Kept separate from <code>broadcastPluginState</code> because console traffic is per-line and single-recipient.</p>
+      <h3>Flood protection</h3>
+      <ul>
+        <li><strong>Per line:</strong> <code>message</code> truncated at <strong>8&nbsp;KB</strong> with a <code>…[truncated]</code> marker.</li>
+        <li><strong>Per batch:</strong> at most <strong>256</strong> lines; overflow is dropped and replaced by one synthetic <code>{ level: "error", message: "N console lines dropped (rate limit)" }</code>.</li>
+        <li><strong>Per <code>(plugin, chat)</code>:</strong> a token bucket (≈500 lines / 10&nbsp;s). Sustained flooding drops with the same synthetic marker rather than backing up the buffer.</li>
+      </ul>
 
       <div class="table-wrap">
         <table>
@@ -877,6 +980,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></td><td>author + dev</td><td>editor bootstrap: source inline + blob shas</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></td><td>author + dev</td><td>save + trigger reload</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/publish</code></td><td>author</td><td>dev → new candidate branch</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></td><td>author</td><td>withdraw own candidate → <span class="pill pill--cancelled">CANCELLED</span></td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/moderation/branches?status=WAITING_APPROVE</code></td><td>moderator</td><td>review queue</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></td><td>moderator</td><td><span class="pill pill--wait">WAITING_APPROVE</span> → <span class="pill pill--review">APPROVING</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></td><td>moderator</td><td>→ <span class="pill pill--released">RELEASED</span></td></tr>
@@ -894,7 +998,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <tbody>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>evict engine for a chat; 3s min interval → <code>429</code>; runs state auto-migrator</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>author + dev &mdash; overwrite state from the editor</td></tr>
-            <tr><td colspan="3" class="wrap"><code>print</code> hook now emits <code>fstick.plugin.console</code> via Integration, addressed to the author. Engine cache re-keyed to <code>(pluginId, client_sha, server_sha)</code>.</td></tr>
+            <tr><td colspan="3" class="wrap"><code>print</code> hook buffers lines and <code>POST</code>s them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Engine cache re-keyed to <code>(pluginId, client_sha, server_sha)</code>; author <code>internal_uuid</code> cached in the entry.</td></tr>
           </tbody>
         </table>
       </div>
@@ -904,8 +1008,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <table>
           <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugin-console</code></td><td>forward one console line to the author via <code>/events/push</code></td></tr>
-            <tr><td colspan="3" class="wrap">New sync event types over the existing pipe: <code>fstick.plugin.console</code>, <code>fstick.plugin.reloaded</code>. No new transport.</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/identity/resolve</code></td><td><code>{ mxid } → { internal_uuid }</code>, create-or-return; mints the uuid on first contact</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/identity/{internal_uuid}</code></td><td><code>→ { mxid }</code>, for outbound push; batch variant for member lists</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugin-console</code></td><td>resolve author <code>internal_uuid → mxid</code>, push one batch <code>{ msgs:[…] }</code> via <code>/events/push</code></td></tr>
+            <tr><td colspan="3" class="wrap">integration gains its first datastore (Postgres) for the identity table &mdash; see &sect;3. New sync event types over the existing pipe: <code>fstick.plugin.console</code>, <code>fstick.plugin.reloaded</code>. No new transport.</td></tr>
           </tbody>
         </table>
       </div>
@@ -917,7 +1023,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       </ul>
 
       <h3>Gateway</h3>
-      <p>Proxy the new routes with <code>X-User-Id</code> (now the internal UUID) + <code>X-User-Matrix-Id</code> forwarded: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, the moderation actions, <code>PUT …/state</code>, <code>?owned=true</code>.</p>
+      <p>Swap the inbound <code>X-User-Id</code> &mdash; an MXID set by Dendrite &mdash; to <code>internal_uuid</code> via <code>integration /api/v1/identity/resolve</code>, cached in-process (LRU, no invalidation). Forward only that; <code>X-User-Matrix-Id</code> is not propagated. Proxy the new routes: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, the moderation actions, <code>PUT …/state</code>, <code>?owned=true</code>.</p>
     </section>
 
     <!-- 10 -->
@@ -927,10 +1033,19 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <h2><span class="num">10</span>Endpoint contracts</h2>
       </div>
 
+      <h3>Conventions</h3>
+      <ul>
+        <li>Every external call goes through the Gateway with <code>Authorization: Bearer &lt;matrix_token&gt;</code>. The Gateway authenticates it and injects <code>X-User-Id: &lt;internal_uuid&gt;</code> (&sect;3); contracts below are the logical shape at the service boundary.</li>
+        <li>Error body is always <code>{ "error": "&lt;snake_code&gt;", "message": "&lt;human&gt;", … }</code>. Codes: <code>400</code> malformed, <code>401</code> bad token, <code>403</code> not the author / not a moderator, <code>404</code> unknown id or branch not visible to the caller, <code>409</code> state conflict, <code>413</code> too large, <code>422</code> semantic validation, <code>429</code> throttled.</li>
+        <li>The transition actions (<code>claim</code> / <code>approve</code> / <code>reject</code> / <code>cancel</code>) are <strong>idempotent on retry</strong>: a repeat that finds the branch already in the target state returns <code>200</code> with the current row; an action invalid for the current state returns <code>409</code>.</li>
+      </ul>
+
+      <h3>Registry &mdash; editor</h3>
+
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev only</span><span><b>Empty plugin:</b> returns templates</span></div>
+          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev (<code>WORKING</code>) only &rarr; else <code>409</code></span><span><b>Empty plugin:</b> <code>text</code> = templates</span></div>
           <pre><code><span class="tok-c">// 200</span>
 {
   <span class="tok-k">"plugin"</span>:  { <span class="tok-k">"id"</span>: "…", <span class="tok-k">"name"</span>: "…", <span class="tok-k">"author_id"</span>: "…" },
@@ -948,7 +1063,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--put">PUT</span><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev only</span><span><b>Limit:</b> 8 MB/file → 413</span></div>
+          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev only</span><span><b>Limit:</b> 500 KB/file &middot; 1.2 MB decoded body &rarr; <code>413</code></span><span><b>Accepts:</b> <code>Content-Encoding: gzip | br</code></span></div>
           <pre><code><span class="tok-c">// request — send only the side(s) that changed</span>
 {
   <span class="tok-k">"client"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
@@ -963,40 +1078,154 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
 <span class="tok-c">// 409 — someone else moved the code; nothing was written</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"stale_code"</span>,
-  <span class="tok-k">"current"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> } }</code></pre>
+  <span class="tok-k">"current"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> } }
+
+<span class="tok-c">// 413 — one file over 500 000 bytes (measured after decode)</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"file_too_large"</span>, <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"limit"</span>: 500000, <span class="tok-k">"actual"</span>: 812345 }</code></pre>
+          <p>Save writes each changed side to <code>blobs/{sha256}</code>, repoints the dev branch, then calls <code>POST /internal/plugins/{id}/reload</code>. <code>reloaded:false</code> if the reload throttle (&sect;7) deferred it.</p>
         </div>
       </div>
+
+      <h3>Registry &mdash; moderation</h3>
 
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/publish</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author</span><span><b>409:</b> open candidate exists</span></div>
+          <div class="attrs"><span><b>Auth:</b> author</span><span><b>409:</b> open candidate exists</span><span><b>422:</b> <code>semver</code> not &gt; released max</span></div>
           <pre><code><span class="tok-c">// request</span>
 { <span class="tok-k">"source_branch_id"</span>: <span class="tok-s">"&lt;dev branch&gt;"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.2.0"</span>, <span class="tok-k">"changelog"</span>: <span class="tok-s">"…"</span> }
 
-<span class="tok-c">// 201</span>
+<span class="tok-c">// 201 — snapshots the dev branch's blob pair into a frozen candidate</span>
 { <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.2.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/moderation/branches?status=WAITING_APPROVE&amp;page=&amp;limit=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> moderator</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"items"</span>: [ {
+    <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"plugin_name"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"changelog"</span>,
+    <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> | <span class="tok-s">"APPROVING"</span>,
+    <span class="tok-k">"author"</span>: { <span class="tok-k">"id"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:…"</span> },
+    <span class="tok-k">"submitted_at"</span>, <span class="tok-k">"claimed_by"</span>: <span class="tok-s">null</span>
+  } ],
+  <span class="tok-k">"page"</span>: 0, <span class="tok-k">"total"</span>: 7 }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> moderator</span></div>
+          <p>No body. <span class="pill pill--wait">WAITING_APPROVE</span> &rarr; <span class="pill pill--review">APPROVING</span>, records <code>claimed_by</code> = caller. <code>200 { "branch_id", "status": "APPROVING", "claimed_by" }</code>. <code>409 { "error": "claimed_by_other" }</code> if another moderator holds it; a re-claim by the same moderator is a no-op <code>200</code>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> moderator (the claimer) &rarr; else <code>403</code></span></div>
+          <p>No body. <span class="pill pill--review">APPROVING</span> &rarr; <span class="pill pill--released">RELEASED</span>. <code>200 { "branch_id", "status": "RELEASED", "semver" }</code>. Side effects: branch becomes installable by anyone; a &ldquo;released&rdquo; message is posted to the Fstick Developer room; moderation-log row. <code>409</code> if not <code>APPROVING</code>.</p>
         </div>
       </div>
 
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> moderator</span></div>
-          <p>Request <code>{ "reason": "…" }</code>. Effect: branch → <span class="pill pill--rejected">REJECTED</span> (retained), <code>plugins.last_rejection</code> set, moderation-log row appended, author messaged in the Fstick Developer room. No <code>resubmit</code> &mdash; the author edits the dev branch and calls <code>/publish</code> again.</p>
+          <div class="attrs"><span><b>Auth:</b> moderator</span><span><b>From:</b> <code>WAITING_APPROVE</code> or <code>APPROVING</code></span></div>
+          <pre><code><span class="tok-c">// request</span>
+{ <span class="tok-k">"reason"</span>: <span class="tok-s">"…"</span> }        <span class="tok-c">// required, ≤ 2000 chars</span>
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"branch_id"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"REJECTED"</span> }</code></pre>
+          <p>Branch retained (hidden, not installable). <code>plugins.last_rejection = { reason, at, semver, branch_id }</code> set; moderation-log row; author messaged in the Fstick Developer room. No <code>resubmit</code> &mdash; the author edits the dev branch and calls <code>/publish</code> again. <code>409</code> if already terminal.</p>
         </div>
       </div>
 
       <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> author</span><span><b>From:</b> <code>WAITING_APPROVE</code> or <code>APPROVING</code></span></div>
+          <p>No body. Branch &rarr; <span class="pill pill--cancelled">CANCELLED</span> (retained), moderation-log row, drops out of the review queue. No <code>last_rejection</code>, no notification &mdash; the author withdrew it. <code>200 { "branch_id", "status": "CANCELLED" }</code>. <code>409</code> if already terminal (<code>RELEASED</code> / <code>REJECTED</code> / <code>CANCELLED</code>).</p>
+        </div>
+      </div>
+
+      <h3>Registry &mdash; catalog <span class="pill pill--dev">changed</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins?owned=true&amp;page=&amp;limit=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> token required only with <code>owned=true</code></span></div>
+          <p>Without <code>owned</code>: the public list &mdash; only plugins with <code>status=ACTIVE</code> <em>and</em> at least one <span class="pill pill--released">RELEASED</span> branch. With <code>owned=true</code>: plugins where <code>author_id == X-User-Id</code>, including dev-only ones and ones with a pending or rejected candidate.</p>
+          <pre><code><span class="tok-c">// 200 (owned=true)</span>
+{ <span class="tok-k">"items"</span>: [ {
+    <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"icon_url"</span>, <span class="tok-k">"category"</span>, <span class="tok-k">"tags"</span>,
+    <span class="tok-k">"dev_branch_id"</span>,
+    <span class="tok-k">"candidate"</span>: { <span class="tok-k">"branch_id"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"status"</span> } | <span class="tok-s">null</span>,
+    <span class="tok-k">"released_semver"</span>: <span class="tok-s">"1.1.0"</span> | <span class="tok-s">null</span>,
+    <span class="tok-k">"last_rejection"</span>: { <span class="tok-k">"reason"</span>, <span class="tok-k">"at"</span>, <span class="tok-k">"semver"</span> } | <span class="tok-s">null</span>
+  } ],
+  <span class="tok-k">"page"</span>: 0, <span class="tok-k">"total"</span>: 3 }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> optional</span><span><b>Non-author:</b> <code>RELEASED</code> branches only &middot; <code>404</code> if none</span></div>
+          <pre><code><span class="tok-c">// 200 (author view — all branches + last_rejection)</span>
+{
+  <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"author_id"</span>, <span class="tok-k">"icon_url"</span>, <span class="tok-k">"description"</span>,
+  <span class="tok-k">"branches"</span>: [
+    { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">null</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WORKING"</span>, <span class="tok-k">"runtime"</span>: {…} },
+    { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.1.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"RELEASED"</span>, <span class="tok-k">"created_at"</span> },
+    { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.2.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> }
+  ],
+  <span class="tok-k">"last_rejection"</span>: { <span class="tok-k">"reason"</span>, <span class="tok-k">"at"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"branch_id"</span> } | <span class="tok-s">null</span>
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> any user</span><span><b>Changed:</b> <code>icon</code> now optional</span></div>
+          <pre><code><span class="tok-c">// request — no code, no icon required</span>
+{ <span class="tok-k">"name"</span>, <span class="tok-k">"description"</span>, <span class="tok-k">"category"</span>, <span class="tok-k">"tags"</span>: [ … ],
+  <span class="tok-k">"icon"</span>: { <span class="tok-k">"file_name"</span>, <span class="tok-k">"type"</span> } | <span class="tok-s">null</span> }   <span class="tok-c">// null → template icon</span>
+
+<span class="tok-c">// 201 — first branch created as WORKING; edit it via GET …/edit</span>
+{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"dev_branch_id"</span>,
+  <span class="tok-k">"icon_upload"</span>: { <span class="tok-k">"upload_url"</span>, <span class="tok-k">"key"</span> } | <span class="tok-s">null</span> }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/server?branch_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> author (dev / candidate) &middot; any user (<code>RELEASED</code>)</span><span><b>Caller:</b> mostly Runtime, server-to-server</span></div>
+          <p>Gate added: a non-<code>RELEASED</code> branch returns <code>403</code> to anyone but the author. Response is unchanged &mdash; <code>{ "files": [ { "download_url" } ] }</code> presigned GET. Editor code does <em>not</em> go through here (it is inline in <code>…/edit</code>); this endpoint remains for Runtime loading a released plugin.</p>
+        </div>
+      </div>
+
+      <h3>Runtime</h3>
+
+      <div class="endpoint">
         <div class="endpoint-head"><span class="method method--put">PUT</span><code>/api/v1/plugins/{id}/state?chat_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author + dev install</span><span><b>Lock:</b> none (last write wins)</span></div>
-          <pre><code><span class="tok-c">// request — full state JSON</span>
+          <div class="attrs"><span><b>Auth:</b> author + dev install &rarr; else <code>403</code></span><span><b>Lock:</b> none (last write wins)</span><span><b>Limit:</b> 256 KB serialized &rarr; <code>413</code></span></div>
+          <pre><code><span class="tok-c">// request — full state JSON (not a patch)</span>
 { <span class="tok-k">"state"</span>: { <span class="tok-k">"counter"</span>: 5, <span class="tok-k">"votes"</span>: { <span class="tok-k">"@a"</span>: 1 } } }
 
-<span class="tok-c">// 200 — effective state after the migrator ran</span>
+<span class="tok-c">// 200 — effective state after the auto-migrator ran</span>
 { <span class="tok-k">"state"</span>: { … },
-  <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"path"</span>: <span class="tok-s">"votes.@x"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"unknown key dropped"</span> } ] }</code></pre>
+  <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"path"</span>: <span class="tok-s">"votes.@x"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"unknown key dropped"</span> } ] }
+
+<span class="tok-c">// 400 — body is not valid JSON</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"invalid_json"</span> }</code></pre>
+          <p>Writes <code>state:&lt;pluginId&gt;:&lt;chatId&gt;</code> in Redis, then the normal broadcast fires. <code>GET /api/v1/plugins/{id}/state?chat_id=</code> is unchanged &mdash; returns the current effective state object.</p>
         </div>
       </div>
 
@@ -1007,8 +1236,99 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <pre><code><span class="tok-c">// request</span>
 { <span class="tok-k">"chat_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"client_sha"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server_sha"</span>: <span class="tok-s">"sha256:…"</span> }
 
-<span class="tok-c">// 429 — called again within 3s</span>
+<span class="tok-c">// 200 — evicted; next command rebuilds the engine, state auto-migrated</span>
+{ <span class="tok-k">"reloaded"</span>: true, <span class="tok-k">"client_changed"</span>: true }
+
+<span class="tok-c">// 429 — called again within 3s (Registry surfaces reloaded:false to the editor)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
+        </div>
+      </div>
+
+      <h3>Integration &mdash; identity</h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/identity/resolve</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Gateway (internal)</span><span><b>Idempotent:</b> mints on first sight</span></div>
+          <pre><code><span class="tok-c">// request</span>
+{ <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:fstick.local"</span> }
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"internal_uuid"</span>: <span class="tok-s">"9f3c1a2e-…"</span>, <span class="tok-k">"created"</span>: false }</code></pre>
+          <p>Concurrent first-contact is safe: <code>UNIQUE(mxid)</code> + <code>INSERT … ON CONFLICT DO NOTHING RETURNING</code> yields exactly one <code>internal_uuid</code>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/identity/resolve-batch</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> internal &middot; member-list resolution</span></div>
+          <pre><code>{ <span class="tok-k">"mxids"</span>: [ <span class="tok-s">"@a:x"</span>, <span class="tok-s">"@b:x"</span> ] }
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"map"</span>: { <span class="tok-s">"@a:x"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-s">"@b:x"</span>: <span class="tok-s">"&lt;uuid&gt;"</span> } }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/identity/{internal_uuid}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> internal &middot; outbound push</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:fstick.local"</span> }
+<span class="tok-c">// 404 — unknown uuid</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Integration &mdash; console <span class="pill pill--dev">internal</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugin-console</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Runtime (internal)</span><span><b>Delivery:</b> fire-and-forget &rarr; <code>202</code></span><span><b>Cap:</b> 256 msgs/call &middot; 8 KB/message</span></div>
+          <pre><code><span class="tok-c">// request — a coalesced batch</span>
+{
+  <span class="tok-k">"author_id"</span>: <span class="tok-s">"&lt;internal_uuid&gt;"</span>,
+  <span class="tok-k">"msgs"</span>: [
+    { <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>, <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span> }
+  ]
+}
+
+<span class="tok-c">// 202 — resolved author_id → mxid, pushed one fstick.plugin.console { msgs }</span>
+<span class="tok-c">// 404 — author_id unknown → dropped and logged, still 202 to the caller</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Installation <span class="pill pill--dev">changed</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/installations?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> chat member</span><span><b>Debug branch:</b> author only &rarr; <code>403</code></span></div>
+          <pre><code><span class="tok-c">// request</span>
+{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span> }
+
+<span class="tok-c">// 201</span>
+{ <span class="tok-k">"installation_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"branch_status"</span> }
+
+<span class="tok-c">// 403 — target branch is not RELEASED and caller ≠ author</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"debug_install_forbidden"</span> }</code></pre>
+          <p>Installation-service reads <code>branch.status</code> + <code>plugin.author_id</code> from Registry to make this check.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/installations?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> chat member</span><span><b>Added:</b> <code>branch_status</code>, <code>author_id</code></span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"items"</span>: [ {
+    <span class="tok-k">"installation_id"</span>, <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span>,
+    <span class="tok-k">"branch_status"</span>: <span class="tok-s">"WORKING"</span> | <span class="tok-s">"RELEASED"</span>,
+    <span class="tok-k">"author_id"</span>, <span class="tok-k">"installed_by"</span>, <span class="tok-k">"installed_at"</span>
+  } ] }</code></pre>
+          <p>The frontend shows <strong>Edit</strong> when <code>branch_status === "WORKING" &amp;&amp; author_id === myInternalUuid</code>.</p>
         </div>
       </div>
     </section>
@@ -1021,15 +1341,22 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       </div>
       <p>Both ride <code>fstick_events</code> in the Matrix <code>/sync</code> response, surfaced by <code>syncInterceptor</code> as <code>CustomEvent("fstick:sync-event")</code>.</p>
 
-      <pre><code><span class="tok-k">fstick.plugin.console</span>          <span class="tok-c">// → author only</span>
+      <pre><code><span class="tok-k">fstick.plugin.console</span>          <span class="tok-c">// → author only · one push carries many lines</span>
 {
-  <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
-  <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
-  <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>,
-  <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span>     <span class="tok-c">// correlate a line with the command that caused it</span>
+  <span class="tok-k">"msgs"</span>: [
+    {
+      <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>,
+      <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span>   <span class="tok-c">// correlate a line with the command that caused it</span>
+    }
+  ]
 }
+<span class="tok-c">// Runtime → integration:  { "author_id": &lt;internal_uuid&gt;, "msgs": [ … ] }</span>
+<span class="tok-c">// integration maps author_id → MXID, addresses the push, forwards { msgs } as-is.</span>
+<span class="tok-c">// The client-facing event carries no id. Ordering within msgs is preserved.</span>
 
-<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → author (the chat where the editor runs)</span>
+<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → author · one per reload, never batched</span>
 {
   <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
   <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span>          <span class="tok-c">// → re-fetch cl.js, re-run runDsl</span>
@@ -1044,13 +1371,15 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       </div>
       <ul>
         <li><strong>Edit</strong> shows when <code>installation.branch_status === "WORKING"</code> and <code>installation.author_id === myInternalUuid</code>.</li>
-        <li>Editor surface: two code panes (client / server), a console pane filtered by <code>plugin_id</code> + <code>chat_id</code> with an <code>info</code>/<code>error</code> toggle, and a collapsible editable JSON state panel with a refresh button.</li>
+        <li>Editor surface: two code panes (client / server), a console pane that appends each <code>msgs[]</code> entry of a <code>fstick.plugin.console</code> event (filtered by <code>plugin_id</code> + <code>chat_id</code>, <code>info</code>/<code>error</code> toggle), and a collapsible editable JSON state panel with a refresh button.</li>
+        <li>Each code pane shows a live byte counter and blocks Save at <strong>500 KB</strong>; the server <code>413</code> is the backstop.</li>
         <li>Two views: the right-hand panel, and a separate window opened with <code>window.open</code> on the same origin &mdash; auth token read from <code>localStorage</code>, same as the Matrix session.</li>
         <li>Save holds the <code>sha</code> pair from <code>GET …/edit</code>, sends them as <code>base_sha</code>; on <code>409</code> it tells the user the code changed elsewhere and to reload.</li>
         <li>Hot-reload button is debounced to &ge;&nbsp;3&nbsp;s and handles <code>429</code>.</li>
         <li>On <code>fstick.plugin.reloaded</code> with <code>client_changed</code>, re-fetch <code>cl.js</code> and re-run <code>runDsl</code>.</li>
         <li>A brand-new debug plugin opens with template code and a template icon.</li>
         <li>The author is shown as <code>@localpart</code> &mdash; strip <code>:domain</code> from the MXID; never render the full MXID or the internal UUID.</li>
+        <li>When a candidate branch is pending (<code>WAITING_APPROVE</code> / <code>APPROVING</code>), the plugin's management view shows its status and a <strong>Cancel submission</strong> action (<code>POST …/branches/{bid}/cancel</code>).</li>
       </ul>
     </section>
 
@@ -1065,7 +1394,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>#</th><th>Question</th><th>Leaning</th></tr></thead>
           <tbody>
             <tr><td class="tnum">1</td><td class="wrap">Identity mapper &mdash; build now, or ship the editor against the current UUID hack and defer author-targeted console?</td><td>build now; it unblocks console and removes the <code>nameUUIDFromBytes</code> guesswork</td></tr>
-            <tr><td class="tnum">2</td><td class="wrap">Where the <code>uuid ↔ mxid</code> mapper lives &mdash; inside Gateway, or a standalone service?</td><td>Gateway for now, extract later</td></tr>
+            <tr><td class="tnum">2</td><td class="wrap">Mapper table goes in integration-service, giving that (currently stateless) ACL its first datastore &mdash; accepted, or split identity into its own service now?</td><td>accept &mdash; identity is Matrix-ACL domain; extract only if integration grows further</td></tr>
             <tr><td class="tnum">3</td><td class="wrap">Keep <code>APPROVING</code> as a distinct state, or collapse to <code>WAITING_APPROVE → RELEASED|REJECTED</code>?</td><td>keep &mdash; enables claim / "under review"</td></tr>
             <tr><td class="tnum">4</td><td class="wrap">Blob GC: when are superseded dev-save blobs and rejected-branch blobs collected?</td><td>ref-count + TTL sweep; needs a policy</td></tr>
             <tr><td class="tnum">5</td><td class="wrap">Commit history (phase 2) &mdash; in the first build or deferred?</td><td>deferred; branch model alone gives <code>REJECTED</code></td></tr>
@@ -1088,9 +1417,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Topic</th><th>Decision</th></tr></thead>
           <tbody>
             <tr><td>debug/release granularity</td><td>on the version (branch), not the plugin</td></tr>
-            <tr><td>state names</td><td><code>WORKING</code> · <code>WAITING_APPROVE</code> · <code>APPROVING</code> · <code>RELEASED</code> · <code>REJECTED</code> (preliminary)</td></tr>
+            <tr><td>state names</td><td><code>WORKING</code> · <code>WAITING_APPROVE</code> · <code>APPROVING</code> · <code>RELEASED</code> · <code>REJECTED</code> · <code>CANCELLED</code> (preliminary)</td></tr>
             <tr><td>publish</td><td><code>POST /plugins/{id}/publish</code> — creates a new candidate branch, snapshot from dev</td></tr>
-            <tr><td>rejection</td><td>branch status <code>REJECTED</code> + <code>last_rejection</code> + moderation log + bot-room message; no <code>resubmit</code></td></tr>
+            <tr><td>rejection</td><td>moderator; branch status <code>REJECTED</code> + <code>last_rejection</code> + moderation log + bot-room message; no <code>resubmit</code></td></tr>
+            <tr><td>cancellation</td><td>author withdraws own candidate from <code>WAITING_APPROVE</code>/<code>APPROVING</code> → <code>CANCELLED</code> tombstone; moderation-log row, no notification; clears the one-open-candidate guard</td></tr>
             <tr><td>debug installs per author</td><td>unlimited; <code>chat_id</code> required on editor calls</td></tr>
             <tr><td>editor code transport</td><td>inline through Registry — no presigned URL, no TTL</td></tr>
             <tr><td>save notification</td><td>new <code>PUT …/code</code>; not a reuse of <code>commit</code></td></tr>
@@ -1100,11 +1430,13 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>S3 names</td><td>unified — content-addressed <code>blobs/{sha256}</code>, exactly 2 files</td></tr>
             <tr><td>concurrency on save</td><td>content-hash compare → <code>409 stale_code</code>; no server-side lock table</td></tr>
             <tr><td>broken code on save</td><td>saved, returns <code>warnings</code></td></tr>
-            <tr><td>file size limit</td><td>8 MB → <code>413</code></td></tr>
+            <tr><td>file size limit</td><td><strong>500 KB (500 000 bytes UTF-8) per file</strong>, measured after transfer decode; decoded request body capped at 1.2 MB (zip-bomb guard). ≈ 500 000 ASCII chars ≈ 8 000–16 000 lines; gzips ~3–5× on the wire</td></tr>
             <tr><td>runtime string <code>@X</code></td><td>stdlib version; editable from the editor (not yet implemented server-side)</td></tr>
             <tr><td>console recipients / timing</td><td>author only; always on; live only; subtypes <code>info</code> / <code>error</code></td></tr>
             <tr><td>other users' prints</td><td>shown (shared backend state)</td></tr>
-            <tr><td>console author resolution</td><td>Runtime, cached in the engine entry (Variant A)</td></tr>
+            <tr><td>console author resolution</td><td>Runtime carries the author's <code>internal_uuid</code> (cached in the engine entry); integration maps it to an MXID at push time</td></tr>
+            <tr><td>console batching</td><td>Runtime buffers <code>print</code> lines (~100 ms / 64 lines / command end) and <code>POST</code>s <code>{ author_id, msgs:[…] }</code>; the <code>fstick.plugin.console</code> event carries <code>{ msgs:[…] }</code>, one push per batch</td></tr>
+            <tr><td>console flood limits</td><td>8 KB/line (truncate), 256 lines/batch, ≈500 lines/10 s per (plugin, chat); overflow → one synthetic <code>error</code> line</td></tr>
             <tr><td>engine cache key</td><td><code>(pluginId, client_sha, server_sha)</code></td></tr>
             <tr><td>state auto-migration</td><td>built into Runtime; runs on reload and on state PUT</td></tr>
             <tr><td>editable state panel</td><td>yes — Runtime applies it</td></tr>
@@ -1117,7 +1449,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>empty plugin / new debug plugin</td><td><code>GET …/edit</code> returns templates; template icon assigned</td></tr>
             <tr><td>uninstall while editor open</td><td>allowed — there is no editor session</td></tr>
             <tr><td>reload rate limit</td><td>3 s minimum</td></tr>
-            <tr><td>identity</td><td>pure internal UUID in the overlay + bidirectional <code>uuid ↔ mxid</code> mapper; frontend shows <code>@localpart</code>; no handle</td></tr>
+            <tr><td>identity &mdash; core</td><td>pure <code>internal_uuid</code> everywhere; MXID only on two hops (Dendrite→Gateway in, integration→Dendrite out); frontend shows <code>@localpart</code>; no handle</td></tr>
+            <tr><td>identity &mdash; mapper</td><td><code>uuid ↔ mxid</code> table owned by integration-service in <strong>Postgres</strong> (system of record); Gateway caches lookups in-process; Redis only ever a read cache, never the store</td></tr>
+            <tr><td>identity &mdash; provisioning</td><td>integration mints <code>internal_uuid</code> on first <code>identity/resolve</code> miss (idempotent via <code>UNIQUE(mxid)</code>)</td></tr>
           </tbody>
         </table>
       </div>
@@ -1126,7 +1460,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   </main>
 
   <footer class="foot">
-    Fstick · Plugin Editor Integration · design note, 2026-09-08 · supersedes the API sections of fstick_specification.md where they conflict
+    Fstick · Plugin Editor Integration · design note, updated 2026-09-09 · supersedes the API sections of fstick_specification.md where they conflict
   </footer>
 
 </div>
