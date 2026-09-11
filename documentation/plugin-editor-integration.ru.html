@@ -1,0 +1,1477 @@
+<title>Интеграция редактора плагинов</title>
+<meta name="description" content="Проектирование API для интеграции редактора кода плагинов (два поля + hot-reload) в Fstick." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+
+<style>
+  :root {
+    --bg: #f2f4f7;
+    --surface: #ffffff;
+    --surface-2: #e9edf1;
+    --ink: #1b2330;
+    --ink-soft: #545f6e;
+    --ink-faint: #8a95a2;
+    --border: #d7dde4;
+    --border-strong: #b7c1cb;
+    --accent: #365d8d;
+    --accent-ink: #2b4d78;
+    --accent-soft: #e8eef6;
+
+    --s-dev: #545f6e;      --s-dev-bg: #e5e8ec;
+    --s-wait: #8f6412;     --s-wait-bg: #f5ecd9;
+    --s-review: #365d8d;   --s-review-bg: #e6eef7;
+    --s-released: #226b45; --s-released-bg: #dcefe4;
+    --s-rejected: #9a3a37; --s-rejected-bg: #f3dfde;
+
+    --m-get: #226b45;      --m-get-bg: #dcefe4;
+    --m-post: #365d8d;     --m-post-bg: #e6eef7;
+    --m-put: #8f6412;      --m-put-bg: #f5ecd9;
+    --m-patch: #5f4a86;    --m-patch-bg: #ebe6f3;
+    --m-delete: #9a3a37;   --m-delete-bg: #f3dfde;
+
+    --shadow: 0 1px 2px rgba(20, 28, 40, 0.06), 0 8px 24px -12px rgba(20, 28, 40, 0.12);
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101318;
+      --surface: #181c23;
+      --surface-2: #212630;
+      --ink: #e3e7ee;
+      --ink-soft: #9aa4b2;
+      --ink-faint: #6c7683;
+      --border: #2a303a;
+      --border-strong: #3b434f;
+      --accent: #7ba1d6;
+      --accent-ink: #9cbce4;
+      --accent-soft: #1c2632;
+
+      --s-dev: #9aa4b2;      --s-dev-bg: #232831;
+      --s-wait: #d3a55f;     --s-wait-bg: #322819;
+      --s-review: #7ba1d6;   --s-review-bg: #1b2633;
+      --s-released: #67bd8e; --s-released-bg: #16271e;
+      --s-rejected: #d98a86; --s-rejected-bg: #2f1f1e;
+
+      --m-get: #67bd8e;      --m-get-bg: #16271e;
+      --m-post: #7ba1d6;     --m-post-bg: #1b2633;
+      --m-put: #d3a55f;      --m-put-bg: #322819;
+      --m-patch: #b19bd8;    --m-patch-bg: #241f31;
+      --m-delete: #d98a86;   --m-delete-bg: #2f1f1e;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #101318;
+    --surface: #181c23;
+    --surface-2: #212630;
+    --ink: #e3e7ee;
+    --ink-soft: #9aa4b2;
+    --ink-faint: #6c7683;
+    --border: #2a303a;
+    --border-strong: #3b434f;
+    --accent: #7ba1d6;
+    --accent-ink: #9cbce4;
+    --accent-soft: #1c2632;
+
+    --s-dev: #9aa4b2;      --s-dev-bg: #232831;
+    --s-wait: #d3a55f;     --s-wait-bg: #322819;
+    --s-review: #7ba1d6;   --s-review-bg: #1b2633;
+    --s-released: #67bd8e; --s-released-bg: #16271e;
+    --s-rejected: #d98a86; --s-rejected-bg: #2f1f1e;
+
+    --m-get: #67bd8e;      --m-get-bg: #16271e;
+    --m-post: #7ba1d6;     --m-post-bg: #1b2633;
+    --m-put: #d3a55f;      --m-put-bg: #322819;
+    --m-patch: #b19bd8;    --m-patch-bg: #241f31;
+    --m-delete: #d98a86;   --m-delete-bg: #2f1f1e;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code, pre, .mono { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  ::selection { background: var(--accent-soft); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  .layout {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 clamp(20px, 5vw, 56px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  @media (min-width: 1120px) {
+    .layout { grid-template-columns: 232px minmax(0, 1fr); gap: 56px; align-items: start; }
+    .toc { position: sticky; top: 0; max-height: 100vh; overflow-y: auto; padding: 40px 0; }
+  }
+
+  /* ---- Masthead ---- */
+  .masthead {
+    grid-column: 1 / -1;
+    padding: clamp(48px, 9vw, 96px) 0 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .masthead h1 {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 700;
+    font-size: clamp(2.2rem, 5.6vw, 3.6rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 18px 0 0;
+  }
+  .masthead .lede {
+    max-width: 62ch;
+    margin: 22px 0 0;
+    font-size: 1.15rem;
+    color: var(--ink-soft);
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin-top: 28px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+  .meta-row span strong { color: var(--ink-soft); font-weight: 500; }
+
+  /* ---- TOC ---- */
+  .toc nav { display: flex; flex-direction: column; gap: 2px; }
+  .toc .toc-title {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+  .toc a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 13.5px;
+    padding: 3px 0;
+    display: flex;
+    gap: 10px;
+    line-height: 1.4;
+  }
+  .toc a:hover { color: var(--ink); }
+  .toc a .n { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; padding-top: 1px; }
+  .toc-hr { height: 1px; background: var(--border); margin: 12px 0; border: 0; }
+
+  @media (max-width: 1119px) {
+    .toc { padding: 28px 0 4px; }
+    .toc details { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .toc summary { padding: 12px 16px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    .toc nav { padding: 0 16px 16px; }
+  }
+  @media (min-width: 1120px) {
+    .toc summary { list-style: none; pointer-events: none; }
+    .toc summary::-webkit-details-marker { display: none; }
+    .toc details { border: 0; background: none; }
+    .toc details[open] summary { display: none; }
+  }
+
+  /* ---- Content ---- */
+  main { padding: 40px 0 120px; min-width: 0; }
+
+  section { padding: 44px 0; border-top: 1px solid var(--border); scroll-margin-top: 24px; }
+  section:first-of-type { border-top: 0; }
+
+  .sec-head { margin-bottom: 24px; }
+  .sec-head .eyebrow { display: block; }
+  section h2 {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 600;
+    font-size: clamp(1.5rem, 3.2vw, 2rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 10px 0 0;
+  }
+  section h2 .num {
+    color: var(--ink-faint);
+    font-weight: 500;
+    margin-right: 0.5em;
+  }
+  h3 {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 600;
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+    margin: 36px 0 0;
+  }
+  h4 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    margin: 24px 0 0;
+    color: var(--ink);
+  }
+
+  p, li { max-width: var(--measure); }
+  p { margin: 14px 0 0; }
+  ul, ol { margin: 12px 0 0; padding-left: 1.3em; }
+  li { margin: 6px 0 0; }
+  li::marker { color: var(--ink-faint); }
+  strong { font-weight: 600; }
+
+  .prose-lead { font-size: 1.05rem; color: var(--ink-soft); }
+
+  code {
+    background: var(--surface-2);
+    padding: 0.12em 0.4em;
+    border-radius: 4px;
+    font-size: 0.86em;
+    border: 1px solid var(--border);
+  }
+
+  pre {
+    margin: 18px 0 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    box-shadow: var(--shadow);
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  .tok-c { color: var(--ink-faint); }
+  .tok-k { color: var(--accent-ink); font-weight: 500; }
+  .tok-s { color: var(--s-released); }
+
+  /* ---- Callouts ---- */
+  .note {
+    margin: 20px 0 0;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 18px;
+    max-width: var(--measure);
+  }
+  .note .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+  .note.warn { border-left-color: var(--s-rejected); }
+  .note.warn .k { color: var(--s-rejected); }
+  .note p:first-of-type { margin-top: 6px; }
+
+  /* ---- Tables ---- */
+  .table-wrap { margin: 22px 0 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 500;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: 0; }
+  td code { font-size: 12px; white-space: nowrap; }
+  td.wrap code { white-space: normal; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ---- Pills & badges ---- */
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .pill--dev { color: var(--s-dev); background: var(--s-dev-bg); }
+  .pill--wait { color: var(--s-wait); background: var(--s-wait-bg); }
+  .pill--review { color: var(--s-review); background: var(--s-review-bg); }
+  .pill--released { color: var(--s-released); background: var(--s-released-bg); }
+  .pill--rejected { color: var(--s-rejected); background: var(--s-rejected-bg); }
+  .pill--cancelled { color: var(--ink-soft); background: var(--surface-2); border: 1px dashed var(--border-strong); padding: 1px 7px; }
+
+  .method {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 3px 9px;
+    border-radius: 5px;
+  }
+  .method--get { color: var(--m-get); background: var(--m-get-bg); }
+  .method--post { color: var(--m-post); background: var(--m-post-bg); }
+  .method--put { color: var(--m-put); background: var(--m-put-bg); }
+  .method--patch { color: var(--m-patch); background: var(--m-patch-bg); }
+  .method--delete { color: var(--m-delete); background: var(--m-delete-bg); }
+
+  /* ---- Endpoint contract ---- */
+  .endpoint {
+    margin: 22px 0 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .endpoint-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .endpoint-head code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+    word-break: break-all;
+  }
+  .endpoint-body { padding: 4px 18px 18px; }
+  .endpoint-body .attrs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 14px 0 0;
+    font-size: 12.5px;
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--ink-faint);
+  }
+  .endpoint-body .attrs b { color: var(--ink-soft); font-weight: 500; }
+  .endpoint-body pre { margin-top: 14px; }
+  .endpoint-body > p { font-size: 14px; }
+
+  /* ---- Figures ---- */
+  figure { margin: 26px 0 0; }
+  figure svg { width: 100%; height: auto; display: block; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: var(--shadow); }
+  figcaption { margin-top: 12px; font-size: 13px; color: var(--ink-soft); max-width: var(--measure); }
+  .fig-scroll { overflow-x: auto; }
+  .fig-scroll svg { min-width: 640px; }
+
+  .diag-accent { color: var(--accent); }
+
+  /* ---- ID model grid ---- */
+  .idcards { display: grid; gap: 14px; margin: 22px 0 0; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .idcard { border: 1px solid var(--border); border-radius: 10px; padding: 16px; background: var(--surface); }
+  .idcard h4 { margin: 0; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+  .idcard .ex { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent-ink); margin-top: 6px; }
+  .idcard .mut { font-size: 12px; margin-top: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+  .idcard p { font-size: 13px; margin-top: 8px; max-width: none; }
+
+  /* ---- theme toggle ---- */
+  .theme-toggle {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 20;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink-soft);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font: 500 12px "IBM Plex Mono", monospace;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .theme-toggle:hover { color: var(--ink); }
+
+  hr.rule { border: 0; border-top: 1px solid var(--border); margin: 32px 0 0; }
+
+  .foot {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    padding: 32px 0 60px;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+
+<button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">тема</button>
+
+<div class="layout">
+
+  <header class="masthead">
+    <span class="eyebrow">Fstick · Проектная записка · дополнение к fstick_specification.md</span>
+    <h1>Интеграция редактора плагинов</h1>
+    <p class="lede">Отдельная страница редактора &mdash; два поля кода (фронтенд JS, бэкенд Lua), консоль отладки и кнопка hot-reload &mdash; и все изменения API, которых она требует в Registry, Runtime, Integration, Installation и Gateway.</p>
+    <div class="meta-row">
+      <span><strong>Статус:</strong> дизайн согласован, не реализовано</span>
+      <span><strong>Модель версий:</strong> content-addressed, git-образная</span>
+      <span><strong>Идентичность:</strong> UUID в ядре · маппер в integration</span>
+      <span><strong>Обновлено:</strong> 2026-09-10</span>
+    </div>
+  </header>
+
+  <aside class="toc">
+    <details open>
+      <summary>Содержание</summary>
+      <nav aria-label="Содержание">
+        <span class="toc-title">Содержание</span>
+        <a href="#scope"><span class="n">1</span><span>Задача и цикл редактора</span></a>
+        <a href="#current"><span class="n">2</span><span>Текущее состояние API</span></a>
+        <a href="#identity"><span class="n">3</span><span>Модель идентичности</span></a>
+        <a href="#versions"><span class="n">4</span><span>Версионирование: ветки и блобы</span></a>
+        <a href="#moderation"><span class="n">5</span><span>Жизненный цикл модерации</span></a>
+        <a href="#storage"><span class="n">6</span><span>Хранилище S3</span></a>
+        <a href="#runtime"><span class="n">7</span><span>Runtime: reload и состояние</span></a>
+        <a href="#console"><span class="n">8</span><span>Стриминг консоли</span></a>
+        <hr class="toc-hr" />
+        <a href="#changes"><span class="n">9</span><span>Изменения API по сервисам</span></a>
+        <a href="#contracts"><span class="n">10</span><span>Контракты эндпоинтов</span></a>
+        <a href="#events"><span class="n">11</span><span>События sync</span></a>
+        <a href="#frontend"><span class="n">12</span><span>Контракт фронтенда</span></a>
+        <hr class="toc-hr" />
+        <a href="#open"><span class="n">13</span><span>Открытые вопросы</span></a>
+        <a href="#decisions"><span class="n">14</span><span>Журнал решений</span></a>
+      </nav>
+    </details>
+  </aside>
+
+  <main>
+
+    <!-- 1 -->
+    <section id="scope">
+      <div class="sec-head">
+        <span class="eyebrow">Обзор</span>
+        <h2><span class="num">1</span>Задача и цикл редактора</h2>
+      </div>
+      <p class="prose-lead">Редактор позволяет автору плагина править обе части установленного <strong>debug</strong>-плагина на месте, доставлять изменения в работающий Runtime без переустановки и видеть вывод бэкендного <code>print</code> из того чата, где редактор был открыт.</p>
+
+      <p>Из исходного user story:</p>
+      <ul>
+        <li>У плагина есть состояния: <strong>debug</strong> / <strong>release</strong>.</li>
+        <li>Debug-плагин может установить только автор; в публичном магазине его нет.</li>
+        <li>У установленного debug-плагина есть кнопка <strong>Edit</strong>.</li>
+        <li>Редактор показывается в двух местах: в правой панели (где магазин) и в отдельном окне.</li>
+        <li>Редактор &mdash; это два текстовых поля (Lua, JS) плюс консоль отладки, которая выводит бэкенд-вывод из того чата, откуда редактор был открыт.</li>
+      </ul>
+
+      <p>Инспекция состояния, многофайловые плагины и шаг сборки &mdash; вне рамок. Код &mdash; ровно два файла: один клиентский, один серверный.</p>
+
+      <figure class="fig-scroll">
+        <svg viewBox="0 0 820 470" role="img" aria-label="Последовательность: редактор обращается к Registry для открытия и сохранения кода; Registry пишет content-addressed блоб и вызывает Runtime для reload; Runtime вытесняет движок и мигрирует состояние; вывод консоли и сигнал reloaded идут обратно в редактор через канал sync.">
+          <g stroke="var(--border-strong)" stroke-width="1">
+            <line x1="95" y1="58" x2="95" y2="440" />
+            <line x1="320" y1="58" x2="320" y2="440" />
+            <line x1="545" y1="58" x2="545" y2="440" />
+            <line x1="755" y1="58" x2="755" y2="440" />
+          </g>
+          <g font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="var(--ink)" text-anchor="middle">
+            <g>
+              <rect x="35" y="26" width="120" height="26" rx="6" fill="var(--surface-2)" stroke="var(--border)" />
+              <text x="95" y="43">Редактор</text>
+            </g>
+            <g>
+              <rect x="252" y="26" width="136" height="26" rx="6" fill="var(--surface-2)" stroke="var(--border)" />
+              <text x="320" y="43">Registry</text>
+            </g>
+            <g>
+              <rect x="487" y="26" width="116" height="26" rx="6" fill="var(--surface-2)" stroke="var(--border)" />
+              <text x="545" y="43">Runtime</text>
+            </g>
+            <g>
+              <rect x="683" y="26" width="144" height="26" rx="6" fill="var(--surface-2)" stroke="var(--border)" />
+              <text x="755" y="43">Канал sync</text>
+            </g>
+          </g>
+
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
+            </marker>
+            <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-soft)">
+            <line x1="95" y1="86" x2="320" y2="86" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
+            <text x="100" y="79">1 · GET …/edit</text>
+            <line x1="320" y1="108" x2="95" y2="108" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ah)" />
+            <text x="315" y="101" text-anchor="end" fill="var(--ink-faint)">текст исходников + sha блобов</text>
+
+            <line x1="95" y1="150" x2="320" y2="150" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
+            <text x="100" y="143">2 · PUT …/code &nbsp;{ text, base_sha }</text>
+
+            <path d="M320 168 h44 v20 h-44" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)" />
+            <text x="372" y="182">3 · запись блоба  plugins/{id}/blobs/{sha256}</text>
+
+            <line x1="320" y1="212" x2="545" y2="212" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
+            <text x="325" y="205">4 · POST /internal/…/reload &nbsp;{ chat_id, shas }</text>
+
+            <path d="M545 230 h44 v20 h-44" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)" />
+            <text x="597" y="244">5 · вытеснение движка (plugin, shas) · миграция состояния</text>
+
+            <line x1="320" y1="286" x2="755" y2="286" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
+            <text x="325" y="279">6 · fstick.plugin.reloaded</text>
+            <line x1="755" y1="308" x2="95" y2="308" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ah)" />
+            <text x="750" y="301" text-anchor="end" fill="var(--ink-faint)">client_changed → перезапуск DSL</text>
+
+            <g class="diag-accent">
+              <line x1="545" y1="366" x2="755" y2="366" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#ah-a)" />
+              <text x="540" y="359" text-anchor="end" fill="var(--accent)">7 · при print()</text>
+              <text x="551" y="388" fill="var(--accent)">fstick.plugin.console</text>
+              <line x1="755" y1="410" x2="95" y2="410" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#ah-a)" />
+              <text x="750" y="403" text-anchor="end" fill="var(--accent)">строка консоли — только автору, live</text>
+            </g>
+          </g>
+        </svg>
+        <figcaption>Цикл сохранение / reload / консоль. Шаги 1&ndash;5 &mdash; запрос-ответ; шаги 6&ndash;7 идут по существующему каналу Matrix <code>/sync</code> <code>fstick_events</code>. Путь консоли (акцент) &mdash; единственное место, где дизайн добавляет поведение транспорту; всё остальное переиспользует уже существующий канал.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 2 -->
+    <section id="current">
+      <div class="sec-head">
+        <span class="eyebrow">Аудит</span>
+        <h2><span class="num">2</span>Текущее состояние API</h2>
+      </div>
+      <p>Что есть сегодня и где этого не хватает для редактора.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Область</th><th>Сегодня</th><th>Пробел для редактора</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Загрузка кода</td>
+              <td class="wrap">Двухфазная: <code>POST /plugins</code> → presigned PUT (TTL 600 с) → <code>POST /plugins/{id}/commit</code>. Ключ: <code>plugins/{id}/versions/{v}/{sv|cl}/{lang}/{lver}/{fileName}</code>, имя файла задаёт клиент.</td>
+              <td class="wrap">TTL presigned против долгой сессии редактора; URL серверного кода &mdash; <em>внутренний</em> presign, из браузера недоступен; при сохранении надо заново находить ключ.</td>
+            </tr>
+            <tr>
+              <td>Скачивание кода</td>
+              <td class="wrap"><code>GET /plugins/{id}/code/client</code> и <code>/code/server</code> → presigned GET. Разделение по подстроке пути <code>/cl/</code> vs <code>/sv/</code>; потребители берут <code>files[0]</code>.</td>
+              <td class="wrap"><code>/code/server</code> открыт (без авторизации, без проверки режима). Нет канонического файла &mdash; <code>files[0]</code> работает по случайности.</td>
+            </tr>
+            <tr>
+              <td>Авторизация</td>
+              <td class="wrap"><code>author_id</code> хранится; <code>X-User-Id</code> доходит до сервисов. Не сверяется. <code>resolveAuthorId()</code> выводит UUID из Matrix ID через <code>nameUUIDFromBytes</code>.</td>
+              <td class="wrap">Проверки владельца нет нигде. Выведенный UUID необратим в Matrix ID &mdash; блокирует адресный push автору.</td>
+            </tr>
+            <tr>
+              <td>Состояния плагина</td>
+              <td class="wrap">Статусы <code>ACTIVE / DELETED / HIDDEN / ARCHIVED</code>. Список магазина не фильтрует <em>ничего</em>.</td>
+              <td class="wrap">Нет понятия debug/release. Публичный список показал бы debug-плагины.</td>
+            </tr>
+            <tr>
+              <td>Runtime</td>
+              <td class="wrap"><code>POST /command</code>, <code>GET /plugins/{id}/state</code>. <code>Map&lt;UUID, LuaPluginEngine&gt;</code> грузится лениво, <strong>никогда не инвалидируется</strong>. Берёт <code>versions.get(0)</code>, <code>files.get(0)</code>.</td>
+              <td class="wrap">Нет пути reload. Движок кэшируется по plugin &mdash; debug- и release-код затирали бы друг друга.</td>
+            </tr>
+            <tr>
+              <td>Бэкенд <code>print</code></td>
+              <td class="wrap">Lua <code>print</code> → <code>log.info("[LUA] …")</code>. Только в лог сервера.</td>
+              <td class="wrap">Не доставляется никуда, не привязан к чату.</td>
+            </tr>
+            <tr>
+              <td>Доставка событий</td>
+              <td class="wrap">Runtime → Integration <code>/plugin-state/broadcast</code> → Dendrite <code>/events/push</code> → Matrix <code>/sync</code> <code>fstick_events</code> → <code>syncInterceptor</code> → <code>CustomEvent</code>. Тип <code>fstick.plugin.state</code>.</td>
+              <td class="wrap">Переиспользуется как есть. Нужны новые <em>типы</em> событий, нового транспорта нет.</td>
+            </tr>
+            <tr>
+              <td>Фронтенд</td>
+              <td class="wrap">Карточка магазина в правой панели; <code>DslTopBarSlot</code> рендерит установленные плагины в полосе с ресайзом.</td>
+              <td class="wrap">Нет редактора, нет консоли, нет кнопки Edit.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section id="identity">
+      <div class="sec-head">
+        <span class="eyebrow">Решение · маппер в integration-service</span>
+        <h2><span class="num">3</span>Модель идентичности</h2>
+      </div>
+      <p class="prose-lead">Ядро хранит <strong>один чистый UUID</strong> на пользователя и ничего больше. Маппер <code>uuid&nbsp;↔&nbsp;mxid</code> живёт в <strong>integration-service</strong> &mdash; единственном компоненте, который уже говорит на Matrix. MXID появляется ровно на двух хопах: вход (Dendrite&nbsp;→&nbsp;Gateway) и выход (integration&nbsp;→&nbsp;Dendrite).</p>
+
+      <p>Суффикс <code>:domain</code> нельзя убрать из проводного протокола Matrix без форка от федерации &mdash; он структурен (<code>sender</code> события, membership комнаты, роутинг). Домен фиксируется одной константой и просто не рендерится; Element и так говорит MXID-ами, так что показ <code>@user_id</code> &mdash; это обрезка, а не новый идентификатор.</p>
+
+      <div class="idcards">
+        <div class="idcard">
+          <h4>internal_uuid</h4>
+          <div class="ex">9f3c1a2e-…</div>
+          <div class="mut">единственный id в ядре</div>
+          <p>Внешний ключ в каждом сервисе Fstick: <code>plugins.author_id</code>, <code>installations.installed_by</code>, владелец ветки. Не покидает бэкенд, не доходит до Dendrite.</p>
+        </div>
+        <div class="idcard">
+          <h4>MXID</h4>
+          <div class="ex">@ilya:fstick.local → @ilya</div>
+          <div class="mut">собственный id Matrix</div>
+          <p>Для Dendrite: <code>sender</code>, membership, токены, push событий. Фронтенд рендерит только localpart; домен &mdash; одна фиксированная константа. Matrix display name не трогается &mdash; это метка, не идентификатор.</p>
+        </div>
+      </div>
+
+      <figure class="fig-scroll">
+        <svg viewBox="0 0 820 330" role="img" aria-label="Потоки идентичности: Dendrite аутентифицирует запрос и передаёт MXID в Gateway; Gateway меняет его на internal_uuid через integration-service (с кэшем), и каждый сервис ядра видит только internal_uuid; на обратном пути сервис ядра передаёт integration internal_uuid, integration переводит его обратно в MXID и пушит через Dendrite в sync-поток клиента.">
+          <defs>
+            <marker id="i-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
+            </marker>
+            <marker id="i-ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" fill="var(--ink)" text-anchor="middle">
+            <g><rect x="30" y="42" width="104" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="82" y="67">Клиент</text></g>
+            <g><rect x="196" y="42" width="116" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="254" y="63">Dendrite</text><text x="254" y="77" font-size="9" font-weight="400" fill="var(--ink-faint)">аутентификация</text></g>
+            <g><rect x="374" y="42" width="116" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="432" y="63">Gateway</text><text x="432" y="77" font-size="9" font-weight="400" fill="var(--ink-faint)">меняет id</text></g>
+            <g><rect x="556" y="42" width="234" height="42" rx="7" fill="var(--surface-2)" stroke="var(--border)" /><text x="673" y="63">Registry · Runtime · Installation</text><text x="673" y="77" font-size="9" font-weight="400" fill="var(--ink-faint)">только internal_uuid</text></g>
+            <g><rect x="392" y="238" width="230" height="52" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" /><text x="507" y="260" fill="var(--accent-ink)">integration-service</text><text x="507" y="277" font-size="9.5" font-weight="400" fill="var(--ink-soft)">владеет таблицей uuid ↔ mxid</text></g>
+          </g>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-soft)">
+            <line x1="134" y1="57" x2="194" y2="57" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="164" y="50" text-anchor="middle">токен</text>
+
+            <line x1="312" y1="55" x2="372" y2="55" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#i-ah-a)" />
+            <text x="342" y="37" text-anchor="middle" fill="var(--accent)">X-User-Id</text>
+            <text x="342" y="48" text-anchor="middle" fill="var(--accent)">= @mxid</text>
+
+            <line x1="490" y1="63" x2="554" y2="63" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="522" y="56" text-anchor="middle">= uuid</text>
+
+            <path d="M432 84 Q432 150 440 236" fill="none" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#i-ah)" />
+            <text x="360" y="150" text-anchor="middle" fill="var(--ink-faint)">identity/resolve</text>
+            <text x="360" y="163" text-anchor="middle" fill="var(--ink-faint)">(кэш в Gateway)</text>
+
+            <path d="M660 84 Q650 165 610 234" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="672" y="150" text-anchor="middle">push { author uuid }</text>
+
+            <path d="M392 262 Q300 240 262 86" fill="none" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#i-ah-a)" />
+            <text x="250" y="180" text-anchor="middle" fill="var(--accent)">/events/push</text>
+            <text x="250" y="193" text-anchor="middle" fill="var(--accent)">@mxid</text>
+
+            <line x1="194" y1="73" x2="136" y2="73" stroke="currentColor" stroke-width="1.4" marker-end="url(#i-ah)" />
+            <text x="164" y="90" text-anchor="middle">/sync</text>
+          </g>
+        </svg>
+        <figcaption>MXID живёт только на акцентных хопах &mdash; Dendrite&nbsp;→&nbsp;Gateway на входе и integration&nbsp;→&nbsp;Dendrite на выходе. Всё между ними &mdash; <code>internal_uuid</code>. Dendrite уже аутентифицирует и проставляет <code>X-User-Id</code> сегодня (<code>authenticateAndGetUserID</code>); единственный новый шаг &mdash; замена в Gateway.</figcaption>
+      </figure>
+
+      <h3>Маппер</h3>
+      <ul>
+        <li>Таблица в <strong>integration-service</strong>: <code>internal_uuid</code> (PK) ↔ <code>mxid</code> (unique). Двунаправленная. Ни handle, ни профильного слоя.</li>
+        <li><span class="method method--post">POST</span> <code>/api/v1/identity/resolve</code> &nbsp;<code>{ mxid } → { internal_uuid }</code> &mdash; create-or-return, идемпотентно. Здесь <code>internal_uuid</code> пользователя <strong>минтится</strong> при первом контакте.</li>
+        <li><span class="method method--get">GET</span> <code>/api/v1/identity/{internal_uuid}</code> &nbsp;<code>→ { mxid }</code> &mdash; обратное, для исходящего push. Batch-вариант для списков участников.</li>
+        <li>Gateway вызывает <code>resolve</code>, чтобы превратить <code>X-User-Id</code>, который дал Dendrite (это MXID), в <code>internal_uuid</code>, и форвардит уже его. Результат кэшируется в процессе &mdash; связка не меняется, поэтому кэш это LRU без инвалидации. <code>X-User-Matrix-Id</code> <em>не</em> прокидывается; за Gateway он никому не нужен.</li>
+        <li><code>registry.plugins.author_id</code> = <code>internal_uuid</code> (колонка уже <code>UUID</code>). Удалить <code>resolveAuthorId()</code> / <code>nameUUIDFromBytes</code>.</li>
+      </ul>
+
+      <h3>Почему Postgres, а не только Redis</h3>
+      <p>Кэш (Redis или в процессе) Gateway держит в любом случае. Вопрос в системе-источнике истины, и она обязана быть Postgres:</p>
+      <ul>
+        <li><strong>Это source of truth, а не производные данные.</strong> Каждый FK <code>plugins.author_id</code> и <code>installations.installed_by</code> &mdash; это <code>internal_uuid</code>, который имеет смысл только через эту таблицу. Кэш можно восстановить из источника; эта таблица <em>и есть</em> источник. Потеря на вытеснении или flush осиротит каждую запись о владении.</li>
+        <li><strong>Долговечность.</strong> Персистентность Redis (RDB/AOF) лоссова по дизайну &mdash; интервалы снапшотов, окна fsync. Postgres даёт настоящий ACID + WAL: закоммиченная идентичность остаётся закоммиченной.</li>
+        <li><strong>Атомарная идемпотентность.</strong> <code>resolve</code> должен заминтить ровно один <code>internal_uuid</code>, даже когда тот же новый пользователь шлёт два запроса параллельно. <code>UNIQUE(mxid)</code> + <code>INSERT … ON CONFLICT DO NOTHING RETURNING</code> делает это одним запросом. В Redis это рукописный танец <code>SETNX</code>/Lua с краевыми случаями.</li>
+        <li><strong>Запросы.</strong> Аудит первого появления, admin-поиск, batch-резолв участников, позже история handle, если она вернётся &mdash; всё реляционное. Redis отвечает на GET по точному ключу и больше ни на что без рукописных вторичных индексов.</li>
+      </ul>
+      <p>Итого: <strong>Postgres &mdash; система-источник истины; Redis (или собственная мапа Gateway) &mdash; необязательный read-кэш перед ней</strong> &mdash; без инвалидации, потому что маппинг неизменяем.</p>
+
+      <div class="note">
+        <span class="k">Цена</span>
+        <p>integration-service сегодня stateless (чистый ACL к Dendrite &mdash; без датасорса). Это даёт ему первую таблицу. И Gateway теперь зависит от integration при авторизации любого <em>некэшированного</em> запроса: кэшированные пользователи переживут падение integration, совсем новые получат <code>503</code>. integration и так на критическом пути (installation-service зовёт его за membership), так что нового класса отказа нет &mdash; но радиус поражения шире. См. &sect;13.</p>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section id="versions">
+      <div class="sec-head">
+        <span class="eyebrow">Решение · git-образная модель</span>
+        <h2><span class="num">4</span>Версионирование: ветки и content-addressed блобы</h2>
+      </div>
+      <p class="prose-lead">Код плагина живёт на <strong>ветках</strong>. Сохранение пишет неизменяемый content-addressed <strong>блоб</strong>. Публикация форкает ветку-кандидат. <code>REJECTED</code> и <code>CANCELLED</code> &mdash; статусы ветки, а не глобальные состояния.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Git</th><th>Fstick</th></tr></thead>
+          <tbody>
+            <tr><td>рабочая ветка (<code>dev</code>)</td><td>debug-копия плагина &mdash; одна на плагин, принадлежит автору</td></tr>
+            <tr><td>commit</td><td>каждое сохранение / hot-reload в редакторе <span class="pill pill--dev">фаза&nbsp;2</span></td></tr>
+            <tr><td>создать ветку-кандидат</td><td><code>POST /plugins/{id}/publish</code> &mdash; снапшот текущей пары блобов dev-ветки</td></tr>
+            <tr><td>статус ветки</td><td><span class="pill pill--wait">WAITING_APPROVE</span> <span class="pill pill--review">APPROVING</span> <span class="pill pill--released">RELEASED</span> <span class="pill pill--rejected">REJECTED</span> <span class="pill pill--cancelled">CANCELLED</span> &mdash; на ветке</td></tr>
+            <tr><td><code>main</code> / release-тег</td><td>ветка со статусом <span class="pill pill--released">RELEASED</span>; установки резолвятся на максимальный SemVer среди них</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Модель данных &mdash; фаза 1 (без истории коммитов)</h3>
+      <pre><code><span class="tok-c">-- одна строка на плагин</span>
+branches (
+  id, plugin_id,
+  status            <span class="tok-c">-- WORKING (dev) | WAITING_APPROVE | APPROVING | RELEASED | REJECTED | CANCELLED</span>
+  semver            <span class="tok-c">-- null на dev-ветке</span>
+  client_blob_sha, server_blob_sha,
+  runtime_client, runtime_server   <span class="tok-c">-- напр. cl.js@1.0.0 / sv.lua@1.0.0 (версия stdlib)</span>
+  base_branch_id,   <span class="tok-c">-- dev-ветка, из которой вырезан кандидат</span>
+  reject_reason,    <span class="tok-c">-- ставится только для REJECTED; null для CANCELLED</span>
+  created_at, updated_at
+)
+
+<span class="tok-c">-- content-addressed, неизменяемо, дедуплицировано</span>
+S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
+
+      <ul>
+        <li>Ровно два блоба на ветку (client + server). Имя файла от клиента отбрасывается.</li>
+        <li>sha блобов dev-ветки <em>и есть</em> её HEAD; сохранение их заменяет (старые блобы становятся кандидатами на GC &mdash; см. &sect;13).</li>
+        <li><code>installation</code> ссылается на ветку. Debug-установка указывает на dev-ветку и следует за её sha. Обычная установка указывает на <code>RELEASED</code>-ветку, перенаводится через <code>PATCH</code>.</li>
+        <li>Публичный список магазина: плагины со <code>status = ACTIVE</code> <em>и</em> хотя бы одной <code>RELEASED</code>-веткой. <code>GET /plugins?owned=true</code> возвращает собственные плагины вызывающего, включая dev-only.</li>
+        <li>Легаси-плагины с произвольными именами ключей сохраняют fallback <code>files[0]</code> до бэкфилла.</li>
+      </ul>
+
+      <p><strong>Фаза 2</strong>, когда понадобится diff / revert / история: добавить таблицу <code>commits</code>. Блобы уже content-addressed, так что это заходит без миграции данных.</p>
+    </section>
+
+    <!-- 5 -->
+    <section id="moderation">
+      <div class="sec-head">
+        <span class="eyebrow">Решение · явные действия</span>
+        <h2><span class="num">5</span>Жизненный цикл модерации</h2>
+      </div>
+      <p>Автор работает на dev-ветке. Публикация вырезает ветку-кандидат в очередь ревью. Отказ (модератор) или отмена (автор) оставляет мёртвую ветку &mdash; автор возвращается на dev-ветку и публикует снова.</p>
+
+      <figure class="fig-scroll">
+        <svg viewBox="0 0 820 300" role="img" aria-label="Поток состояний: dev-ветка публикуется в WAITING_APPROVE; модератор берёт её в APPROVING; approve переводит в RELEASED, reject в REJECTED. Автор может отменить из WAITING_APPROVE или APPROVING, переведя ветку в CANCELLED. REJECTED и CANCELLED — сохраняемые тумстоуны, оба тупиковые; автор возвращается на dev-ветку и публикует нового кандидата.">
+          <defs>
+            <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
+            </marker>
+            <marker id="m2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+          <g font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle">
+            <rect x="24" y="118" width="120" height="44" rx="8" fill="var(--s-dev-bg)" stroke="var(--border-strong)" />
+            <text x="84" y="137" fill="var(--s-dev)" font-weight="600">dev branch</text>
+            <text x="84" y="153" fill="var(--ink-faint)" font-size="10">WORKING</text>
+
+            <rect x="206" y="118" width="150" height="44" rx="8" fill="var(--s-wait-bg)" stroke="var(--border-strong)" />
+            <text x="281" y="143" fill="var(--s-wait)" font-weight="600">WAITING_APPROVE</text>
+
+            <rect x="422" y="118" width="130" height="44" rx="8" fill="var(--s-review-bg)" stroke="var(--border-strong)" />
+            <text x="487" y="143" fill="var(--s-review)" font-weight="600">APPROVING</text>
+
+            <rect x="642" y="44" width="150" height="44" rx="8" fill="var(--s-released-bg)" stroke="var(--border-strong)" />
+            <text x="717" y="69" fill="var(--s-released)" font-weight="600">RELEASED</text>
+
+            <rect x="642" y="118" width="150" height="44" rx="8" fill="var(--s-rejected-bg)" stroke="var(--border-strong)" />
+            <text x="717" y="143" fill="var(--s-rejected)" font-weight="600">REJECTED</text>
+
+            <rect x="358" y="234" width="150" height="44" rx="8" fill="var(--s-dev-bg)" stroke="var(--border-strong)" stroke-dasharray="5 3" />
+            <text x="433" y="259" fill="var(--ink-soft)" font-weight="600">CANCELLED</text>
+          </g>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-soft)" stroke="none">
+            <line x1="144" y1="140" x2="204" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="174" y="132" text-anchor="middle">publish</text>
+
+            <line x1="356" y1="140" x2="420" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="388" y="132" text-anchor="middle">claim</text>
+
+            <path d="M552 130 Q602 92 640 82" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="600" y="98" text-anchor="middle">approve</text>
+
+            <line x1="552" y1="140" x2="640" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#m2)" />
+            <text x="596" y="132" text-anchor="middle">reject {reason}</text>
+
+            <path d="M268 162 Q246 205 396 232" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#m2-a)" />
+            <path d="M472 162 Q474 204 456 232" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#m2-a)" />
+            <text x="352" y="202" text-anchor="middle" fill="var(--accent)">cancel (автор)</text>
+          </g>
+        </svg>
+        <figcaption>Жизненный цикл ветки-кандидата. Прямой переход <code>WAITING_APPROVE → REJECTED</code> тоже разрешён (reject до claim). <span class="diag-accent">Cancel</span> &mdash; автор отзывает собственную заявку. <code>REJECTED</code> и <code>CANCELLED</code> &mdash; сохраняемые тумстоуны, оба тупиковые; <code>resubmit</code> нет, автор правит dev-ветку и публикует нового кандидата.</figcaption>
+      </figure>
+
+      <h3>При reject</h3>
+      <ul>
+        <li>Ветка <code>status = REJECTED</code>, сохраняется (скрыта, никогда в очереди, никогда не устанавливается).</li>
+        <li><code>plugins.last_rejection = { reason, at, semver, branch_id }</code> &mdash; чтобы UI показывал «нужны правки» без скана чата.</li>
+        <li>Дописывается строка в <code>plugin_moderation_log</code>.</li>
+        <li>Автору отправляется сообщение в системную комнату (&laquo;Fstick Developer&raquo;) через Integration &mdash; доставка, не источник истины.</li>
+      </ul>
+
+      <h3>При cancel</h3>
+      <ul>
+        <li>Автор отзывает собственного кандидата из <code>WAITING_APPROVE</code> <em>или</em> <code>APPROVING</code>: <code>POST /plugins/{id}/branches/{bid}/cancel</code>.</li>
+        <li>Ветка <code>status = CANCELLED</code>, сохраняется как тумстоун (скрыта, не в очереди, не устанавливается).</li>
+        <li>Ни <code>last_rejection</code>, ни сообщения в бот-комнату &mdash; ничего не было не так. Строка в <code>plugin_moderation_log</code> всё равно дописывается для истории.</li>
+        <li>Если модератор уже взял её (<code>APPROVING</code>), она просто исчезает из его очереди.</li>
+      </ul>
+
+      <div class="note">
+        <span class="k">Ограничение</span>
+        <p><code>POST /publish</code> возвращает <code>409</code>, если у плагина уже есть нетерминальный кандидат (<code>WAITING_APPROVE</code> или <code>APPROVING</code>). Один открытый кандидат за раз &mdash; отказ <em>или</em> отмена его снимают, следующий <code>/publish</code> проходит.</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section id="storage">
+      <div class="sec-head">
+        <span class="eyebrow">Решение</span>
+        <h2><span class="num">6</span>Хранилище S3</h2>
+      </div>
+      <ul>
+        <li><strong>Content-addressed блобы</strong>: <code>plugins/{pluginId}/blobs/{sha256}</code>. Неизменяемые, никогда не перезаписываются, дедуплицированы. sha <em>и есть</em> идентификатор, которым обмениваются редактор и Runtime.</li>
+        <li><strong>Ровно два файла</strong> на ветку &mdash; один клиентский, один серверный. Многофайловых плагинов нет. Это навсегда убирает неоднозначность <code>files[0]</code>.</li>
+        <li>Редактор <strong>никогда не получает presigned URL</strong>. Код идёт инлайн через Registry, так что авторизация проверяется на каждый запрос и нет TTL, с которым надо гонки.</li>
+        <li>Двухфазная presigned-загрузка остаётся &mdash; но только для иконок, скриншотов и будущих release-бандлов, где файлы крупнее и грузятся один раз.</li>
+      </ul>
+      <p>Идентификатор на основе sha заодно закрывает два прежних вопроса: вопрос «одноразовой ссылки» исчезает (ссылки нет), а проверка оптимистичной конкурентности при сохранении (&sect;10) &mdash; это просто сравнение sha.</p>
+
+      <h3>Размер файла и сжатие запроса</h3>
+      <p>Лимит: <strong>500&nbsp;КБ &mdash; 500&nbsp;000 байт UTF-8 &mdash; на файл</strong>, замеряется на раскодированной строке <code>text</code> после любого transfer-декодирования. Больше &rarr; <code>413 { "error": "file_too_large", "side": "server", "limit": 500000, "actual": 812345 }</code>.</p>
+      <ul>
+        <li><strong>Лимит на распакованный контент, не на байты в проводе.</strong> Клиент может слать <code>Content-Encoding: gzip</code> (или <code>br</code>); Gateway и Registry сначала декодируют, потом меряют. Сжатие уменьшает загрузку &mdash; потолок оно не поднимает.</li>
+        <li><strong>Декомпрессия сама ограничена</strong>, чтобы обезвредить zip-бомбу: запрос отклоняется с <code>413</code>, как только раскодированный поток проходит <strong>1.2&nbsp;МБ</strong> (два файла по 500&nbsp;КБ + <code>base_sha</code> + JSON-обвязка + запас), что бы ни утверждал <code>Content-Length</code>; отношение decoded/encoded больше ~200 триггерит тот же guard.</li>
+        <li>Редактор показывает живой счётчик байт в каждом поле и блокирует сохранение локально на лимите; <code>413</code> &mdash; серверный бэкстоп.</li>
+      </ul>
+
+      <h4>Что реально даёт 500&nbsp;КБ</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Контент</th><th>Байт / символ</th><th>≈ символов</th><th>≈ строк</th></tr></thead>
+          <tbody>
+            <tr><td>ASCII-код (типично)</td><td class="tnum">1</td><td class="tnum">500&nbsp;000</td><td class="tnum">8&nbsp;000 &ndash; 16&nbsp;000</td></tr>
+            <tr><td>много кириллицы в комментариях / строках</td><td class="tnum">2</td><td class="tnum">~250&nbsp;000</td><td class="tnum">4&nbsp;000 &ndash; 8&nbsp;000</td></tr>
+            <tr><td>плотно эмодзи</td><td class="tnum">4</td><td class="tnum">~125&nbsp;000</td><td class="tnum">&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Оценка строк исходит из 30&ndash;60 символов на строку с учётом отступа и перевода строки. Для сравнения: крупный одиночный файл исходников в самом Element &mdash; 2&nbsp;000&ndash;3&nbsp;000 строк, а файл Lua или JS на 500&nbsp;КБ далеко за рамками всего, на что рассчитан редактор с двумя полями. В проводе исходный текст жмётся gzip ~3&ndash;5&times; (Brotli ~4&ndash;6&times;), так что файл на лимите грузится примерно как <strong>100&ndash;150&nbsp;КБ</strong>.</p>
+    </section>
+
+    <!-- 7 -->
+    <section id="runtime">
+      <div class="sec-head">
+        <span class="eyebrow">Решение</span>
+        <h2><span class="num">7</span>Runtime: reload и состояние</h2>
+      </div>
+
+      <h3>Кэш движка</h3>
+      <p><code>Map&lt;VersionKey, LuaPluginEngine&gt;</code>, где <code>VersionKey = (pluginId, client_blob_sha, server_blob_sha)</code>. <code>RELEASED</code>-ветка, работающая во множестве чатов, и dev-ветка автора &mdash; <strong>разные записи кэша</strong>, ни одна не затирает другую. Состояние плагина по-прежнему кэшируется по <code>(pluginId, chatId)</code> в Redis и подставляется через <code>changeContext</code> перед каждой командой.</p>
+
+      <h3>Reload</h3>
+      <p><code>POST /internal/plugins/{pluginId}/reload</code> &mdash; вызывается Registry после сохранения. Вытесняет запись <code>(pluginId, shas)</code>, чтобы следующая команда в этом чате пересобрала её; состояние в Redis сохраняется и проходит через <strong>встроенный авто-мигратор</strong>. Минимальный интервал <strong>3&nbsp;с</strong> на <code>(plugin, chat)</code> → <code>429 { retry_after_ms }</code>.</p>
+
+      <h3>Редактирование состояния</h3>
+      <p>JSON-панель состояния в редакторе <strong>редактируемая</strong>; Runtime её применяет. <code>PUT /api/v1/plugins/{id}/state?chat_id=</code>, только автор + установка на dev-ветке. Полный JSON (не патч). Невалидный JSON → <code>400</code>. Иначе payload проходит через авто-мигратор и валидацию по схеме, лениво: недостающие поля добираются дефолтами, неизвестные ключи отбрасываются, несовпадения типов коэрсятся &mdash; пишется в Redis, расхождения возвращаются в <code>warnings</code>, затем срабатывает обычный broadcast. <strong>Оптимистичной блокировки нет</strong> &mdash; состояние меняется на каждой команде, так что hash-guard почти всегда конфликтовал бы; вместо него у панели кнопка «обновить».</p>
+    </section>
+
+    <!-- 8 -->
+    <section id="console">
+      <div class="sec-head">
+        <span class="eyebrow">Решение</span>
+        <h2><span class="num">8</span>Стриминг консоли</h2>
+      </div>
+      <p>Хук <code>print</code> срабатывает внутри исполнения команды, где Runtime знает <code>pluginId</code>, <code>branchId</code>, <code>chatId</code> и вызывающего пользователя &mdash; всё как <code>internal_uuid</code>. Строка консоли должна дойти до автора плагина и ни до кого больше.</p>
+
+      <h3>Путь &mdash; батчами</h3>
+      <ol>
+        <li>Runtime берёт <code>internal_uuid</code> автора прямо из <code>GET registry /plugins/{id}</code> (поле <code>author_id</code> &mdash; никакого MXID) и кэширует его в записи движка по ключу <code>(pluginId, shas)</code>.</li>
+        <li>Runtime <strong>буферизует</strong> строки <code>print</code> и <code>POST</code>-ит их батчами в <code>integration /api/v1/plugin-console</code> как <code>{ author_id, msgs: [ … ] }</code> &mdash; flush по таймеру ~100&nbsp;мс, при достижении 64 строк или при возврате команды, что раньше.</li>
+        <li>integration резолвит <code>internal_uuid → mxid</code> <em>один раз</em>, оборачивает массив в одно событие <code>fstick.plugin.console</code> <code>{ msgs: [ … ] }</code> и вызывает Dendrite <code>/events/push</code>. Клиент добавляет каждый элемент <code>msgs[]</code> в панель консоли по порядку.</li>
+      </ol>
+      <p>Отдельно от <code>broadcastPluginState</code> &mdash; трафик консоли бёрстовый и одному получателю. Один резолв, один push, N строк. Именно поэтому маппер сидит в integration: единственный сервис, который уже превращает внутренние id в Matrix-push, делает и резолв, а Runtime никогда не трогает MXID.</p>
+
+      <h3>Защита от флуда</h3>
+      <ul>
+        <li><strong>На строку:</strong> <code>message</code> обрезается на <strong>8&nbsp;КБ</strong> с маркером <code>…[truncated]</code>.</li>
+        <li><strong>На батч:</strong> максимум <strong>256</strong> строк; переполнение отбрасывается и заменяется одной синтетической <code>{ level: "error", message: "N console lines dropped (rate limit)" }</code>.</li>
+        <li><strong>На <code>(plugin, chat)</code>:</strong> token bucket (≈500 строк / 10&nbsp;с). Постоянный флуд отбрасывается тем же синтетическим маркером, а не копит буфер.</li>
+      </ul>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Свойство</th><th>Контракт</th></tr></thead>
+          <tbody>
+            <tr><td>Тип события</td><td><code>fstick.plugin.console</code></td></tr>
+            <tr><td>Получатели</td><td>только автор плагина</td></tr>
+            <tr><td>Когда</td><td>всегда, для любого исполнения на dev-ветке</td></tr>
+            <tr><td>История</td><td>нет &mdash; live с момента подключения</td></tr>
+            <tr><td>Команды других пользователей</td><td>включаются (бэкенд-состояние общее)</td></tr>
+            <tr><td>Ошибки Runtime / стектрейсы</td><td>тот же канал, <code>level: "error"</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 9 -->
+    <section id="changes">
+      <div class="sec-head">
+        <span class="eyebrow">Справочник</span>
+        <h2><span class="num">9</span>Изменения API по сервисам</h2>
+      </div>
+
+      <h3>Registry service</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Метод</th><th>Путь</th><th>Доступ</th><th>Назначение</th></tr></thead>
+          <tbody>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins?owned=true</code></td><td>автор</td><td>свои плагины, включая dev-only</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins</code> (публичный)</td><td>все</td><td>фильтр <code>ACTIVE</code> + есть <code>RELEASED</code>-ветка</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}</code></td><td>все / автор</td><td>не-автор видит только <code>RELEASED</code>-ветки</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></td><td>автор + dev</td><td>bootstrap редактора: исходники инлайн + sha блобов</td></tr>
+            <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></td><td>автор + dev</td><td>сохранение + триггер reload</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/publish</code></td><td>автор</td><td>dev → новая ветка-кандидат</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></td><td>автор</td><td>отозвать своего кандидата → <span class="pill pill--cancelled">CANCELLED</span></td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/moderation/branches?status=WAITING_APPROVE</code></td><td>модератор</td><td>очередь ревью</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></td><td>модератор</td><td><span class="pill pill--wait">WAITING_APPROVE</span> → <span class="pill pill--review">APPROVING</span></td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></td><td>модератор</td><td>→ <span class="pill pill--released">RELEASED</span></td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></td><td>модератор</td><td>→ <span class="pill pill--rejected">REJECTED</span> + уведомление</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server</code></td><td>автор (dev) / все (released)</td><td>добавлен gate</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Создание плагина больше не требует иконку в payload &mdash; назначается <strong>шаблонная иконка</strong>, а первая ветка создаётся как <code>dev</code> / <code>WORKING</code>.</p>
+
+      <h3>Runtime service</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Метод</th><th>Путь</th><th>Назначение</th></tr></thead>
+          <tbody>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>вытеснить движок для чата; мин. интервал 3&nbsp;с → <code>429</code>; запускает авто-мигратор состояния</td></tr>
+            <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>автор + dev &mdash; перезаписать состояние из редактора</td></tr>
+            <tr><td colspan="3" class="wrap">Хук <code>print</code> буферизует строки и <code>POST</code>-ит их батчами (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;мс / 64 строки / конец команды) в <code>integration /plugin-console</code> &mdash; Runtime несёт <code>internal_uuid</code> автора, никогда MXID. Ключ кэша движка перекеен на <code>(pluginId, client_sha, server_sha)</code>; <code>internal_uuid</code> автора кэшируется в записи.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Integration / Dendrite</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Метод</th><th>Путь</th><th>Назначение</th></tr></thead>
+          <tbody>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/identity/resolve</code></td><td><code>{ mxid } → { internal_uuid }</code>, create-or-return; минтит uuid при первом контакте</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/identity/{internal_uuid}</code></td><td><code>→ { mxid }</code>, для исходящего push; batch-вариант для списков участников</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugin-console</code></td><td>резолв <code>internal_uuid → mxid</code> автора, push одного батча <code>{ msgs:[…] }</code> через <code>/events/push</code></td></tr>
+            <tr><td colspan="3" class="wrap">integration получает свой первый датастор (Postgres) под таблицу идентичности &mdash; см. &sect;3. Новые типы событий поверх существующего канала: <code>fstick.plugin.console</code>, <code>fstick.plugin.reloaded</code>. Нового транспорта нет.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Installation service</h3>
+      <ul>
+        <li><code>POST /installations</code>: получить <code>status</code> ветки + <code>author_id</code> из Registry; если целевая ветка <code>dev</code>, требовать <code>X-User-Id == author_id</code> → иначе <code>403</code>. Released-ветки: кто угодно.</li>
+        <li><code>GET /installations</code>: добавить <code>branch_status</code> и <code>author_id</code> в каждый элемент, чтобы фронтенд мог показать <strong>Edit</strong>.</li>
+      </ul>
+
+      <h3>Gateway</h3>
+      <p>Менять входящий <code>X-User-Id</code> &mdash; MXID, проставленный Dendrite &mdash; на <code>internal_uuid</code> через <code>integration /api/v1/identity/resolve</code>, с кэшем в процессе (LRU, без инвалидации). Форвардить только его; <code>X-User-Matrix-Id</code> не прокидывается. Проксировать новые маршруты: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, действия модерации, <code>PUT …/state</code>, <code>?owned=true</code>.</p>
+    </section>
+
+    <!-- 10 -->
+    <section id="contracts">
+      <div class="sec-head">
+        <span class="eyebrow">Справочник</span>
+        <h2><span class="num">10</span>Контракты эндпоинтов</h2>
+      </div>
+
+      <h3>Соглашения</h3>
+      <ul>
+        <li>Каждый внешний вызов идёт через Gateway с <code>Authorization: Bearer &lt;matrix_token&gt;</code>. Gateway его аутентифицирует и проставляет <code>X-User-Id: &lt;internal_uuid&gt;</code> (&sect;3); контракты ниже &mdash; это логическая форма на границе сервиса.</li>
+        <li>Тело ошибки всегда <code>{ "error": "&lt;snake_code&gt;", "message": "&lt;human&gt;", … }</code>. Коды: <code>400</code> невалидный запрос, <code>401</code> плохой токен, <code>403</code> не автор / не модератор, <code>404</code> неизвестный id или ветка не видна вызывающему, <code>409</code> конфликт состояния, <code>413</code> слишком большой, <code>422</code> семантическая валидация, <code>429</code> throttled.</li>
+        <li>Действия-переходы (<code>claim</code> / <code>approve</code> / <code>reject</code> / <code>cancel</code>) <strong>идемпотентны при повторе</strong>: повтор, который находит ветку уже в целевом состоянии, возвращает <code>200</code> с текущей строкой; действие, невозможное для текущего состояния, возвращает <code>409</code>.</li>
+      </ul>
+
+      <h3>Registry &mdash; редактор</h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Ветка:</b> только dev (<code>WORKING</code>) &rarr; иначе <code>409</code></span><span><b>Пустой плагин:</b> <code>text</code> = шаблоны</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{
+  <span class="tok-k">"plugin"</span>:  { <span class="tok-k">"id"</span>: "…", <span class="tok-k">"name"</span>: "…", <span class="tok-k">"author_id"</span>: "…" },
+  <span class="tok-k">"branch"</span>:  { <span class="tok-k">"id"</span>: "…", <span class="tok-k">"status"</span>: <span class="tok-s">"WORKING"</span>,
+               <span class="tok-k">"runtime"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"cl.js@1.0.0"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sv.lua@1.0.0"</span> } },
+  <span class="tok-k">"source"</span>: {
+    <span class="tok-k">"client"</span>: { <span class="tok-k">"text"</span>: <span class="tok-s">"…js…"</span>,  <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> },
+    <span class="tok-k">"server"</span>: { <span class="tok-k">"text"</span>: <span class="tok-s">"…lua…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }
+  },
+  <span class="tok-k">"chat_id"</span>: "…"
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--put">PUT</span><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Ветка:</b> только dev</span><span><b>Лимит:</b> 500 КБ/файл &middot; 1.2 МБ декод. тело &rarr; <code>413</code></span><span><b>Принимает:</b> <code>Content-Encoding: gzip | br</code></span></div>
+          <pre><code><span class="tok-c">// запрос — слать только изменившуюся сторону(ы)</span>
+{
+  <span class="tok-k">"client"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
+  <span class="tok-k">"server"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
+  <span class="tok-k">"runtime"</span>: { <span class="tok-k">"server"</span>: <span class="tok-s">"sv.lua@2.0.0"</span> }   <span class="tok-c">// опц. — @X = версия stdlib</span>
+}
+
+<span class="tok-c">// 200 — битый код ВСЁ РАВНО сохраняется, с варнингом</span>
+{ <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"syntax error at line 12"</span> } ],
+  <span class="tok-k">"sha"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> },
+  <span class="tok-k">"reloaded"</span>: true }
+
+<span class="tok-c">// 409 — кто-то другой сдвинул код; ничего не записано</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"stale_code"</span>,
+  <span class="tok-k">"current"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> } }
+
+<span class="tok-c">// 413 — один файл больше 500 000 байт (замер после декода)</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"file_too_large"</span>, <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"limit"</span>: 500000, <span class="tok-k">"actual"</span>: 812345 }</code></pre>
+          <p>Сохранение пишет каждую изменённую сторону в <code>blobs/{sha256}</code>, перенаводит dev-ветку, затем вызывает <code>POST /internal/plugins/{id}/reload</code>. <code>reloaded:false</code>, если throttle reload (&sect;7) его отложил.</p>
+        </div>
+      </div>
+
+      <h3>Registry &mdash; модерация</h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/publish</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>409:</b> открытый кандидат уже есть</span><span><b>422:</b> <code>semver</code> не &gt; макс. released</span></div>
+          <pre><code><span class="tok-c">// запрос</span>
+{ <span class="tok-k">"source_branch_id"</span>: <span class="tok-s">"&lt;dev branch&gt;"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.2.0"</span>, <span class="tok-k">"changelog"</span>: <span class="tok-s">"…"</span> }
+
+<span class="tok-c">// 201 — снапшот пары блобов dev-ветки в замороженного кандидата</span>
+{ <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.2.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/moderation/branches?status=WAITING_APPROVE&amp;page=&amp;limit=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> модератор</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"items"</span>: [ {
+    <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"plugin_name"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"changelog"</span>,
+    <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> | <span class="tok-s">"APPROVING"</span>,
+    <span class="tok-k">"author"</span>: { <span class="tok-k">"id"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:…"</span> },
+    <span class="tok-k">"submitted_at"</span>, <span class="tok-k">"claimed_by"</span>: <span class="tok-s">null</span>
+  } ],
+  <span class="tok-k">"page"</span>: 0, <span class="tok-k">"total"</span>: 7 }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> модератор</span></div>
+          <p>Без тела. <span class="pill pill--wait">WAITING_APPROVE</span> &rarr; <span class="pill pill--review">APPROVING</span>, записывает <code>claimed_by</code> = вызывающий. <code>200 { "branch_id", "status": "APPROVING", "claimed_by" }</code>. <code>409 { "error": "claimed_by_other" }</code>, если ветку держит другой модератор; повторный claim тем же модератором &mdash; no-op <code>200</code>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> модератор (взявший claim) &rarr; иначе <code>403</code></span></div>
+          <p>Без тела. <span class="pill pill--review">APPROVING</span> &rarr; <span class="pill pill--released">RELEASED</span>. <code>200 { "branch_id", "status": "RELEASED", "semver" }</code>. Побочные эффекты: ветка становится устанавливаемой кем угодно; в комнату Fstick Developer постится сообщение «released»; строка в moderation-log. <code>409</code>, если не <code>APPROVING</code>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> модератор</span><span><b>Из:</b> <code>WAITING_APPROVE</code> или <code>APPROVING</code></span></div>
+          <pre><code><span class="tok-c">// запрос</span>
+{ <span class="tok-k">"reason"</span>: <span class="tok-s">"…"</span> }        <span class="tok-c">// обязательно, ≤ 2000 символов</span>
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"branch_id"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"REJECTED"</span> }</code></pre>
+          <p>Ветка сохраняется (скрыта, не устанавливается). Ставится <code>plugins.last_rejection = { reason, at, semver, branch_id }</code>; строка в moderation-log; автору сообщение в комнату Fstick Developer. <code>resubmit</code> нет &mdash; автор правит dev-ветку и снова зовёт <code>/publish</code>. <code>409</code>, если уже терминальная.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Из:</b> <code>WAITING_APPROVE</code> или <code>APPROVING</code></span></div>
+          <p>Без тела. Ветка &rarr; <span class="pill pill--cancelled">CANCELLED</span> (сохраняется), строка в moderation-log, выпадает из очереди ревью. Ни <code>last_rejection</code>, ни уведомления &mdash; автор отозвал сам. <code>200 { "branch_id", "status": "CANCELLED" }</code>. <code>409</code>, если уже терминальная (<code>RELEASED</code> / <code>REJECTED</code> / <code>CANCELLED</code>).</p>
+        </div>
+      </div>
+
+      <h3>Registry &mdash; каталог <span class="pill pill--dev">изменено</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins?owned=true&amp;page=&amp;limit=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> токен нужен только с <code>owned=true</code></span></div>
+          <p>Без <code>owned</code>: публичный список &mdash; только плагины со <code>status=ACTIVE</code> <em>и</em> хотя бы одной <span class="pill pill--released">RELEASED</span>-веткой. С <code>owned=true</code>: плагины, где <code>author_id == X-User-Id</code>, включая dev-only и те, у которых висит или отклонён кандидат.</p>
+          <pre><code><span class="tok-c">// 200 (owned=true)</span>
+{ <span class="tok-k">"items"</span>: [ {
+    <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"icon_url"</span>, <span class="tok-k">"category"</span>, <span class="tok-k">"tags"</span>,
+    <span class="tok-k">"dev_branch_id"</span>,
+    <span class="tok-k">"candidate"</span>: { <span class="tok-k">"branch_id"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"status"</span> } | <span class="tok-s">null</span>,
+    <span class="tok-k">"released_semver"</span>: <span class="tok-s">"1.1.0"</span> | <span class="tok-s">null</span>,
+    <span class="tok-k">"last_rejection"</span>: { <span class="tok-k">"reason"</span>, <span class="tok-k">"at"</span>, <span class="tok-k">"semver"</span> } | <span class="tok-s">null</span>
+  } ],
+  <span class="tok-k">"page"</span>: 0, <span class="tok-k">"total"</span>: 3 }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> опционально</span><span><b>Не-автор:</b> только <code>RELEASED</code>-ветки &middot; <code>404</code>, если нет ни одной</span></div>
+          <pre><code><span class="tok-c">// 200 (вид автора — все ветки + last_rejection)</span>
+{
+  <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"author_id"</span>, <span class="tok-k">"icon_url"</span>, <span class="tok-k">"description"</span>,
+  <span class="tok-k">"branches"</span>: [
+    { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">null</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WORKING"</span>, <span class="tok-k">"runtime"</span>: {…} },
+    { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.1.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"RELEASED"</span>, <span class="tok-k">"created_at"</span> },
+    { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.2.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> }
+  ],
+  <span class="tok-k">"last_rejection"</span>: { <span class="tok-k">"reason"</span>, <span class="tok-k">"at"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"branch_id"</span> } | <span class="tok-s">null</span>
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> любой пользователь</span><span><b>Изменено:</b> <code>icon</code> теперь опционален</span></div>
+          <pre><code><span class="tok-c">// запрос — код не нужен, иконка не нужна</span>
+{ <span class="tok-k">"name"</span>, <span class="tok-k">"description"</span>, <span class="tok-k">"category"</span>, <span class="tok-k">"tags"</span>: [ … ],
+  <span class="tok-k">"icon"</span>: { <span class="tok-k">"file_name"</span>, <span class="tok-k">"type"</span> } | <span class="tok-s">null</span> }   <span class="tok-c">// null → шаблонная иконка</span>
+
+<span class="tok-c">// 201 — первая ветка создана как WORKING; править через GET …/edit</span>
+{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"dev_branch_id"</span>,
+  <span class="tok-k">"icon_upload"</span>: { <span class="tok-k">"upload_url"</span>, <span class="tok-k">"key"</span> } | <span class="tok-s">null</span> }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/server?branch_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор (dev / кандидат) &middot; любой (<code>RELEASED</code>)</span><span><b>Вызывающий:</b> в основном Runtime, server-to-server</span></div>
+          <p>Добавлен gate: не-<code>RELEASED</code> ветка возвращает <code>403</code> всем, кроме автора. Ответ не изменился &mdash; <code>{ "files": [ { "download_url" } ] }</code> presigned GET. Код редактора через это <em>не</em> ходит (он инлайн в <code>…/edit</code>); эндпоинт остаётся для загрузки released-плагина в Runtime.</p>
+        </div>
+      </div>
+
+      <h3>Runtime</h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--put">PUT</span><code>/api/v1/plugins/{id}/state?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор + dev-установка &rarr; иначе <code>403</code></span><span><b>Блокировка:</b> нет (last write wins)</span><span><b>Лимит:</b> 256 КБ сериализованно &rarr; <code>413</code></span></div>
+          <pre><code><span class="tok-c">// запрос — полный JSON состояния (не патч)</span>
+{ <span class="tok-k">"state"</span>: { <span class="tok-k">"counter"</span>: 5, <span class="tok-k">"votes"</span>: { <span class="tok-k">"@a"</span>: 1 } } }
+
+<span class="tok-c">// 200 — эффективное состояние после авто-мигратора</span>
+{ <span class="tok-k">"state"</span>: { … },
+  <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"path"</span>: <span class="tok-s">"votes.@x"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"unknown key dropped"</span> } ] }
+
+<span class="tok-c">// 400 — тело не валидный JSON</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"invalid_json"</span> }</code></pre>
+          <p>Пишет <code>state:&lt;pluginId&gt;:&lt;chatId&gt;</code> в Redis, затем срабатывает обычный broadcast. <code>GET /api/v1/plugins/{id}/state?chat_id=</code> не изменился &mdash; возвращает текущий объект эффективного состояния.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/internal/plugins/{id}/reload</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Registry (внутренний)</span><span><b>Throttle:</b> 3&nbsp;с / (plugin, chat)</span></div>
+          <pre><code><span class="tok-c">// запрос</span>
+{ <span class="tok-k">"chat_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"client_sha"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server_sha"</span>: <span class="tok-s">"sha256:…"</span> }
+
+<span class="tok-c">// 200 — вытеснено; следующая команда пересоберёт движок, состояние авто-мигрировано</span>
+{ <span class="tok-k">"reloaded"</span>: true, <span class="tok-k">"client_changed"</span>: true }
+
+<span class="tok-c">// 429 — вызван снова в пределах 3 с (Registry отдаёт reloaded:false редактору)</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
+        </div>
+      </div>
+
+      <h3>Integration &mdash; идентичность</h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/identity/resolve</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Gateway (внутренний)</span><span><b>Идемпотентно:</b> минтит при первом появлении</span></div>
+          <pre><code><span class="tok-c">// запрос</span>
+{ <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:fstick.local"</span> }
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"internal_uuid"</span>: <span class="tok-s">"9f3c1a2e-…"</span>, <span class="tok-k">"created"</span>: false }</code></pre>
+          <p>Параллельный первый контакт безопасен: <code>UNIQUE(mxid)</code> + <code>INSERT … ON CONFLICT DO NOTHING RETURNING</code> даёт ровно один <code>internal_uuid</code>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/identity/resolve-batch</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> внутренний &middot; резолв списка участников</span></div>
+          <pre><code>{ <span class="tok-k">"mxids"</span>: [ <span class="tok-s">"@a:x"</span>, <span class="tok-s">"@b:x"</span> ] }
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"map"</span>: { <span class="tok-s">"@a:x"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-s">"@b:x"</span>: <span class="tok-s">"&lt;uuid&gt;"</span> } }</code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/identity/{internal_uuid}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> внутренний &middot; исходящий push</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:fstick.local"</span> }
+<span class="tok-c">// 404 — неизвестный uuid</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Integration &mdash; консоль <span class="pill pill--dev">внутренний</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugin-console</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Runtime (внутренний)</span><span><b>Доставка:</b> fire-and-forget &rarr; <code>202</code></span><span><b>Кап:</b> 256 msgs/вызов &middot; 8 КБ/message</span></div>
+          <pre><code><span class="tok-c">// запрос — коалесцированный батч</span>
+{
+  <span class="tok-k">"author_id"</span>: <span class="tok-s">"&lt;internal_uuid&gt;"</span>,
+  <span class="tok-k">"msgs"</span>: [
+    { <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>, <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span> }
+  ]
+}
+
+<span class="tok-c">// 202 — резолв author_id → mxid, отправлено одно fstick.plugin.console { msgs }</span>
+<span class="tok-c">// 404 — author_id неизвестен → отброшено и залогировано, вызывающему всё равно 202</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Installation <span class="pill pill--dev">изменено</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/installations?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> участник чата</span><span><b>Debug-ветка:</b> только автор &rarr; <code>403</code></span></div>
+          <pre><code><span class="tok-c">// запрос</span>
+{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span> }
+
+<span class="tok-c">// 201</span>
+{ <span class="tok-k">"installation_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"branch_status"</span> }
+
+<span class="tok-c">// 403 — целевая ветка не RELEASED и вызывающий ≠ автор</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"debug_install_forbidden"</span> }</code></pre>
+          <p>Installation-service читает <code>branch.status</code> + <code>plugin.author_id</code> из Registry для этой проверки.</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/installations?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> участник чата</span><span><b>Добавлено:</b> <code>branch_status</code>, <code>author_id</code></span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"items"</span>: [ {
+    <span class="tok-k">"installation_id"</span>, <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span>,
+    <span class="tok-k">"branch_status"</span>: <span class="tok-s">"WORKING"</span> | <span class="tok-s">"RELEASED"</span>,
+    <span class="tok-k">"author_id"</span>, <span class="tok-k">"installed_by"</span>, <span class="tok-k">"installed_at"</span>
+  } ] }</code></pre>
+          <p>Фронтенд показывает <strong>Edit</strong>, когда <code>branch_status === "WORKING" &amp;&amp; author_id === myInternalUuid</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section id="events">
+      <div class="sec-head">
+        <span class="eyebrow">Справочник</span>
+        <h2><span class="num">11</span>События sync</h2>
+      </div>
+      <p>Оба идут в <code>fstick_events</code> ответа Matrix <code>/sync</code>, поднимаются <code>syncInterceptor</code> как <code>CustomEvent("fstick:sync-event")</code>.</p>
+
+      <pre><code><span class="tok-k">fstick.plugin.console</span>          <span class="tok-c">// → только автору · один push несёт много строк</span>
+{
+  <span class="tok-k">"msgs"</span>: [
+    {
+      <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>,
+      <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span>   <span class="tok-c">// связать строку с командой, которая её вызвала</span>
+    }
+  ]
+}
+<span class="tok-c">// Runtime → integration:  { "author_id": &lt;internal_uuid&gt;, "msgs": [ … ] }</span>
+<span class="tok-c">// integration переводит author_id → MXID, адресует push, форвардит { msgs } как есть.</span>
+<span class="tok-c">// Клиентское событие id не несёт. Порядок внутри msgs сохраняется.</span>
+
+<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → автору · один на reload, никогда не батчится</span>
+{
+  <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
+  <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span>          <span class="tok-c">// → перекачать cl.js, перезапустить runDsl</span>
+}</code></pre>
+    </section>
+
+    <!-- 12 -->
+    <section id="frontend">
+      <div class="sec-head">
+        <span class="eyebrow">Справочник</span>
+        <h2><span class="num">12</span>Контракт фронтенда</h2>
+      </div>
+      <ul>
+        <li><strong>Edit</strong> показывается, когда <code>installation.branch_status === "WORKING"</code> и <code>installation.author_id === myInternalUuid</code>.</li>
+        <li>Поверхность редактора: два поля кода (client / server), панель консоли, которая добавляет каждый элемент <code>msgs[]</code> события <code>fstick.plugin.console</code> (фильтр по <code>plugin_id</code> + <code>chat_id</code>, тумблер <code>info</code>/<code>error</code>), и сворачиваемая редактируемая JSON-панель состояния с кнопкой «обновить».</li>
+        <li>Каждое поле кода показывает живой счётчик байт и блокирует сохранение на <strong>500 КБ</strong>; серверный <code>413</code> &mdash; бэкстоп.</li>
+        <li>Два вида: правая панель и отдельное окно, открываемое через <code>window.open</code> на том же origin &mdash; токен авторизации читается из <code>localStorage</code>, как у Matrix-сессии.</li>
+        <li>Сохранение держит пару <code>sha</code> из <code>GET …/edit</code>, шлёт их как <code>base_sha</code>; на <code>409</code> сообщает пользователю, что код изменён в другом месте, и просит обновить страницу.</li>
+        <li>Кнопка hot-reload дебаунсится до &ge;&nbsp;3&nbsp;с и обрабатывает <code>429</code>.</li>
+        <li>По <code>fstick.plugin.reloaded</code> с <code>client_changed</code> &mdash; перекачать <code>cl.js</code> и перезапустить <code>runDsl</code>.</li>
+        <li>Совсем новый debug-плагин открывается с шаблонным кодом и шаблонной иконкой.</li>
+        <li>Автор показывается как <code>@localpart</code> &mdash; отрезать <code>:domain</code> от MXID; никогда не рендерить полный MXID или внутренний UUID.</li>
+        <li>Пока ветка-кандидат висит (<code>WAITING_APPROVE</code> / <code>APPROVING</code>), в панели управления плагином виден её статус и действие <strong>Отменить заявку</strong> (<code>POST …/branches/{bid}/cancel</code>).</li>
+      </ul>
+    </section>
+
+    <!-- 13 -->
+    <section id="open">
+      <div class="sec-head">
+        <span class="eyebrow">Решить до реализации</span>
+        <h2><span class="num">13</span>Открытые вопросы</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Вопрос</th><th>Склонность</th></tr></thead>
+          <tbody>
+            <tr><td class="tnum">1</td><td class="wrap">Маппер идентичности &mdash; строить сейчас или запустить редактор на текущем UUID-хаке и отложить адресную консоль автору?</td><td>строить сейчас; разблокирует консоль и убирает угадайку <code>nameUUIDFromBytes</code></td></tr>
+            <tr><td class="tnum">2</td><td class="wrap">Таблица маппера едет в integration-service, давая этому (сейчас stateless) ACL первый датастор &mdash; принимаем или выносим идентичность в отдельный сервис сейчас?</td><td>принять &mdash; идентичность это домен Matrix-ACL; выносить только если integration разрастётся дальше</td></tr>
+            <tr><td class="tnum">3</td><td class="wrap">Оставить <code>APPROVING</code> отдельным состоянием или свернуть до <code>WAITING_APPROVE → RELEASED|REJECTED</code>?</td><td>оставить &mdash; включает claim / «на ревью»</td></tr>
+            <tr><td class="tnum">4</td><td class="wrap">GC блобов: когда собираются вытесненные блобы dev-сохранений и блобы отклонённых веток?</td><td>ref-count + TTL-свип; нужна политика</td></tr>
+            <tr><td class="tnum">5</td><td class="wrap">История коммитов (фаза 2) &mdash; в первую сборку или отложить?</td><td>отложить; одна модель веток уже даёт <code>REJECTED</code></td></tr>
+            <tr><td class="tnum">6</td><td class="wrap">Комната Fstick Developer &mdash; кто её создаёт, одна на автора, что ещё она несёт (release-уведомления, счётчики установок)?</td><td>одна на автора, общий канал dev-уведомлений</td></tr>
+            <tr><td class="tnum">7</td><td class="wrap">Валидация панели состояния &mdash; подтверждаем lenient + warnings или строгий <code>422</code> при несовпадении схемы?</td><td>lenient, в тон «сохранять битый код»</td></tr>
+            <tr><td class="tnum">8</td><td class="wrap">Область throttle reload &mdash; на <code>(plugin, chat)</code>, на пользователя или глобально?</td><td>на <code>(plugin, chat)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 14 -->
+    <section id="decisions">
+      <div class="sec-head">
+        <span class="eyebrow">Приложение</span>
+        <h2><span class="num">14</span>Журнал решений</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Тема</th><th>Решение</th></tr></thead>
+          <tbody>
+            <tr><td>гранулярность debug/release</td><td>на версии (ветке), не на плагине</td></tr>
+            <tr><td>имена состояний</td><td><code>WORKING</code> · <code>WAITING_APPROVE</code> · <code>APPROVING</code> · <code>RELEASED</code> · <code>REJECTED</code> · <code>CANCELLED</code> (предварительно)</td></tr>
+            <tr><td>publish</td><td><code>POST /plugins/{id}/publish</code> — создаёт новую ветку-кандидат, снапшот из dev</td></tr>
+            <tr><td>отказ (reject)</td><td>модератор; статус ветки <code>REJECTED</code> + <code>last_rejection</code> + moderation-log + сообщение в бот-комнату; <code>resubmit</code> нет</td></tr>
+            <tr><td>отмена (cancel)</td><td>автор отзывает своего кандидата из <code>WAITING_APPROVE</code>/<code>APPROVING</code> → тумстоун <code>CANCELLED</code>; строка в moderation-log, без уведомления; снимает ограничение «один открытый кандидат»</td></tr>
+            <tr><td>debug-установок на автора</td><td>без лимита; <code>chat_id</code> обязателен в вызовах редактора</td></tr>
+            <tr><td>транспорт кода редактора</td><td>инлайн через Registry — без presigned URL, без TTL</td></tr>
+            <tr><td>уведомление о сохранении</td><td>новый <code>PUT …/code</code>; не переиспользование <code>commit</code></td></tr>
+            <tr><td>reload → клиент</td><td>переиспользуем канал sync; новый тип <code>fstick.plugin.reloaded</code></td></tr>
+            <tr><td>hot reload в runtime</td><td><code>POST /internal/plugins/{id}/reload</code>; вытеснение + ленивая перезагрузка; мин. интервал 3&nbsp;с</td></tr>
+            <tr><td>скачивание серверного кода</td><td>gated: автор для dev-ветки, кто угодно для released</td></tr>
+            <tr><td>имена в S3</td><td>унифицированы — content-addressed <code>blobs/{sha256}</code>, ровно 2 файла</td></tr>
+            <tr><td>конкурентность при сохранении</td><td>сравнение content-hash → <code>409 stale_code</code>; серверной таблицы блокировок нет</td></tr>
+            <tr><td>битый код при сохранении</td><td>сохраняется, возвращает <code>warnings</code></td></tr>
+            <tr><td>лимит размера файла</td><td><strong>500 КБ (500 000 байт UTF-8) на файл</strong>, замер после transfer-декода; декодированное тело запроса ограничено 1.2 МБ (защита от zip-бомбы). ≈ 500 000 ASCII-символов ≈ 8 000–16 000 строк; gzip ~3–5× в проводе</td></tr>
+            <tr><td>runtime-строка <code>@X</code></td><td>версия stdlib; редактируется из редактора (на сервере пока не реализовано)</td></tr>
+            <tr><td>получатели / тайминг консоли</td><td>только автор; всегда включена; только live; подтипы <code>info</code> / <code>error</code></td></tr>
+            <tr><td>принты других пользователей</td><td>показываются (бэкенд-состояние общее)</td></tr>
+            <tr><td>резолв автора для консоли</td><td>Runtime несёт <code>internal_uuid</code> автора (кэш в записи движка); integration переводит его в MXID в момент push</td></tr>
+            <tr><td>батчинг консоли</td><td>Runtime буферизует строки <code>print</code> (~100 мс / 64 строки / конец команды) и <code>POST</code>-ит <code>{ author_id, msgs:[…] }</code>; событие <code>fstick.plugin.console</code> несёт <code>{ msgs:[…] }</code>, один push на батч</td></tr>
+            <tr><td>лимиты флуда консоли</td><td>8 КБ/строка (обрезка), 256 строк/батч, ≈500 строк/10 с на (plugin, chat); переполнение → одна синтетическая <code>error</code>-строка</td></tr>
+            <tr><td>ключ кэша движка</td><td><code>(pluginId, client_sha, server_sha)</code></td></tr>
+            <tr><td>авто-миграция состояния</td><td>встроена в Runtime; работает на reload и на PUT state</td></tr>
+            <tr><td>редактируемая панель состояния</td><td>да — Runtime её применяет</td></tr>
+            <tr><td>публичный список магазина</td><td><code>ACTIVE</code> + есть <code>RELEASED</code>-ветка</td></tr>
+            <tr><td>список своих плагинов</td><td><code>GET /plugins?owned=true</code></td></tr>
+            <tr><td>GET одного плагина</td><td>debug-ветка видна только автору; released — кому угодно</td></tr>
+            <tr><td>со-мейнтейнеры</td><td>не поддерживаются</td></tr>
+            <tr><td>ответ installations</td><td>добавляет <code>branch_status</code>, <code>author_id</code></td></tr>
+            <tr><td>авторизация отдельного окна</td><td>тот же origin + токен из <code>localStorage</code></td></tr>
+            <tr><td>пустой плагин / новый debug-плагин</td><td><code>GET …/edit</code> возвращает шаблоны; назначается шаблонная иконка</td></tr>
+            <tr><td>uninstall при открытом редакторе</td><td>разрешён — сессии редактора нет</td></tr>
+            <tr><td>рейт-лимит reload</td><td>минимум 3&nbsp;с</td></tr>
+            <tr><td>идентичность &mdash; ядро</td><td>чистый <code>internal_uuid</code> везде; MXID только на двух хопах (Dendrite→Gateway на вход, integration→Dendrite на выход); фронтенд показывает <code>@localpart</code>; handle нет</td></tr>
+            <tr><td>идентичность &mdash; маппер</td><td>таблица <code>uuid ↔ mxid</code> у integration-service в <strong>Postgres</strong> (источник истины); Gateway кэширует лукапы в процессе; Redis только read-кэш, никогда не хранилище</td></tr>
+            <tr><td>идентичность &mdash; провижининг</td><td>integration минтит <code>internal_uuid</code> при первом промахе <code>identity/resolve</code> (идемпотентно через <code>UNIQUE(mxid)</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    Fstick · Интеграция редактора плагинов · проектная записка, обновлено 2026-09-10 · заменяет разделы API в fstick_specification.md там, где они расходятся · EN-версия: plugin-editor-integration.html
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var KEY = "fstick-editor-doc-theme";
+    var root = document.documentElement;
+    var btn = document.getElementById("themeToggle");
+    function apply(t) {
+      if (t === "light" || t === "dark") root.setAttribute("data-theme", t);
+      else root.removeAttribute("data-theme");
+    }
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    if (saved) apply(saved);
+    function current() {
+      var explicit = root.getAttribute("data-theme");
+      if (explicit) return explicit;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    btn.addEventListener("click", function () {
+      var next = current() === "dark" ? "light" : "dark";
+      apply(next);
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+    });
+  })();
+</script>
