@@ -448,7 +448,7 @@
       <span><strong>Status:</strong> design agreed, not implemented</span>
       <span><strong>Branch model:</strong> content-addressed, git-shaped</span>
       <span><strong>Identity:</strong> UUID core · mapper in integration</span>
-      <span><strong>Updated:</strong> 2026-09-09</span>
+      <span><strong>Updated:</strong> 2026-09-11</span>
     </div>
   </header>
 
@@ -930,20 +930,27 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <span class="eyebrow">Decision</span>
         <h2><span class="num">8</span>Console streaming</h2>
       </div>
-      <p>The <code>print</code> hook fires inside command execution, where Runtime knows <code>pluginId</code>, <code>branchId</code>, <code>chatId</code>, and the calling user &mdash; all as <code>internal_uuid</code>. The console line must reach the plugin author, and no one else.</p>
+      <p>The <code>print</code>/<code>warn</code> hooks fire inside command execution, where Runtime knows <code>pluginId</code>, <code>branchId</code>, <code>chatId</code>, and the calling user &mdash; all as <code>internal_uuid</code>. The console line must reach the plugin author, and no one else.</p>
 
       <h3>Path &mdash; batched</h3>
       <ol>
         <li>Runtime takes the author's <code>internal_uuid</code> straight from <code>GET registry /plugins/{id}</code> (the <code>author_id</code> field &mdash; no MXID anywhere) and caches it in the engine entry, keyed by <code>(pluginId, shas)</code>.</li>
-        <li>Runtime <strong>buffers</strong> <code>print</code> lines and <code>POST</code>s them in batches to <code>integration /api/v1/plugin-console</code> as <code>{ author_id, msgs: [ … ] }</code> &mdash; flushed on a ~100&nbsp;ms timer, when the buffer hits 64 lines, or when the command returns, whichever is first.</li>
+        <li>Runtime <strong>buffers</strong> <code>print</code>/<code>warn</code> lines and <code>POST</code>s them in batches to <code>integration /api/v1/plugin-console</code> as <code>{ author_id, msgs: [ … ] }</code> &mdash; flushed on a ~100&nbsp;ms timer, when the buffer hits 64 lines, or when the command returns, whichever is first.</li>
         <li>integration resolves <code>internal_uuid → mxid</code> <em>once</em>, wraps the array into a single <code>fstick.plugin.console</code> event <code>{ msgs: [ … ] }</code>, and calls Dendrite <code>/events/push</code>. The client appends every <code>msgs[]</code> entry to the console pane in order.</li>
       </ol>
       <p>Kept separate from <code>broadcastPluginState</code> &mdash; console traffic is bursty and single-recipient. One resolve, one push, N lines. This is why the mapper sits in integration: the one service that already turns internal ids into Matrix pushes does the resolution, and Runtime never handles an MXID.</p>
 
+      <h3>Levels &amp; the system flag</h3>
+      <ul>
+        <li><code>level: "info" | "warn" | "error"</code>. Lua gets two output hooks now: <code>print(msg)</code> → <code>info</code>, and a new <code>warn(msg)</code> → <code>warn</code>. Both are the plugin's own output, so <code>system: false</code>.</li>
+        <li><code>system: boolean</code> says <em>who</em> produced the line. <code>false</code> &mdash; the plugin's own code called <code>print</code>/<code>warn</code>. <code>true</code> &mdash; Runtime generated it itself: an uncaught Lua exception, a load-time syntax error, or a flood-protection notice. System lines are <code>level: "error"</code> today (nothing else triggers one yet), but the flag is independent of level so a future Runtime advisory (e.g. "approaching state size limit") can ship as <code>warn</code> without being mistaken for the author's own output.</li>
+        <li>The editor renders <code>system: true</code> lines visually distinct from the author's own <code>print</code>/<code>warn</code> output (different left rule / icon), so a crash doesn't read like something the plugin printed on purpose.</li>
+      </ul>
+
       <h3>Flood protection</h3>
       <ul>
         <li><strong>Per line:</strong> <code>message</code> truncated at <strong>8&nbsp;KB</strong> with a <code>…[truncated]</code> marker.</li>
-        <li><strong>Per batch:</strong> at most <strong>256</strong> lines; overflow is dropped and replaced by one synthetic <code>{ level: "error", message: "N console lines dropped (rate limit)" }</code>.</li>
+        <li><strong>Per batch:</strong> at most <strong>256</strong> lines; overflow is dropped and replaced by one synthetic <code>{ level: "error", system: true, message: "N console lines dropped (rate limit)" }</code>.</li>
         <li><strong>Per <code>(plugin, chat)</code>:</strong> a token bucket (≈500 lines / 10&nbsp;s). Sustained flooding drops with the same synthetic marker rather than backing up the buffer.</li>
       </ul>
 
@@ -956,7 +963,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>When</td><td>always, for any dev-branch execution</td></tr>
             <tr><td>History</td><td>none &mdash; live from connection time</td></tr>
             <tr><td>Other users' commands</td><td>included (backend state is shared)</td></tr>
-            <tr><td>Runtime errors / stack traces</td><td>same channel, <code>level: "error"</code></td></tr>
+            <tr><td>Levels</td><td><code>info</code> (<code>print</code>) · <code>warn</code> (<code>warn</code>) · <code>error</code> (exceptions, flood notices)</td></tr>
+            <tr><td>System flag</td><td><code>system: false</code> &mdash; author's <code>print</code>/<code>warn</code>; <code>system: true</code> &mdash; Runtime-generated</td></tr>
+            <tr><td>Runtime errors / stack traces</td><td>same channel, <code>level: "error"</code>, <code>system: true</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -998,7 +1007,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <tbody>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>evict engine for a chat; 3s min interval → <code>429</code>; runs state auto-migrator</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>author + dev &mdash; overwrite state from the editor</td></tr>
-            <tr><td colspan="3" class="wrap"><code>print</code> hook buffers lines and <code>POST</code>s them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Engine cache re-keyed to <code>(pluginId, client_sha, server_sha)</code>; author <code>internal_uuid</code> cached in the entry.</td></tr>
+            <tr><td colspan="3" class="wrap"><code>print</code>/<code>warn</code> hooks buffer lines (<code>level: info|warn</code>, <code>system: false</code>) and <code>POST</code> them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Uncaught exceptions go the same route as <code>level: "error", system: true</code>. Engine cache re-keyed to <code>(pluginId, client_sha, server_sha)</code>; author <code>internal_uuid</code> cached in the entry.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1290,7 +1299,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   <span class="tok-k">"author_id"</span>: <span class="tok-s">"&lt;internal_uuid&gt;"</span>,
   <span class="tok-k">"msgs"</span>: [
     { <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
-      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"warn"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"system"</span>: <span class="tok-s">false</span>,   <span class="tok-c">// true = Runtime-generated (exception, flood notice) — never the plugin's own print/warn</span>
       <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>, <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span> }
   ]
 }
@@ -1346,7 +1356,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   <span class="tok-k">"msgs"</span>: [
     {
       <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
-      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"warn"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"system"</span>: <span class="tok-s">boolean</span>,   <span class="tok-c">// false = author's print/warn · true = Runtime-generated</span>
       <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>,
       <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span>   <span class="tok-c">// correlate a line with the command that caused it</span>
     }
@@ -1371,7 +1382,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       </div>
       <ul>
         <li><strong>Edit</strong> shows when <code>installation.branch_status === "WORKING"</code> and <code>installation.author_id === myInternalUuid</code>.</li>
-        <li>Editor surface: two code panes (client / server), a console pane that appends each <code>msgs[]</code> entry of a <code>fstick.plugin.console</code> event (filtered by <code>plugin_id</code> + <code>chat_id</code>, <code>info</code>/<code>error</code> toggle), and a collapsible editable JSON state panel with a refresh button.</li>
+        <li>Editor surface: two code panes (client / server), a console pane that appends each <code>msgs[]</code> entry of a <code>fstick.plugin.console</code> event (filtered by <code>plugin_id</code> + <code>chat_id</code>, <code>info</code>/<code>warn</code>/<code>error</code> toggle), and a collapsible editable JSON state panel with a refresh button.</li>
+        <li>Console lines with <code>system: true</code> render visually distinct from the plugin's own <code>print</code>/<code>warn</code> output &mdash; a crash shouldn't look like something the author printed.</li>
         <li>Each code pane shows a live byte counter and blocks Save at <strong>500 KB</strong>; the server <code>413</code> is the backstop.</li>
         <li>Two views: the right-hand panel, and a separate window opened with <code>window.open</code> on the same origin &mdash; auth token read from <code>localStorage</code>, same as the Matrix session.</li>
         <li>Save holds the <code>sha</code> pair from <code>GET …/edit</code>, sends them as <code>base_sha</code>; on <code>409</code> it tells the user the code changed elsewhere and to reload.</li>
@@ -1432,11 +1444,13 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>broken code on save</td><td>saved, returns <code>warnings</code></td></tr>
             <tr><td>file size limit</td><td><strong>500 KB (500 000 bytes UTF-8) per file</strong>, measured after transfer decode; decoded request body capped at 1.2 MB (zip-bomb guard). ≈ 500 000 ASCII chars ≈ 8 000–16 000 lines; gzips ~3–5× on the wire</td></tr>
             <tr><td>runtime string <code>@X</code></td><td>stdlib version; editable from the editor (not yet implemented server-side)</td></tr>
-            <tr><td>console recipients / timing</td><td>author only; always on; live only; subtypes <code>info</code> / <code>error</code></td></tr>
+            <tr><td>console recipients / timing</td><td>author only; always on; live only; levels <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
+            <tr><td>console <code>warn</code> level</td><td>added; new Lua hook <code>warn(msg)</code> alongside <code>print(msg)</code>, same batching path, <code>system: false</code></td></tr>
+            <tr><td>console <code>system</code> flag</td><td>boolean per line: <code>false</code> = plugin's own <code>print</code>/<code>warn</code>; <code>true</code> = Runtime-generated (exceptions, flood notices) — rendered visually distinct in the editor</td></tr>
             <tr><td>other users' prints</td><td>shown (shared backend state)</td></tr>
             <tr><td>console author resolution</td><td>Runtime carries the author's <code>internal_uuid</code> (cached in the engine entry); integration maps it to an MXID at push time</td></tr>
-            <tr><td>console batching</td><td>Runtime buffers <code>print</code> lines (~100 ms / 64 lines / command end) and <code>POST</code>s <code>{ author_id, msgs:[…] }</code>; the <code>fstick.plugin.console</code> event carries <code>{ msgs:[…] }</code>, one push per batch</td></tr>
-            <tr><td>console flood limits</td><td>8 KB/line (truncate), 256 lines/batch, ≈500 lines/10 s per (plugin, chat); overflow → one synthetic <code>error</code> line</td></tr>
+            <tr><td>console batching</td><td>Runtime buffers <code>print</code>/<code>warn</code> lines (~100 ms / 64 lines / command end) and <code>POST</code>s <code>{ author_id, msgs:[…] }</code>; the <code>fstick.plugin.console</code> event carries <code>{ msgs:[…] }</code>, one push per batch</td></tr>
+            <tr><td>console flood limits</td><td>8 KB/line (truncate), 256 lines/batch, ≈500 lines/10 s per (plugin, chat); overflow → one synthetic <code>error</code>, <code>system: true</code> line</td></tr>
             <tr><td>engine cache key</td><td><code>(pluginId, client_sha, server_sha)</code></td></tr>
             <tr><td>state auto-migration</td><td>built into Runtime; runs on reload and on state PUT</td></tr>
             <tr><td>editable state panel</td><td>yes — Runtime applies it</td></tr>
@@ -1460,7 +1474,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   </main>
 
   <footer class="foot">
-    Fstick · Plugin Editor Integration · design note, updated 2026-09-10 · supersedes the API sections of fstick_specification.md where they conflict · RU: plugin-editor-integration.ru.html
+    Fstick · Plugin Editor Integration · design note, updated 2026-09-11 · supersedes the API sections of fstick_specification.md where they conflict · RU: plugin-editor-integration.ru.html
   </footer>
 
 </div>

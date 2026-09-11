@@ -448,7 +448,7 @@
       <span><strong>Статус:</strong> дизайн согласован, не реализовано</span>
       <span><strong>Модель версий:</strong> content-addressed, git-образная</span>
       <span><strong>Идентичность:</strong> UUID в ядре · маппер в integration</span>
-      <span><strong>Обновлено:</strong> 2026-09-10</span>
+      <span><strong>Обновлено:</strong> 2026-09-11</span>
     </div>
   </header>
 
@@ -916,20 +916,27 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <span class="eyebrow">Решение</span>
         <h2><span class="num">8</span>Стриминг консоли</h2>
       </div>
-      <p>Хук <code>print</code> срабатывает внутри исполнения команды, где Runtime знает <code>pluginId</code>, <code>branchId</code>, <code>chatId</code> и вызывающего пользователя &mdash; всё как <code>internal_uuid</code>. Строка консоли должна дойти до автора плагина и ни до кого больше.</p>
+      <p>Хуки <code>print</code>/<code>warn</code> срабатывают внутри исполнения команды, где Runtime знает <code>pluginId</code>, <code>branchId</code>, <code>chatId</code> и вызывающего пользователя &mdash; всё как <code>internal_uuid</code>. Строка консоли должна дойти до автора плагина и ни до кого больше.</p>
 
       <h3>Путь &mdash; батчами</h3>
       <ol>
         <li>Runtime берёт <code>internal_uuid</code> автора прямо из <code>GET registry /plugins/{id}</code> (поле <code>author_id</code> &mdash; никакого MXID) и кэширует его в записи движка по ключу <code>(pluginId, shas)</code>.</li>
-        <li>Runtime <strong>буферизует</strong> строки <code>print</code> и <code>POST</code>-ит их батчами в <code>integration /api/v1/plugin-console</code> как <code>{ author_id, msgs: [ … ] }</code> &mdash; flush по таймеру ~100&nbsp;мс, при достижении 64 строк или при возврате команды, что раньше.</li>
+        <li>Runtime <strong>буферизует</strong> строки <code>print</code>/<code>warn</code> и <code>POST</code>-ит их батчами в <code>integration /api/v1/plugin-console</code> как <code>{ author_id, msgs: [ … ] }</code> &mdash; flush по таймеру ~100&nbsp;мс, при достижении 64 строк или при возврате команды, что раньше.</li>
         <li>integration резолвит <code>internal_uuid → mxid</code> <em>один раз</em>, оборачивает массив в одно событие <code>fstick.plugin.console</code> <code>{ msgs: [ … ] }</code> и вызывает Dendrite <code>/events/push</code>. Клиент добавляет каждый элемент <code>msgs[]</code> в панель консоли по порядку.</li>
       </ol>
       <p>Отдельно от <code>broadcastPluginState</code> &mdash; трафик консоли бёрстовый и одному получателю. Один резолв, один push, N строк. Именно поэтому маппер сидит в integration: единственный сервис, который уже превращает внутренние id в Matrix-push, делает и резолв, а Runtime никогда не трогает MXID.</p>
 
+      <h3>Уровни и флаг system</h3>
+      <ul>
+        <li><code>level: "info" | "warn" | "error"</code>. У Lua теперь два хука вывода: <code>print(msg)</code> → <code>info</code>, и новый <code>warn(msg)</code> → <code>warn</code>. Оба &mdash; собственный вывод плагина, поэтому <code>system: false</code>.</li>
+        <li><code>system: boolean</code> говорит, <em>кто</em> породил строку. <code>false</code> &mdash; код плагина сам вызвал <code>print</code>/<code>warn</code>. <code>true</code> &mdash; строку сгенерировал сам Runtime: неперехваченное исключение Lua, синтаксическая ошибка при загрузке или уведомление защиты от флуда. Сегодня системные строки всегда <code>level: "error"</code> (больше пока нечему её вызвать), но флаг независим от уровня, чтобы будущее предупреждение от Runtime (например, «приближение к лимиту размера состояния») могло идти как <code>warn</code>, не выдавая себя за собственный вывод автора.</li>
+        <li>Редактор рендерит строки с <code>system: true</code> визуально отдельно от собственного вывода автора через <code>print</code>/<code>warn</code> (другая левая полоса / иконка), чтобы падение не читалось как то, что плагин напечатал намеренно.</li>
+      </ul>
+
       <h3>Защита от флуда</h3>
       <ul>
         <li><strong>На строку:</strong> <code>message</code> обрезается на <strong>8&nbsp;КБ</strong> с маркером <code>…[truncated]</code>.</li>
-        <li><strong>На батч:</strong> максимум <strong>256</strong> строк; переполнение отбрасывается и заменяется одной синтетической <code>{ level: "error", message: "N console lines dropped (rate limit)" }</code>.</li>
+        <li><strong>На батч:</strong> максимум <strong>256</strong> строк; переполнение отбрасывается и заменяется одной синтетической <code>{ level: "error", system: true, message: "N console lines dropped (rate limit)" }</code>.</li>
         <li><strong>На <code>(plugin, chat)</code>:</strong> token bucket (≈500 строк / 10&nbsp;с). Постоянный флуд отбрасывается тем же синтетическим маркером, а не копит буфер.</li>
       </ul>
 
@@ -942,7 +949,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>Когда</td><td>всегда, для любого исполнения на dev-ветке</td></tr>
             <tr><td>История</td><td>нет &mdash; live с момента подключения</td></tr>
             <tr><td>Команды других пользователей</td><td>включаются (бэкенд-состояние общее)</td></tr>
-            <tr><td>Ошибки Runtime / стектрейсы</td><td>тот же канал, <code>level: "error"</code></td></tr>
+            <tr><td>Уровни</td><td><code>info</code> (<code>print</code>) · <code>warn</code> (<code>warn</code>) · <code>error</code> (исключения, уведомления о флуде)</td></tr>
+            <tr><td>Флаг system</td><td><code>system: false</code> &mdash; <code>print</code>/<code>warn</code> автора; <code>system: true</code> &mdash; сгенерировано Runtime</td></tr>
+            <tr><td>Ошибки Runtime / стектрейсы</td><td>тот же канал, <code>level: "error"</code>, <code>system: true</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -984,7 +993,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <tbody>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>вытеснить движок для чата; мин. интервал 3&nbsp;с → <code>429</code>; запускает авто-мигратор состояния</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>автор + dev &mdash; перезаписать состояние из редактора</td></tr>
-            <tr><td colspan="3" class="wrap">Хук <code>print</code> буферизует строки и <code>POST</code>-ит их батчами (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;мс / 64 строки / конец команды) в <code>integration /plugin-console</code> &mdash; Runtime несёт <code>internal_uuid</code> автора, никогда MXID. Ключ кэша движка перекеен на <code>(pluginId, client_sha, server_sha)</code>; <code>internal_uuid</code> автора кэшируется в записи.</td></tr>
+            <tr><td colspan="3" class="wrap">Хуки <code>print</code>/<code>warn</code> буферизуют строки (<code>level: info|warn</code>, <code>system: false</code>) и <code>POST</code>-ят их батчами (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;мс / 64 строки / конец команды) в <code>integration /plugin-console</code> &mdash; Runtime несёт <code>internal_uuid</code> автора, никогда MXID. Неперехваченные исключения идут тем же путём как <code>level: "error", system: true</code>. Ключ кэша движка перекеен на <code>(pluginId, client_sha, server_sha)</code>; <code>internal_uuid</code> автора кэшируется в записи.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1276,7 +1285,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   <span class="tok-k">"author_id"</span>: <span class="tok-s">"&lt;internal_uuid&gt;"</span>,
   <span class="tok-k">"msgs"</span>: [
     { <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
-      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"warn"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"system"</span>: <span class="tok-s">false</span>,   <span class="tok-c">// true = сгенерировано Runtime (исключение, уведомление о флуде) — никогда собственный print/warn плагина</span>
       <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>, <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span> }
   ]
 }
@@ -1332,7 +1342,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   <span class="tok-k">"msgs"</span>: [
     {
       <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
-      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"level"</span>: <span class="tok-s">"info"</span> | <span class="tok-s">"warn"</span> | <span class="tok-s">"error"</span>,
+      <span class="tok-k">"system"</span>: <span class="tok-s">boolean</span>,   <span class="tok-c">// false = print/warn автора · true = сгенерировано Runtime</span>
       <span class="tok-k">"message"</span>, <span class="tok-k">"ts"</span>,
       <span class="tok-k">"command_name"</span>, <span class="tok-k">"track_id"</span>   <span class="tok-c">// связать строку с командой, которая её вызвала</span>
     }
@@ -1357,7 +1368,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       </div>
       <ul>
         <li><strong>Edit</strong> показывается, когда <code>installation.branch_status === "WORKING"</code> и <code>installation.author_id === myInternalUuid</code>.</li>
-        <li>Поверхность редактора: два поля кода (client / server), панель консоли, которая добавляет каждый элемент <code>msgs[]</code> события <code>fstick.plugin.console</code> (фильтр по <code>plugin_id</code> + <code>chat_id</code>, тумблер <code>info</code>/<code>error</code>), и сворачиваемая редактируемая JSON-панель состояния с кнопкой «обновить».</li>
+        <li>Поверхность редактора: два поля кода (client / server), панель консоли, которая добавляет каждый элемент <code>msgs[]</code> события <code>fstick.plugin.console</code> (фильтр по <code>plugin_id</code> + <code>chat_id</code>, тумблер <code>info</code>/<code>warn</code>/<code>error</code>), и сворачиваемая редактируемая JSON-панель состояния с кнопкой «обновить».</li>
+        <li>Строки консоли с <code>system: true</code> рендерятся визуально отдельно от собственного вывода плагина через <code>print</code>/<code>warn</code> &mdash; падение не должно выглядеть как то, что напечатал автор.</li>
         <li>Каждое поле кода показывает живой счётчик байт и блокирует сохранение на <strong>500 КБ</strong>; серверный <code>413</code> &mdash; бэкстоп.</li>
         <li>Два вида: правая панель и отдельное окно, открываемое через <code>window.open</code> на том же origin &mdash; токен авторизации читается из <code>localStorage</code>, как у Matrix-сессии.</li>
         <li>Сохранение держит пару <code>sha</code> из <code>GET …/edit</code>, шлёт их как <code>base_sha</code>; на <code>409</code> сообщает пользователю, что код изменён в другом месте, и просит обновить страницу.</li>
@@ -1418,11 +1430,13 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>битый код при сохранении</td><td>сохраняется, возвращает <code>warnings</code></td></tr>
             <tr><td>лимит размера файла</td><td><strong>500 КБ (500 000 байт UTF-8) на файл</strong>, замер после transfer-декода; декодированное тело запроса ограничено 1.2 МБ (защита от zip-бомбы). ≈ 500 000 ASCII-символов ≈ 8 000–16 000 строк; gzip ~3–5× в проводе</td></tr>
             <tr><td>runtime-строка <code>@X</code></td><td>версия stdlib; редактируется из редактора (на сервере пока не реализовано)</td></tr>
-            <tr><td>получатели / тайминг консоли</td><td>только автор; всегда включена; только live; подтипы <code>info</code> / <code>error</code></td></tr>
+            <tr><td>получатели / тайминг консоли</td><td>только автор; всегда включена; только live; уровни <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
+            <tr><td>уровень консоли <code>warn</code></td><td>добавлен; новый Lua-хук <code>warn(msg)</code> рядом с <code>print(msg)</code>, тот же путь батчинга, <code>system: false</code></td></tr>
+            <tr><td>флаг <code>system</code> консоли</td><td>булево на строку: <code>false</code> = собственный <code>print</code>/<code>warn</code> плагина; <code>true</code> = сгенерировано Runtime (исключения, уведомления о флуде) &mdash; рендерится в редакторе визуально отдельно</td></tr>
             <tr><td>принты других пользователей</td><td>показываются (бэкенд-состояние общее)</td></tr>
             <tr><td>резолв автора для консоли</td><td>Runtime несёт <code>internal_uuid</code> автора (кэш в записи движка); integration переводит его в MXID в момент push</td></tr>
-            <tr><td>батчинг консоли</td><td>Runtime буферизует строки <code>print</code> (~100 мс / 64 строки / конец команды) и <code>POST</code>-ит <code>{ author_id, msgs:[…] }</code>; событие <code>fstick.plugin.console</code> несёт <code>{ msgs:[…] }</code>, один push на батч</td></tr>
-            <tr><td>лимиты флуда консоли</td><td>8 КБ/строка (обрезка), 256 строк/батч, ≈500 строк/10 с на (plugin, chat); переполнение → одна синтетическая <code>error</code>-строка</td></tr>
+            <tr><td>батчинг консоли</td><td>Runtime буферизует строки <code>print</code>/<code>warn</code> (~100 мс / 64 строки / конец команды) и <code>POST</code>-ит <code>{ author_id, msgs:[…] }</code>; событие <code>fstick.plugin.console</code> несёт <code>{ msgs:[…] }</code>, один push на батч</td></tr>
+            <tr><td>лимиты флуда консоли</td><td>8 КБ/строка (обрезка), 256 строк/батч, ≈500 строк/10 с на (plugin, chat); переполнение → одна синтетическая строка <code>error</code>, <code>system: true</code></td></tr>
             <tr><td>ключ кэша движка</td><td><code>(pluginId, client_sha, server_sha)</code></td></tr>
             <tr><td>авто-миграция состояния</td><td>встроена в Runtime; работает на reload и на PUT state</td></tr>
             <tr><td>редактируемая панель состояния</td><td>да — Runtime её применяет</td></tr>
@@ -1446,7 +1460,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   </main>
 
   <footer class="foot">
-    Fstick · Интеграция редактора плагинов · проектная записка, обновлено 2026-09-10 · заменяет разделы API в fstick_specification.md там, где они расходятся · EN-версия: plugin-editor-integration.html
+    Fstick · Интеграция редактора плагинов · проектная записка, обновлено 2026-09-11 · заменяет разделы API в fstick_specification.md там, где они расходятся · EN-версия: plugin-editor-integration.html
   </footer>
 
 </div>
