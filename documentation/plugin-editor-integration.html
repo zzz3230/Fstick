@@ -448,7 +448,7 @@
       <span><strong>Status:</strong> design agreed, not implemented</span>
       <span><strong>Branch model:</strong> content-addressed, git-shaped</span>
       <span><strong>Identity:</strong> UUID core · mapper in integration</span>
-      <span><strong>Updated:</strong> 2026-09-11</span>
+      <span><strong>Updated:</strong> 2026-09-12</span>
     </div>
   </header>
 
@@ -553,11 +553,11 @@
 
             <!-- 4 reload -->
             <line x1="320" y1="212" x2="545" y2="212" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
-            <text x="325" y="205">4 · POST /internal/…/reload &nbsp;{ chat_id, shas }</text>
+            <text x="325" y="205">4 · POST /internal/…/reload &nbsp;{ chat_id, branch_id }</text>
 
             <!-- 5 evict -->
             <path d="M545 230 h44 v20 h-44" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)" />
-            <text x="597" y="244">5 · evict engine (plugin, shas) · run state migrator</text>
+            <text x="597" y="244">5 · rebuild engine (plugin, branch_id) · run state migrator</text>
 
             <!-- 6 reloaded -->
             <line x1="320" y1="286" x2="755" y2="286" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
@@ -880,7 +880,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <ul>
         <li><strong>Content-addressed blobs</strong>: <code>plugins/{pluginId}/blobs/{sha256}</code>. Immutable, never overwritten, deduplicated. The sha <em>is</em> the identifier the editor and Runtime pass around.</li>
         <li><strong>Exactly two files</strong> per branch &mdash; one client, one server. No multi-file plugins. This removes the <code>files[0]</code> ambiguity for good.</li>
-        <li>The editor <strong>never receives a presigned URL</strong>. Code travels inline through Registry, so authorisation is checked per request and there is no TTL to race.</li>
+        <li><strong>No consumer of code ever receives a presigned URL</strong> &mdash; not the editor, not Runtime. Code travels inline through Registry in both directions (&sect;7, &sect;10), so authorisation is checked per request and there is no TTL to race.</li>
         <li>The presigned two-phase upload stays &mdash; but only for icons, screenshots, and any future release bundles, where files are larger and uploaded once.</li>
       </ul>
       <p>The sha-based identifier also settles two earlier questions at once: the "one-time link" question disappears (no link), and the optimistic-concurrency check on save (&sect;10) is just a sha comparison.</p>
@@ -914,11 +914,32 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <h2><span class="num">7</span>Runtime: reload &amp; state</h2>
       </div>
 
+      <h3>Branch resolution &mdash; the client never sends <code>branch_id</code></h3>
+      <p><code>POST /command</code> only ever carries <code>{ name, pluginId, chatId, trackId, args }</code>. The plugin's own frontend (the DSL running in the browser) neither knows nor sends a branch id &mdash; the same trust boundary as identity (&sect;3): a chat cannot pick which code runs against it. Runtime resolves <code>(pluginId, chatId) → branch_id</code> itself:</p>
+      <ul>
+        <li>cache <code>Map&lt;(pluginId, chatId), branchId&gt;</code>, TTL <strong>60&nbsp;s</strong> &mdash; a plain timeout rather than push-based invalidation, since a stale entry only matters for the rare case of an uninstall or a version switch, and the cost of being wrong for up to a minute (one command runs against the previous branch) is low;</li>
+        <li>on a miss, Runtime calls <code>GET installation-service /internal/installations/resolve?plugin_id=&amp;chat_id=</code> → <code>{ branch_id, branch_status }</code>.</li>
+      </ul>
+      <p>This cache is independent of the engine cache below and untouched by reload &mdash; a hot-reload never changes <em>which</em> branch is installed, only the code inside it.</p>
+
       <h3>Engine cache</h3>
-      <p><code>Map&lt;VersionKey, LuaPluginEngine&gt;</code> where <code>VersionKey = (pluginId, client_blob_sha, server_blob_sha)</code>. A <code>RELEASED</code> branch running in many chats and the author's dev branch are <strong>different cache entries</strong> &mdash; neither clobbers the other. Plugin state stays keyed by <code>(pluginId, chatId)</code> in Redis and is swapped in via <code>changeContext</code> before each command.</p>
+      <p><code>Map&lt;(pluginId, branchId), LuaPluginEngine&gt;</code>. No sha in the key. Runtime never executes client code, so <code>client_blob_sha</code> was never a legitimate part of this key &mdash; a client-only edit used to force a pointless rebuild. A <code>RELEASED</code> branch running in many chats and the author's dev branch are <strong>different cache entries</strong> &mdash; neither clobbers the other. Plugin state stays keyed by <code>(pluginId, chatId)</code> in Redis and is swapped in via <code>changeContext</code> before each command.</p>
+      <p>One function loads an engine, used everywhere an entry is missing &mdash; a cold cache after a Runtime restart is not a special case. <code>GET /code/server</code> returns the source <strong>inline</strong> (&sect;10) &mdash; no presigned URL, no second hop to S3; Registry does that read itself:</p>
+      <pre><code><span class="tok-k">loadEngine</span>(pluginId, branchId):
+  <span class="tok-c">if</span> cache.has((pluginId, branchId)): <span class="tok-c">return</span> cache.get(...)
+  { text, sha } = <span class="tok-k">GET</span> registry <span class="tok-s">/plugins/{pluginId}/code/server?branch_id={branchId}</span>
+  engine = compile(text)
+  cache.put((pluginId, branchId), engine)
+  <span class="tok-c">return</span> engine</code></pre>
 
       <h3>Reload</h3>
-      <p><code>POST /internal/plugins/{pluginId}/reload</code> &mdash; called by Registry after a save. Evicts the entry for <code>(pluginId, shas)</code> so the next command in that chat rebuilds it; Redis state is preserved and passed through the <strong>built-in auto-migrator</strong>. Minimum interval <strong>3&nbsp;s</strong> per <code>(plugin, chat)</code> → <code>429 { retry_after_ms }</code>.</p>
+      <p><code>POST /internal/plugins/{pluginId}/reload { chat_id, branch_id }</code> &mdash; called by Registry <strong>only when the server side changed</strong>. A client-only save (JS edited, Lua untouched) never reaches Runtime at all &mdash; there is nothing for it to reload, since it doesn't execute client code in the first place. Runtime evicts <code>(pluginId, branchId)</code> and immediately re-invokes the <em>same</em> <code>loadEngine</code> above to rebuild it &mdash; not an inlined copy of the new code. Two reasons:</p>
+      <ul>
+        <li><strong>One pipeline, not two.</strong> If reload instead carried the code inline, "engine came from a reload" and "engine came from a cold cache miss" would be different code paths that can silently drift apart (e.g. after a Runtime restart, the cache is empty and every engine is rebuilt through <code>loadEngine</code> &mdash; if reload had its own inline path, that path would go untested until the one moment it matters).</li>
+        <li><strong>Free GC for the mutable branch.</strong> The dev branch keeps the same <code>branch_id</code> forever, so reload is a plain <code>cache.put()</code> on a key that already exists &mdash; the old <code>LuaPluginEngine</code> is simply dereferenced and left to the JVM. Nothing to track, no orphaned shas to sweep. A <code>RELEASED</code> branch's <code>branch_id</code> never reloads at all (its code is frozen); its cache entry only ever leaves via ordinary idle/LRU eviction.</li>
+      </ul>
+      <p>Redis state is preserved across a reload and passed through the <strong>built-in auto-migrator</strong>. Minimum interval <strong>3&nbsp;s</strong> per <code>(plugin, chat)</code> → <code>429 { retry_after_ms }</code>. The response is just <code>{ "reloaded": true }</code> &mdash; Runtime never touches client code, so it has no opinion on <code>client_changed</code>; Registry already knows that from the save it just performed and reports it itself (&sect;10, &sect;11).</p>
+      <p>Net effect on a save's internal call count (&sect;10, &sect;14 have the numbers): a client-only edit never involves Runtime at all &mdash; just the S3 write plus the <code>fstick.plugin.reloaded</code> push, since other open editor tabs still need to know to re-fetch <code>cl.js</code>. A server-only edit skips that push (&sect;11) but pays for the write, the reload call, and the now single-hop code fetch. Only an edit that touches both sides pays for everything.</p>
 
       <h3>State editing</h3>
       <p>The editor's JSON state panel is <strong>editable</strong>; Runtime applies it. <code>PUT /api/v1/plugins/{id}/state?chat_id=</code>, author + dev-branch install only. Full JSON (not a patch). Invalid JSON → <code>400</code>. Otherwise the payload runs through the auto-migrator and schema validation, leniently: missing fields defaulted, unknown keys dropped, type mismatches coerced &mdash; written to Redis, discrepancies returned as <code>warnings</code>, then the normal broadcast fires. <strong>No optimistic lock</strong> &mdash; state changes on every command, so a hash guard would almost always conflict; the panel gets a refresh button instead.</p>
@@ -934,7 +955,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>Path &mdash; batched</h3>
       <ol>
-        <li>Runtime takes the author's <code>internal_uuid</code> straight from <code>GET registry /plugins/{id}</code> (the <code>author_id</code> field &mdash; no MXID anywhere) and caches it in the engine entry, keyed by <code>(pluginId, shas)</code>.</li>
+        <li>Runtime takes the author's <code>internal_uuid</code> straight from <code>GET registry /plugins/{id}</code> (the <code>author_id</code> field &mdash; no MXID anywhere) and caches it in its own small map, <code>Map&lt;pluginId, authorId&gt;</code> &mdash; independent of the engine cache (&sect;7) and untouched by reload, since the author never changes with the code.</li>
         <li>Runtime <strong>buffers</strong> <code>print</code>/<code>warn</code> lines and <code>POST</code>s them in batches to <code>integration /api/v1/plugin-console</code> as <code>{ author_id, msgs: [ … ] }</code> &mdash; flushed on a ~100&nbsp;ms timer, when the buffer hits 64 lines, or when the command returns, whichever is first.</li>
         <li>integration resolves <code>internal_uuid → mxid</code> <em>once</em>, wraps the array into a single <code>fstick.plugin.console</code> event <code>{ msgs: [ … ] }</code>, and calls Dendrite <code>/events/push</code>. The client appends every <code>msgs[]</code> entry to the console pane in order.</li>
       </ol>
@@ -987,14 +1008,14 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins</code> (public)</td><td>all</td><td>filter <code>ACTIVE</code> + has <code>RELEASED</code> branch</td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}</code></td><td>all / author</td><td>non-author sees only <code>RELEASED</code> branches</td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></td><td>author + dev</td><td>editor bootstrap: source inline + blob shas</td></tr>
-            <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></td><td>author + dev</td><td>save + trigger reload</td></tr>
+            <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></td><td>author + dev</td><td>save + trigger reload, only if the server side changed</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/publish</code></td><td>author</td><td>dev → new candidate branch</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></td><td>author</td><td>withdraw own candidate → <span class="pill pill--cancelled">CANCELLED</span></td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/moderation/branches?status=WAITING_APPROVE</code></td><td>moderator</td><td>review queue</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></td><td>moderator</td><td><span class="pill pill--wait">WAITING_APPROVE</span> → <span class="pill pill--review">APPROVING</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></td><td>moderator</td><td>→ <span class="pill pill--released">RELEASED</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></td><td>moderator</td><td>→ <span class="pill pill--rejected">REJECTED</span> + notify</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server</code></td><td>author (dev) / all (released)</td><td>gate added</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server?branch_id=</code></td><td>author (dev) / all (released)</td><td>gate added; response is now inline source, not a presigned URL</td></tr>
           </tbody>
         </table>
       </div>
@@ -1005,9 +1026,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <table>
           <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>evict engine for a chat; 3s min interval → <code>429</code>; runs state auto-migrator</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>rebuild the engine for <code>branch_id</code>; 3s min interval → <code>429</code>; runs state auto-migrator</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>author + dev &mdash; overwrite state from the editor</td></tr>
-            <tr><td colspan="3" class="wrap"><code>print</code>/<code>warn</code> hooks buffer lines (<code>level: info|warn</code>, <code>system: false</code>) and <code>POST</code> them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Uncaught exceptions go the same route as <code>level: "error", system: true</code>. Engine cache re-keyed to <code>(pluginId, client_sha, server_sha)</code>; author <code>internal_uuid</code> cached in the entry.</td></tr>
+            <tr><td colspan="3" class="wrap"><code>print</code>/<code>warn</code> hooks buffer lines (<code>level: info|warn</code>, <code>system: false</code>) and <code>POST</code> them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Uncaught exceptions go the same route as <code>level: "error", system: true</code>. Engine cache keyed <code>(pluginId, branchId)</code> &mdash; no sha; branch resolved per <code>(pluginId, chatId)</code> via Installation, cached 60s; author <code>internal_uuid</code> cached separately, by <code>pluginId</code> alone.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1026,6 +1047,14 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       </div>
 
       <h3>Installation service</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/internal/installations/resolve?plugin_id=&amp;chat_id=</code></td><td>new, internal &mdash; <code>→ { branch_id, branch_status }</code>; the only way Runtime learns which branch a chat runs (&sect;7)</td></tr>
+          </tbody>
+        </table>
+      </div>
       <ul>
         <li><code>POST /installations</code>: fetch branch <code>status</code> + <code>author_id</code> from Registry; if the target branch is <code>dev</code>, require <code>X-User-Id == author_id</code> → else <code>403</code>. Released branches: anyone.</li>
         <li><code>GET /installations</code>: add <code>branch_status</code> and <code>author_id</code> per item so the frontend can show <strong>Edit</strong>.</li>
@@ -1083,7 +1112,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 <span class="tok-c">// 200 — broken code IS saved, with a warning</span>
 { <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"syntax error at line 12"</span> } ],
   <span class="tok-k">"sha"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> },
-  <span class="tok-k">"reloaded"</span>: true }
+  <span class="tok-k">"reloaded"</span>: true,
+  <span class="tok-k">"client_changed"</span>: false }   <span class="tok-c">// Registry compares old vs new client_blob_sha — Runtime is never asked</span>
 
 <span class="tok-c">// 409 — someone else moved the code; nothing was written</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"stale_code"</span>,
@@ -1091,7 +1121,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
 <span class="tok-c">// 413 — one file over 500 000 bytes (measured after decode)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"file_too_large"</span>, <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"limit"</span>: 500000, <span class="tok-k">"actual"</span>: 812345 }</code></pre>
-          <p>Save writes each changed side to <code>blobs/{sha256}</code>, repoints the dev branch, then calls <code>POST /internal/plugins/{id}/reload</code>. <code>reloaded:false</code> if the reload throttle (&sect;7) deferred it.</p>
+          <p>Save writes each changed side to <code>blobs/{sha256}</code> and repoints the dev branch. <code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code> is called <strong>only if the server side changed</strong> &mdash; a client-only save never touches Runtime, since it never executes client code (&sect;7). <code>reloaded</code> is <code>true</code> whenever the engine is guaranteed current after this call &mdash; that covers a successful reload <em>and</em> the case where nothing needed reloading; it's <code>false</code> only if the reload throttle (&sect;7) deferred an actually-needed rebuild. <code>client_changed</code> is Registry's own comparison of the client blob sha before/after &mdash; Runtime is never asked (&sect;7).</p>
         </div>
       </div>
 
@@ -1214,8 +1244,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/server?branch_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author (dev / candidate) &middot; any user (<code>RELEASED</code>)</span><span><b>Caller:</b> mostly Runtime, server-to-server</span></div>
-          <p>Gate added: a non-<code>RELEASED</code> branch returns <code>403</code> to anyone but the author. Response is unchanged &mdash; <code>{ "files": [ { "download_url" } ] }</code> presigned GET. Editor code does <em>not</em> go through here (it is inline in <code>…/edit</code>); this endpoint remains for Runtime loading a released plugin.</p>
+          <div class="attrs"><span><b>Auth:</b> author (dev / candidate) &middot; any user (<code>RELEASED</code>)</span><span><b>Caller:</b> Runtime's <code>loadEngine</code> (&sect;7), server-to-server</span><span><b>Changed:</b> inline, not presigned</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"text"</span>: <span class="tok-s">"…lua…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }</code></pre>
+          <p>Gate added: a non-<code>RELEASED</code> branch returns <code>403</code> to anyone but the author. Registry reads the blob from S3 itself and returns the text directly &mdash; no presigned URL, no second hop, same rule as the editor's own code transport (&sect;6). Used for <em>any</em> branch, not just released ones: it's the one path <code>loadEngine</code> calls, whether the trigger is a cold cache miss or a reload.</p>
         </div>
       </div>
 
@@ -1241,15 +1273,17 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/internal/plugins/{id}/reload</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span><span><b>Throttle:</b> 3s / (plugin, chat)</span></div>
+          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span><span><b>Called:</b> only if the server side changed</span><span><b>Throttle:</b> 3s / (plugin, chat)</span></div>
           <pre><code><span class="tok-c">// request</span>
-{ <span class="tok-k">"chat_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"client_sha"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server_sha"</span>: <span class="tok-s">"sha256:…"</span> }
+{ <span class="tok-k">"chat_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span> }
 
-<span class="tok-c">// 200 — evicted; next command rebuilds the engine, state auto-migrated</span>
-{ <span class="tok-k">"reloaded"</span>: true, <span class="tok-k">"client_changed"</span>: true }
+<span class="tok-c">// 200 — engine at (pluginId, branch_id) rebuilt synchronously via the same</span>
+<span class="tok-c">// path a cold cache miss would use (§7); state auto-migrated</span>
+{ <span class="tok-k">"reloaded"</span>: true }
 
 <span class="tok-c">// 429 — called again within 3s (Registry surfaces reloaded:false to the editor)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
+          <p>No <code>client_sha</code>/<code>server_sha</code> here &mdash; Runtime doesn't key on shas (&sect;7) and doesn't report <code>client_changed</code>, since it never loads client code. Registry computes and carries that fact itself (see above and &sect;11).</p>
         </div>
       </div>
 
@@ -1310,6 +1344,19 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         </div>
       </div>
 
+      <h3>Installation &mdash; internal <span class="pill pill--dev">internal</span></h3>
+
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/installations/resolve?plugin_id=&amp;chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Runtime (internal)</span><span><b>Cached by caller:</b> 60s TTL</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"branch_status"</span>: <span class="tok-s">"WORKING"</span> | <span class="tok-s">"RELEASED"</span> }
+<span class="tok-c">// 404 — plugin not installed in this chat</span></code></pre>
+          <p>The only way Runtime finds out which branch a chat is running (&sect;7) &mdash; the command request itself never carries a <code>branch_id</code>.</p>
+        </div>
+      </div>
+
       <h3>Installation <span class="pill pill--dev">changed</span></h3>
 
       <div class="endpoint">
@@ -1367,11 +1414,15 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 <span class="tok-c">// integration maps author_id → MXID, addresses the push, forwards { msgs } as-is.</span>
 <span class="tok-c">// The client-facing event carries no id. Ordering within msgs is preserved.</span>
 
-<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → author · one per reload, never batched</span>
+<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → author · fired only when client_changed is true</span>
 {
   <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
   <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span>          <span class="tok-c">// → re-fetch cl.js, re-run runDsl</span>
-}</code></pre>
+}
+<span class="tok-c">// Fired by Registry (via Integration), not Runtime — Registry is the only party</span>
+<span class="tok-c">// that compares old vs new client_blob_sha; Runtime's /reload never reports it.</span>
+<span class="tok-c">// A server-only save has nothing for another open editor tab to refresh, so</span>
+<span class="tok-c">// Registry skips the event entirely rather than pushing client_changed:false.</span></code></pre>
     </section>
 
     <!-- 12 -->
@@ -1434,10 +1485,13 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>rejection</td><td>moderator; branch status <code>REJECTED</code> + <code>last_rejection</code> + moderation log + bot-room message; no <code>resubmit</code></td></tr>
             <tr><td>cancellation</td><td>author withdraws own candidate from <code>WAITING_APPROVE</code>/<code>APPROVING</code> → <code>CANCELLED</code> tombstone; moderation-log row, no notification; clears the one-open-candidate guard</td></tr>
             <tr><td>debug installs per author</td><td>unlimited; <code>chat_id</code> required on editor calls</td></tr>
-            <tr><td>editor code transport</td><td>inline through Registry — no presigned URL, no TTL</td></tr>
+            <tr><td>code transport</td><td>inline through Registry both ways — editor <em>and</em> Runtime's <code>loadEngine</code>; no presigned URL, no TTL, anywhere</td></tr>
             <tr><td>save notification</td><td>new <code>PUT …/code</code>; not a reuse of <code>commit</code></td></tr>
-            <tr><td>reload → client</td><td>reuse the sync pipe; new type <code>fstick.plugin.reloaded</code></td></tr>
-            <tr><td>runtime hot reload</td><td><code>POST /internal/plugins/{id}/reload</code>; evict + lazy re-fetch; 3s min interval</td></tr>
+            <tr><td>reload → client</td><td>reuse the sync pipe; new type <code>fstick.plugin.reloaded</code>, fired only when <code>client_changed</code> &mdash; a server-only save doesn't push at all</td></tr>
+            <tr><td>runtime hot reload</td><td><code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code>, called only when the server side changed; rebuilds via the same <code>loadEngine</code> path a cache miss uses, response just <code>{ reloaded: true }</code>; 3s min interval</td></tr>
+            <tr><td>internal call count on save</td><td>client-only: 3 (write + reloaded-event + push). server-only: 3 (write + reload + inline code fetch). both changed: 6 (2 writes + reload + inline fetch + event + push). down from 6&ndash;7 across the board before A+B+C</td></tr>
+            <tr><td>branch resolution for commands</td><td>client never sends <code>branch_id</code>; Runtime resolves <code>(pluginId, chatId) → branch_id</code> via <code>GET internal /installations/resolve</code>, cached 60s TTL, independent of the engine cache</td></tr>
+            <tr><td><code>client_changed</code> ownership</td><td>computed and reported by Registry (old vs new client blob sha); dropped from Runtime's reload contract entirely — Runtime never loads client code</td></tr>
             <tr><td>server code download</td><td>gated: author for dev branch, anyone for released</td></tr>
             <tr><td>S3 names</td><td>unified — content-addressed <code>blobs/{sha256}</code>, exactly 2 files</td></tr>
             <tr><td>concurrency on save</td><td>content-hash compare → <code>409 stale_code</code>; no server-side lock table</td></tr>
@@ -1448,10 +1502,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>console <code>warn</code> level</td><td>added; new Lua hook <code>warn(msg)</code> alongside <code>print(msg)</code>, same batching path, <code>system: false</code></td></tr>
             <tr><td>console <code>system</code> flag</td><td>boolean per line: <code>false</code> = plugin's own <code>print</code>/<code>warn</code>; <code>true</code> = Runtime-generated (exceptions, flood notices) — rendered visually distinct in the editor</td></tr>
             <tr><td>other users' prints</td><td>shown (shared backend state)</td></tr>
-            <tr><td>console author resolution</td><td>Runtime carries the author's <code>internal_uuid</code> (cached in the engine entry); integration maps it to an MXID at push time</td></tr>
+            <tr><td>console author resolution</td><td>Runtime carries the author's <code>internal_uuid</code>, cached separately by <code>pluginId</code> alone &mdash; not in the engine entry; integration maps it to an MXID at push time</td></tr>
             <tr><td>console batching</td><td>Runtime buffers <code>print</code>/<code>warn</code> lines (~100 ms / 64 lines / command end) and <code>POST</code>s <code>{ author_id, msgs:[…] }</code>; the <code>fstick.plugin.console</code> event carries <code>{ msgs:[…] }</code>, one push per batch</td></tr>
             <tr><td>console flood limits</td><td>8 KB/line (truncate), 256 lines/batch, ≈500 lines/10 s per (plugin, chat); overflow → one synthetic <code>error</code>, <code>system: true</code> line</td></tr>
-            <tr><td>engine cache key</td><td><code>(pluginId, client_sha, server_sha)</code></td></tr>
+            <tr><td>engine cache key</td><td><code>(pluginId, branchId)</code> &mdash; no sha at all; reload replaces the value in place, giving GC for free on the mutable dev branch</td></tr>
             <tr><td>state auto-migration</td><td>built into Runtime; runs on reload and on state PUT</td></tr>
             <tr><td>editable state panel</td><td>yes — Runtime applies it</td></tr>
             <tr><td>marketplace public list</td><td><code>ACTIVE</code> + has a <code>RELEASED</code> branch</td></tr>
@@ -1474,7 +1528,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   </main>
 
   <footer class="foot">
-    Fstick · Plugin Editor Integration · design note, updated 2026-09-11 · supersedes the API sections of fstick_specification.md where they conflict · RU: plugin-editor-integration.ru.html
+    Fstick · Plugin Editor Integration · design note, updated 2026-09-12 · supersedes the API sections of fstick_specification.md where they conflict · RU: plugin-editor-integration.ru.html
   </footer>
 
 </div>
