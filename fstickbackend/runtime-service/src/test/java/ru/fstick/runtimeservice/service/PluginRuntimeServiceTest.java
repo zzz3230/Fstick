@@ -31,7 +31,7 @@ class PluginRuntimeServiceTest {
     @InjectMocks private PluginRuntimeService pluginRuntimeService;
 
     private static final UUID PLUGIN_ID = UUID.randomUUID();
-    private static final String USER_ID  = "@user:homeserver.org";
+    private static final String USER_ID  = "3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10";
     private static final String CHAT_ID  = "!room:homeserver.org";
     private static final String TRACK_ID = "track-123";
 
