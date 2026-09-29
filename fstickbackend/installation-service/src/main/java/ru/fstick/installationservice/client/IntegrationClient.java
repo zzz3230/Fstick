@@ -20,18 +20,18 @@ public class IntegrationClient {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
     }
 
-    public boolean isMember(String userId, String chatId) {
+    public boolean isMember(UUID userId, String chatId) {
         return getMemberInfo(userId, chatId) != null
                 && Boolean.TRUE.equals(getMemberInfo(userId, chatId).getMember());
     }
 
-    public boolean isAdmin(String userId, String chatId) {
+    public boolean isAdmin(UUID userId, String chatId) {
         ChatMemberResponse info = getMemberInfo(userId, chatId);
         return info != null && Boolean.TRUE.equals(info.getMember())
                 && "ADMIN".equals(info.getRole());
     }
 
-    private ChatMemberResponse getMemberInfo(String userId, String chatId) {
+    private ChatMemberResponse getMemberInfo(UUID userId, String chatId) {
         try {
             return restClient.get()
                     .uri("/api/v1/chats/{chatId}/members/{userId}", chatId, userId)
@@ -46,7 +46,7 @@ public class IntegrationClient {
         }
     }
 
-    public void notifyPluginInstalled(String userId, UUID pluginId,
+    public void notifyPluginInstalled(UUID userId, UUID pluginId,
                                       String chatId, UUID versionId, UUID installationId) {
         pushEvent(userId, pluginId, chatId, "PLUGIN_INSTALLED", Map.of(
                 "versionId", versionId.toString(),
@@ -54,14 +54,14 @@ public class IntegrationClient {
         ));
     }
 
-    public void notifyPluginUninstalled(String userId, UUID pluginId,
+    public void notifyPluginUninstalled(UUID userId, UUID pluginId,
                                         String chatId, UUID installationId) {
         pushEvent(userId, pluginId, chatId, "PLUGIN_UNINSTALLED", Map.of(
                 "installationId", installationId.toString()
         ));
     }
 
-    private void pushEvent(String userId, UUID pluginId, String chatId,
+    private void pushEvent(UUID userId, UUID pluginId, String chatId,
                            String eventName, Map<String, Object> eventData) {
         restClient.post()
                 .uri("/api/v1/events/push")
@@ -71,7 +71,7 @@ public class IntegrationClient {
     }
 
     record PushEventRequest(
-            @JsonProperty("user_id") String userId,
+            @JsonProperty("user_id") UUID userId,
             @JsonProperty("plugin_id") UUID pluginId,
             @JsonProperty("chat_id") String chatId,
             @JsonProperty("event_name") String eventName,

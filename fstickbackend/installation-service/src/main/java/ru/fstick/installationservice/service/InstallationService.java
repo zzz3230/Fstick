@@ -31,7 +31,7 @@ public class InstallationService {
         this.pendingInstallStore = pendingInstallStore;
     }
 
-    public Object install(InstallRequest request, String chatId, String userId) {
+    public Object install(InstallRequest request, String chatId, UUID userId) {
         checkChatAdmin(userId, chatId);
 
         List<InstallWarning> warnings = checkPluginAndVersion(
@@ -50,7 +50,7 @@ public class InstallationService {
         return doInstall(request, chatId, userId);
     }
 
-    public InstallationWithWarningsResponse confirmInstall(String token, String userId) {
+    public InstallationWithWarningsResponse confirmInstall(String token, UUID userId) {
         PendingInstallStore.PendingInstall pending = pendingInstallStore.get(token);
 
         if (pending == null) {
@@ -67,7 +67,7 @@ public class InstallationService {
     }
 
     private InstallationWithWarningsResponse doInstall(InstallRequest request,
-                                                       String chatId, String userId) {
+                                                       String chatId, UUID userId) {
         Installation installation = new Installation();
         installation.setPluginId(request.getPluginId());
         installation.setVersionId(request.getVersionId());
@@ -85,7 +85,7 @@ public class InstallationService {
     }
 
     public PaginatedResponse<InstallationShortResponse> getAllByChatId(String chatId,
-                                                                       String userId,
+                                                                       UUID userId,
                                                                        int page, int limit) {
         checkChatMembership(userId, chatId);
 
@@ -100,7 +100,7 @@ public class InstallationService {
         return new PaginatedResponse<>(data, page, limit, totalCount);
     }
 
-    public InstallationResponse getById(UUID installationId, String userId) {
+    public InstallationResponse getById(UUID installationId, UUID userId) {
         Installation installation = repository.findById(installationId)
                 .orElseThrow(() -> new InstallationNotFoundException(installationId));
 
@@ -109,7 +109,7 @@ public class InstallationService {
         return toResponse(installation);
     }
 
-    public void uninstall(UUID installationId, String userId) {
+    public void uninstall(UUID installationId, UUID userId) {
         Installation installation = repository.findById(installationId)
                 .orElseThrow(() -> new InstallationNotFoundException(installationId));
 
@@ -125,13 +125,13 @@ public class InstallationService {
         );
     }
 
-    private void checkChatMembership(String userId, String chatId) {
+    private void checkChatMembership(UUID userId, String chatId) {
         if (!integrationClient.isMember(userId, chatId)) {
             throw new ForbiddenException(userId, chatId);
         }
     }
 
-    private void checkChatAdmin(String userId, String chatId) {
+    private void checkChatAdmin(UUID userId, String chatId) {
         if (!integrationClient.isAdmin(userId, chatId)) {
             throw new ForbiddenException(userId, chatId);
         }

@@ -12,6 +12,6 @@ public class InstallationShortResponse {
     private UUID installationId;
     private UUID pluginId;
     private UUID versionId;
-    private String installedBy;
+    private UUID installedBy;
     private OffsetDateTime installedAt;
 }

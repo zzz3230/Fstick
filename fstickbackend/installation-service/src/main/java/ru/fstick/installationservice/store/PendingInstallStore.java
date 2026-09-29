@@ -26,7 +26,7 @@ public class PendingInstallStore {
         this.ttl = Duration.ofMinutes(ttlMinutes);
     }
 
-    public String save(InstallRequest request, String chatId, String userId) {
+    public String save(InstallRequest request, String chatId, UUID userId) {
         String token = UUID.randomUUID().toString();
         try {
             PendingInstall pending = new PendingInstall(request, chatId, userId);
@@ -52,5 +52,5 @@ public class PendingInstallStore {
         redis.delete(KEY_PREFIX + token);
     }
 
-    public record PendingInstall(InstallRequest request, String chatId, String userId) {}
+    public record PendingInstall(InstallRequest request, String chatId, UUID userId) {}
 }

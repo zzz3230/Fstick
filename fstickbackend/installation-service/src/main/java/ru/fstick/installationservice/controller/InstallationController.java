@@ -22,7 +22,7 @@ public class InstallationController {
 
     @PostMapping
     public ResponseEntity<Object> install(
-            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestParam("chat_id") String chatId,
             @RequestBody InstallRequest request
     ) {
@@ -32,7 +32,7 @@ public class InstallationController {
 
     @GetMapping
     public PaginatedResponse<InstallationShortResponse> getAll(
-            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestParam("chat_id") String chatId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit
@@ -42,7 +42,7 @@ public class InstallationController {
 
     @GetMapping("/{installationId}")
     public InstallationResponse getById(
-            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID installationId
     ) {
         return service.getById(installationId, userId);
@@ -51,7 +51,7 @@ public class InstallationController {
     @PostMapping("/confirm")
     @ResponseStatus(HttpStatus.CREATED)
     public InstallationWithWarningsResponse confirmInstall(
-            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestBody ConfirmInstallRequest request
     ) {
         return service.confirmInstall(request.getConfirmationToken(), userId);
@@ -60,7 +60,7 @@ public class InstallationController {
     @DeleteMapping("/{installationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void uninstall(
-            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID installationId
     ) {
         service.uninstall(installationId, userId);
