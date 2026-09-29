@@ -4,23 +4,32 @@ info:
   title: Plugin Installation Service API
   description: |
     Internal REST API микросервиса управления установками плагинов.
-    Сервис принимает запросы только от Gateway Service.
+    Публичные маршруты (/api/v1) принимает только от Gateway Service.
+    Маршруты /internal/** доступны только сервисам внутри fstick-network
+    (Runtime, Registry) и не проверяют X-User-Id.
+
+    Установка привязана к ветке (branch) плагина, а не к версии, и закреплена за ней:
+    новый релиз не двигает существующие установки, обновление выполняется через PATCH.
     Плагины привязываются к чату (Matrix Room), а не к пользователю.
 
     Аутентификация: internal_uuid пользователя передаётся в заголовке X-User-Id.
     chat_id передаётся как query parameter.
 
-    Проверка членства пользователя в чате выполняется внутри сервиса
-    через вызов к Integration Service.
-  version: 3.0.0
+    Проверка прав в чате выполняется внутри сервиса через вызов к Integration Service:
+    установка, смена ветки и удаление требуют роли администратора чата, чтение - членства.
+
+    Все JSON-тела используют snake_case. Ошибки: { "error": "<snake_code>", "message": "..." }.
+  version: 4.0.0
 
 servers:
-  - url: http://installation-service:8080/api/v1
+  - url: http://installation-service:8081
     description: Internal Docker network
 
 tags:
   - name: installations
     description: Управление установками плагинов в чатах
+  - name: internal
+    description: Внутренние маршруты для Runtime и Registry
 
 components:
 
@@ -56,6 +65,11 @@ components:
 
   schemas:
 
+    BranchStatus:
+      type: string
+      description: Статус установленной ветки. Установить можно только RELEASED или (автору) WORKING.
+      enum: [WORKING, RELEASED]
+
     Installation:
       type: object
       properties:
@@ -67,10 +81,17 @@ components:
           type: string
           format: uuid
           example: "550e8400-e29b-41d4-a716-446655440000"
-        version_id:
+        branch_id:
           type: string
           format: uuid
           example: "660f9511-f3ac-52e5-b827-557766551111"
+        branch_status:
+          $ref: '#/components/schemas/BranchStatus'
+        author_id:
+          type: string
+          format: uuid
+          description: internal_uuid автора плагина, сохранён при установке
+          example: "3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10"
         chat_id:
           type: string
           example: "!roomid:homeserver.org"
@@ -89,7 +110,9 @@ components:
       required:
         - installation_id
         - plugin_id
-        - version_id
+        - branch_id
+        - branch_status
+        - author_id
         - chat_id
         - installed_by
         - installed_at
@@ -107,10 +130,16 @@ components:
           type: string
           format: uuid
           example: "550e8400-e29b-41d4-a716-446655440000"
-        version_id:
+        branch_id:
           type: string
           format: uuid
           example: "660f9511-f3ac-52e5-b827-557766551111"
+        branch_status:
+          $ref: '#/components/schemas/BranchStatus'
+        author_id:
+          type: string
+          format: uuid
+          example: "3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10"
         installed_by:
           type: string
           format: uuid
@@ -122,7 +151,9 @@ components:
       required:
         - installation_id
         - plugin_id
-        - version_id
+        - branch_id
+        - branch_status
+        - author_id
         - installed_by
         - installed_at
 
@@ -133,13 +164,41 @@ components:
           type: string
           format: uuid
           example: "550e8400-e29b-41d4-a716-446655440000"
-        version_id:
+        branch_id:
+          type: string
+          format: uuid
+          description: |
+            Ветка для установки. Если не указана - выбирается RELEASED-ветка
+            с наибольшим SemVer (MAJOR.MINOR.PATCH) и установка закрепляется за ней.
+          example: "660f9511-f3ac-52e5-b827-557766551111"
+      required:
+        - plugin_id
+
+    PatchInstallationRequest:
+      type: object
+      properties:
+        branch_id:
           type: string
           format: uuid
           example: "660f9511-f3ac-52e5-b827-557766551111"
       required:
-        - plugin_id
-        - version_id
+        - branch_id
+
+    InstallationBranch:
+      type: object
+      properties:
+        installation_id:
+          type: string
+          format: uuid
+        branch_id:
+          type: string
+          format: uuid
+        branch_status:
+          $ref: '#/components/schemas/BranchStatus'
+      required:
+        - installation_id
+        - branch_id
+        - branch_status
 
     ConfirmInstallRequest:
       type: object
@@ -181,7 +240,7 @@ components:
 
     InstallWarning:
       type: object
-      description: Предупреждение о совместимости версии при установке
+      description: Предупреждение при установке
       properties:
         code:
           type: string
@@ -211,7 +270,7 @@ components:
     InstallationPending:
       type: object
       description: |
-        Возвращается вместо установки когда обнаружены предупреждения.
+        Возвращается вместо установки когда выбрана не последняя RELEASED-ветка.
         Установка НЕ выполнена. Для подтверждения использовать POST /installations/confirm.
       properties:
         confirmation_token:
@@ -227,41 +286,73 @@ components:
         - confirmation_token
         - warnings
 
+    ResolveResult:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        branch_status:
+          $ref: '#/components/schemas/BranchStatus'
+      required:
+        - branch_id
+        - branch_status
+
+    BranchChats:
+      type: object
+      properties:
+        chat_ids:
+          type: array
+          items:
+            type: string
+          example: ["!a:homeserver.org", "!b:homeserver.org"]
+      required:
+        - chat_ids
+
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-          example: PLUGIN_NOT_FOUND
+          description: |
+            Код ошибки: not_chat_admin, debug_install_forbidden, forbidden, plugin_not_found,
+            branch_not_found, installation_not_found, already_installed, no_release,
+            branch_of_other_plugin, not_installed, invalid_token, internal_error
+          example: plugin_not_found
         message:
           type: string
-          example: "Plugin with id 550e8400-e29b-41d4-a716-446655440000 not found or not active"
+          example: "Plugin 550e8400-e29b-41d4-a716-446655440000 not found or not active"
       required:
         - error
         - message
 
 paths:
 
-  /installations:
+  /api/v1/installations:
 
     post:
       tags: [installations]
       summary: Установить плагин в чат
       description: |
-        Создаёт запись установки плагина для указанного чата.
+        Создаёт запись установки плагина для указанного чата. Требуется роль администратора чата.
 
-        Перед установкой сервис:
-        1. Проверяет членство пользователя в чате (через Integration Service)
-        2. Проверяет что плагин существует и имеет статус ACTIVE (через Registry Service)
-        3. Проверяет что версия принадлежит плагину (через Registry Service)
-        4. Проверяет что плагин ещё не установлен в этом чате (иначе 409)
-        5. Проверяет актуальность версии
+        Алгоритм:
+        1. Проверка роли администратора чата (Integration Service), иначе 403 not_chat_admin.
+        2. Загрузка плагина и веток из Registry (GET /internal/plugins/{id}).
+           Плагин не найден или не ACTIVE - 404 plugin_not_found.
+        3. Выбор ветки:
+           - branch_id указан - ветка должна принадлежать плагину, иначе 404 branch_not_found;
+           - не указан - RELEASED-ветка с наибольшим SemVer, если такой нет - 422 no_release.
+        4. Проверка статуса ветки:
+           - RELEASED - установить может любой администратор чата;
+           - WORKING - только автор плагина, иначе 403 debug_install_forbidden;
+           - остальные статусы - 404 branch_not_found.
+        5. Плагин уже установлен в этом чате - 409 already_installed (смена ветки - через PATCH).
+        6. Если выбрана RELEASED-ветка, но не последняя - установка НЕ выполняется, возвращается
+           confirmation_token и warnings; подтверждение через POST /installations/confirm.
 
-        Если версия не последняя — установка НЕ выполняется, возвращается
-        confirmation_token и warnings. Для подтверждения использовать POST /installations/confirm.
-
-        Если warnings нет — установка выполняется сразу, уведомление отправляется
-        в Integration Service через pushEvent PLUGIN_INSTALLED.
+        После установки в Integration Service отправляются PLUGIN_INSTALLED и
+        fstick.plugin.installation_changed (fire-and-forget, сбой не отменяет установку).
       parameters:
         - $ref: '#/components/parameters/XUserId'
         - $ref: '#/components/parameters/ChatId'
@@ -275,8 +366,8 @@ paths:
         '201':
           description: |
             Два возможных тела ответа:
-            - Если warnings пустые — установка выполнена, возвращается installation + warnings: []
-            - Если есть warnings — установка НЕ выполнена, возвращается confirmation_token + warnings
+            - установка выполнена: installation + warnings: []
+            - выбрана не последняя релизная ветка: установка НЕ выполнена, confirmation_token + warnings
           content:
             application/json:
               schema:
@@ -284,16 +375,22 @@ paths:
                   - $ref: '#/components/schemas/InstallationWithWarnings'
                   - $ref: '#/components/schemas/InstallationPending'
         '403':
-          description: Пользователь не является участником чата
+          description: Не администратор чата (not_chat_admin) или рабочая ветка не принадлежит автору (debug_install_forbidden)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: FORBIDDEN
-                message: "User @maksim:homeserver.org is not a member of !roomid:homeserver.org"
+              examples:
+                notAdmin:
+                  value:
+                    error: not_chat_admin
+                    message: "User 3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10 is not an admin of chat !roomid:homeserver.org"
+                debugInstall:
+                  value:
+                    error: debug_install_forbidden
+                    message: "Only the plugin author can install the working branch"
         '404':
-          description: Плагин или версия не найдены в Registry
+          description: Плагин (plugin_not_found) или ветка (branch_not_found) не найдены либо не устанавливаемы
           content:
             application/json:
               schema:
@@ -305,12 +402,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: ALREADY_INSTALLED
-                message: "Plugin 550e8400-e29b-41d4-a716-446655440000 is already installed in this chat"
+                error: already_installed
+                message: "Plugin 550e8400-e29b-41d4-a716-446655440000 is already installed in chat !roomid:homeserver.org"
+        '422':
+          description: branch_id не указан и у плагина нет RELEASED-веток (no_release)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
     get:
       tags: [installations]
       summary: Получить список плагинов установленных в чате
+      description: |
+        Требуется членство в чате. Фронтенд показывает Edit, когда
+        branch_status == WORKING и author_id совпадает с internal_uuid текущего пользователя.
       parameters:
         - $ref: '#/components/parameters/XUserId'
         - $ref: '#/components/parameters/ChatId'
@@ -341,7 +447,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /installations/confirm:
+  /api/v1/installations/confirm:
 
     post:
       tags: [installations]
@@ -351,8 +457,9 @@ paths:
         с предупреждениями и принял решение продолжить.
 
         Токен получается из ответа POST /installations когда есть warnings.
-        Токен одноразовый — после использования становится невалидным.
+        Токен одноразовый - после использования становится невалидным.
         Подтвердить может только тот же пользователь который инициировал установку.
+        Ветка и права проверяются заново.
       parameters:
         - $ref: '#/components/parameters/XUserId'
       requestBody:
@@ -375,16 +482,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: INVALID_TOKEN
+                error: invalid_token
                 message: "Invalid or expired confirmation token"
         '403':
-          description: Токен принадлежит другому пользователю
+          description: Токен принадлежит другому пользователю или ветка больше недоступна пользователю
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Плагин или ветка больше не доступны для установки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Плагин уже установлен в этом чате
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /installations/{installation_id}:
+  /api/v1/installations/{installation_id}:
 
     parameters:
       - $ref: '#/components/parameters/InstallationId'
@@ -414,12 +533,57 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+    patch:
+      tags: [installations]
+      summary: Перевести установку на другую ветку
+      description: |
+        Обновление или откат закреплённой установки. Требуется роль администратора чата.
+        Проверки те же, что при установке (шаги 2 и 4), без подтверждения через токен.
+        Ветка должна принадлежать плагину установки, иначе 422 branch_of_other_plugin.
+
+        Runtime подхватывает новую ветку в течение 60 секунд (TTL кэша разрешения ветки).
+        После обновления отправляется fstick.plugin.installation_changed.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchInstallationRequest'
+      responses:
+        '200':
+          description: Установка переведена на ветку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallationBranch'
+        '403':
+          description: Не администратор чата (not_chat_admin) или рабочая ветка не принадлежит автору (debug_install_forbidden)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Установка (installation_not_found), плагин (plugin_not_found) или ветка (branch_not_found) не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ветка не принадлежит плагину установки (branch_of_other_plugin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
     delete:
       tags: [installations]
       summary: Удалить плагин из чата
       description: |
-        Удаляет запись установки плагина из чата.
-        После удаления отправляет событие PLUGIN_UNINSTALLED в Integration Service.
+        Удаляет запись установки плагина из чата. Требуется роль администратора чата.
+        После удаления отправляет PLUGIN_UNINSTALLED и fstick.plugin.installation_changed
+        (branch_id = null) в Integration Service.
         Операция необратима.
       parameters:
         - $ref: '#/components/parameters/XUserId'
@@ -427,7 +591,7 @@ paths:
         '204':
           description: Плагин успешно удалён из чата
         '403':
-          description: Пользователь не является участником чата
+          description: Пользователь не является администратором чата
           content:
             application/json:
               schema:
@@ -438,3 +602,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /internal/installations/resolve:
+
+    get:
+      tags: [internal]
+      summary: Какую ветку плагина запускает чат
+      description: Для Runtime. Не требует X-User-Id, к Registry не обращается.
+      parameters:
+        - name: plugin_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: chat_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ветка, закреплённая за установкой
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResult'
+        '404':
+          description: Плагин не установлен в чате (not_installed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /internal/installations:
+
+    get:
+      tags: [internal]
+      summary: Чаты, в которых запущена ветка
+      description: Для Registry (получатели fstick.plugin.reloaded). Не требует X-User-Id.
+      parameters:
+        - name: branch_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Идентификаторы чатов (пустой массив, если ветка нигде не установлена)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchChats'
