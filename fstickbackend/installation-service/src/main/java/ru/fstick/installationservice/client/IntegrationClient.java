@@ -86,11 +86,15 @@ public class IntegrationClient {
 
     private void pushEvent(UUID userId, UUID pluginId, String chatId,
                            String eventName, Map<String, Object> eventData) {
-        restClient.post()
-                .uri("/api/v1/events/push")
-                .body(new PushEventRequest(userId, pluginId, chatId, eventName, eventData))
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            restClient.post()
+                    .uri("/api/v1/events/push")
+                    .body(new PushEventRequest(userId, pluginId, chatId, eventName, eventData))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ex) {
+            log.warn("Failed to push {} for chat {}: {}", eventName, chatId, ex.getMessage());
+        }
     }
 
     record PluginEventRequest(

@@ -91,9 +91,21 @@ class InstallationServiceTest {
         return savedInstallation(branchId, "RELEASED");
     }
 
+    private RegistryClient.BranchInfo lookup(UUID id, UUID owner, String status) {
+        RegistryClient.BranchInfo info = new RegistryClient.BranchInfo();
+        info.setBranchId(id);
+        info.setPluginId(owner);
+        info.setStatus(status);
+        return info;
+    }
+
     private void adminWithPlugin(RegistryClient.InternalPlugin plugin) {
         when(integrationClient.isAdmin(userId, chatId)).thenReturn(true);
         when(registryClient.getPlugin(pluginId)).thenReturn(plugin);
+        if (plugin != null) {
+            plugin.getBranches().forEach(b -> lenient().when(registryClient.getBranch(b.getId()))
+                    .thenReturn(lookup(b.getId(), pluginId, b.getStatus())));
+        }
     }
 
     private ApiException assertApi(int status, String code, org.junit.jupiter.api.function.Executable call) {
@@ -113,8 +125,8 @@ class InstallationServiceTest {
 
         Object result = service.install(request, chatId, userId);
 
-        assertInstanceOf(InstallationWithWarningsResponse.class, result);
-        assertTrue(((InstallationWithWarningsResponse) result).getWarnings().isEmpty());
+        assertInstanceOf(InstallationResponse.class, result);
+        assertEquals(branchId, ((InstallationResponse) result).getBranchId());
 
         ArgumentCaptor<Installation> captor = ArgumentCaptor.forClass(Installation.class);
         verify(repository).save(captor.capture());
@@ -158,7 +170,7 @@ class InstallationServiceTest {
 
         Object result = service.install(request, chatId, userId);
 
-        assertInstanceOf(InstallationWithWarningsResponse.class, result);
+        assertInstanceOf(InstallationResponse.class, result);
         ArgumentCaptor<Installation> captor = ArgumentCaptor.forClass(Installation.class);
         verify(repository).save(captor.capture());
         assertEquals(latestId, captor.getValue().getBranchId());
@@ -181,7 +193,7 @@ class InstallationServiceTest {
 
         Object result = service.install(request, chatId, userId);
 
-        assertInstanceOf(InstallationWithWarningsResponse.class, result);
+        assertInstanceOf(InstallationResponse.class, result);
         ArgumentCaptor<Installation> captor = ArgumentCaptor.forClass(Installation.class);
         verify(repository).save(captor.capture());
         assertEquals("WORKING", captor.getValue().getBranchStatus());
@@ -209,6 +221,15 @@ class InstallationServiceTest {
     @Test
     void install_branchOfOtherPlugin_throwsBranchNotFound() {
         adminWithPlugin(plugin(branch(UUID.randomUUID(), "RELEASED", "1.0.0")));
+        when(registryClient.getBranch(branchId)).thenReturn(lookup(branchId, UUID.randomUUID(), "RELEASED"));
+
+        assertApi(404, "branch_not_found", () -> service.install(request, chatId, userId));
+    }
+
+    @Test
+    void install_unknownBranch_throwsBranchNotFound() {
+        adminWithPlugin(plugin(branch(UUID.randomUUID(), "RELEASED", "1.0.0")));
+        when(registryClient.getBranch(branchId)).thenReturn(null);
 
         assertApi(404, "branch_not_found", () -> service.install(request, chatId, userId));
     }
@@ -259,12 +280,13 @@ class InstallationServiceTest {
         when(pendingInstallStore.get("token")).thenReturn(pending);
         when(registryClient.getPlugin(pluginId))
                 .thenReturn(plugin(branch(branchId, "RELEASED", "1.0.0"), branch(UUID.randomUUID(), "RELEASED", "1.1.0")));
+        when(registryClient.getBranch(branchId)).thenReturn(lookup(branchId, pluginId, "RELEASED"));
         when(repository.existsByPluginIdAndChatId(pluginId, chatId)).thenReturn(false);
         when(repository.save(any())).thenReturn(savedInstallation());
 
-        InstallationWithWarningsResponse result = service.confirmInstall("token", userId);
+        InstallationResponse result = service.confirmInstall("token", userId);
 
-        assertNotNull(result.getInstallation());
+        assertEquals(branchId, result.getBranchId());
         verify(pendingInstallStore).remove("token");
         verify(integrationClient).notifyPluginInstalled(any(), any(), any(), any(), any());
         verify(integrationClient).pushInstallationChanged(eq(chatId), eq(pluginId), any(), eq(branchId));
@@ -325,9 +347,23 @@ class InstallationServiceTest {
         Installation installation = savedInstallation();
         when(repository.findById(installation.getInstallationId())).thenReturn(Optional.of(installation));
         adminWithPlugin(plugin(branch(branchId, "RELEASED", "1.0.0")));
+        UUID foreign = UUID.randomUUID();
+        when(registryClient.getBranch(foreign)).thenReturn(lookup(foreign, UUID.randomUUID(), "RELEASED"));
 
         assertApi(422, "branch_of_other_plugin",
-                () -> service.changeBranch(installation.getInstallationId(), UUID.randomUUID(), userId));
+                () -> service.changeBranch(installation.getInstallationId(), foreign, userId));
+    }
+
+    @Test
+    void changeBranch_unknownBranch_throwsBranchNotFound() {
+        UUID unknown = UUID.randomUUID();
+        Installation installation = savedInstallation();
+        when(repository.findById(installation.getInstallationId())).thenReturn(Optional.of(installation));
+        adminWithPlugin(plugin(branch(branchId, "RELEASED", "1.0.0")));
+        when(registryClient.getBranch(unknown)).thenReturn(null);
+
+        assertApi(404, "branch_not_found",
+                () -> service.changeBranch(installation.getInstallationId(), unknown, userId));
     }
 
     @Test
@@ -412,8 +448,8 @@ class InstallationServiceTest {
         PaginatedResponse<InstallationShortResponse> result =
                 service.getAllByChatId(chatId, userId, 1, 20);
 
-        assertEquals(1, result.getTotalCount());
-        InstallationShortResponse item = result.getData().get(0);
+        assertEquals(1, result.getTotal());
+        InstallationShortResponse item = result.getItems().get(0);
         assertEquals(branchId, item.getBranchId());
         assertEquals("WORKING", item.getBranchStatus());
         assertEquals(authorId, item.getAuthorId());
@@ -436,7 +472,7 @@ class InstallationServiceTest {
                 .thenReturn(Optional.of(installation));
         when(integrationClient.isMember(userId, chatId)).thenReturn(true);
 
-        InstallationResponse result = service.getById(installation.getInstallationId(), userId);
+        InstallationDetailsResponse result = service.getById(installation.getInstallationId(), userId);
 
         assertEquals(installation.getInstallationId(), result.getInstallationId());
         assertEquals(branchId, result.getBranchId());

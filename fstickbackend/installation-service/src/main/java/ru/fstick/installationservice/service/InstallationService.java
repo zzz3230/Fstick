@@ -55,7 +55,7 @@ public class InstallationService {
         return doInstall(target, chatId, userId);
     }
 
-    public InstallationWithWarningsResponse confirmInstall(String token, UUID userId) {
+    public InstallationResponse confirmInstall(String token, UUID userId) {
         PendingInstallStore.PendingInstall pending = pendingInstallStore.get(token);
 
         if (pending == null) {
@@ -75,7 +75,7 @@ public class InstallationService {
         return doInstall(target, pending.chatId(), userId);
     }
 
-    private InstallationWithWarningsResponse doInstall(InstallTarget target, String chatId, UUID userId) {
+    private InstallationResponse doInstall(InstallTarget target, String chatId, UUID userId) {
         Installation installation = new Installation();
         installation.setPluginId(target.plugin().getId());
         installation.setBranchId(target.branch().getId());
@@ -94,7 +94,10 @@ public class InstallationService {
                 chatId, saved.getPluginId(), saved.getInstallationId(), saved.getBranchId()
         );
 
-        return new InstallationWithWarningsResponse(toResponse(saved), List.of());
+        return new InstallationResponse(
+                saved.getInstallationId(), saved.getPluginId(), saved.getBranchId(),
+                saved.getBranchStatus(), saved.getInstalledBy(), saved.getInstalledAt()
+        );
     }
 
     public InstallationBranchResponse changeBranch(UUID installationId, UUID branchId, UUID userId) {
@@ -104,10 +107,15 @@ public class InstallationService {
         checkChatAdmin(userId, installation.getChatId());
 
         RegistryClient.InternalPlugin plugin = loadActivePlugin(installation.getPluginId());
-        RegistryClient.BranchView branch = findBranch(plugin, branchId)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "branch_of_other_plugin",
-                        "Branch " + branchId + " does not belong to plugin " + plugin.getId()));
+        RegistryClient.BranchInfo info = registryClient.getBranch(branchId);
+        if (info == null) {
+            throw branchNotFound(branchId);
+        }
+        if (!plugin.getId().equals(info.getPluginId())) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "branch_of_other_plugin",
+                    "Branch " + branchId + " does not belong to plugin " + plugin.getId());
+        }
+        RegistryClient.BranchView branch = toView(info);
         checkInstallable(plugin, branch, userId);
 
         Installation updated = repository.updateBranch(installationId, branch.getId(), branch.getStatus());
@@ -138,7 +146,7 @@ public class InstallationService {
         return new PaginatedResponse<>(data, page, limit, totalCount);
     }
 
-    public InstallationResponse getById(UUID installationId, UUID userId) {
+    public InstallationDetailsResponse getById(UUID installationId, UUID userId) {
         Installation installation = repository.findById(installationId)
                 .orElseThrow(() -> new InstallationNotFoundException(installationId));
 
@@ -210,8 +218,11 @@ public class InstallationService {
             }
             branch = latest;
         } else {
-            branch = findBranch(plugin, branchId)
-                    .orElseThrow(() -> branchNotFound(branchId));
+            RegistryClient.BranchInfo info = registryClient.getBranch(branchId);
+            if (info == null || !pluginId.equals(info.getPluginId())) {
+                throw branchNotFound(branchId);
+            }
+            branch = toView(info);
         }
 
         checkInstallable(plugin, branch, userId);
@@ -241,11 +252,12 @@ public class InstallationService {
         }
     }
 
-    private Optional<RegistryClient.BranchView> findBranch(RegistryClient.InternalPlugin plugin,
-                                                           UUID branchId) {
-        return plugin.getBranches().stream()
-                .filter(b -> branchId.equals(b.getId()))
-                .findFirst();
+    private RegistryClient.BranchView toView(RegistryClient.BranchInfo info) {
+        RegistryClient.BranchView view = new RegistryClient.BranchView();
+        view.setId(info.getBranchId());
+        view.setStatus(info.getStatus());
+        view.setSemver(info.getSemver());
+        return view;
     }
 
     private Optional<RegistryClient.BranchView> highestReleased(RegistryClient.InternalPlugin plugin) {
@@ -289,8 +301,8 @@ public class InstallationService {
                 "Branch " + branchId + " not found");
     }
 
-    private InstallationResponse toResponse(Installation i) {
-        return new InstallationResponse(
+    private InstallationDetailsResponse toResponse(Installation i) {
+        return new InstallationDetailsResponse(
                 i.getInstallationId(), i.getPluginId(), i.getBranchId(), i.getBranchStatus(),
                 i.getPluginAuthorId(), i.getChatId(), i.getInstalledBy(),
                 i.getInstalledAt(), i.getUpdatedAt()

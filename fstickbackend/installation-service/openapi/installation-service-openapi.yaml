@@ -215,7 +215,7 @@ components:
     PaginatedInstallations:
       type: object
       properties:
-        data:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/InstallationShort'
@@ -225,18 +225,14 @@ components:
         limit:
           type: integer
           example: 20
-        total_count:
+        total:
           type: integer
           example: 5
-        has_next:
-          type: boolean
-          example: false
       required:
-        - data
+        - items
         - page
         - limit
-        - total_count
-        - has_next
+        - total
 
     InstallWarning:
       type: object
@@ -253,19 +249,33 @@ components:
         - code
         - message
 
-    InstallationWithWarnings:
+    InstallationCreated:
       type: object
       properties:
-        installation:
-          $ref: '#/components/schemas/Installation'
-        warnings:
-          type: array
-          items:
-            $ref: '#/components/schemas/InstallWarning'
-          description: Пустой массив если предупреждений нет
+        installation_id:
+          type: string
+          format: uuid
+        plugin_id:
+          type: string
+          format: uuid
+        branch_id:
+          type: string
+          format: uuid
+        branch_status:
+          $ref: '#/components/schemas/BranchStatus'
+        installed_by:
+          type: string
+          format: uuid
+        installed_at:
+          type: string
+          format: date-time
       required:
-        - installation
-        - warnings
+        - installation_id
+        - plugin_id
+        - branch_id
+        - branch_status
+        - installed_by
+        - installed_at
 
     InstallationPending:
       type: object
@@ -341,7 +351,8 @@ paths:
         2. Загрузка плагина и веток из Registry (GET /internal/plugins/{id}).
            Плагин не найден или не ACTIVE - 404 plugin_not_found.
         3. Выбор ветки:
-           - branch_id указан - ветка должна принадлежать плагину, иначе 404 branch_not_found;
+           - branch_id указан - ветка запрашивается в Registry (GET /internal/branches/{id}); неизвестная
+             или чужая ветка - 404 branch_not_found;
            - не указан - RELEASED-ветка с наибольшим SemVer, если такой нет - 422 no_release.
         4. Проверка статуса ветки:
            - RELEASED - установить может любой администратор чата;
@@ -363,17 +374,18 @@ paths:
             schema:
               $ref: '#/components/schemas/InstallRequest'
       responses:
-        '201':
-          description: |
-            Два возможных тела ответа:
-            - установка выполнена: installation + warnings: []
-            - выбрана не последняя релизная ветка: установка НЕ выполнена, confirmation_token + warnings
+        '200':
+          description: Выбрана не последняя релизная ветка. Установка НЕ выполнена, требуется подтверждение
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/InstallationWithWarnings'
-                  - $ref: '#/components/schemas/InstallationPending'
+                $ref: '#/components/schemas/InstallationPending'
+        '201':
+          description: Установка выполнена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstallationCreated'
         '403':
           description: Не администратор чата (not_chat_admin) или рабочая ветка не принадлежит автору (debug_install_forbidden)
           content:
@@ -474,7 +486,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InstallationWithWarnings'
+                $ref: '#/components/schemas/InstallationCreated'
         '400':
           description: Токен невалиден или истёк
           content:
@@ -539,7 +551,8 @@ paths:
       description: |
         Обновление или откат закреплённой установки. Требуется роль администратора чата.
         Проверки те же, что при установке (шаги 2 и 4), без подтверждения через токен.
-        Ветка должна принадлежать плагину установки, иначе 422 branch_of_other_plugin.
+        Ветка запрашивается в Registry (GET /internal/branches/{id}): неизвестная - 404 branch_not_found,
+        ветка другого плагина - 422 branch_of_other_plugin.
 
         Runtime подхватывает новую ветку в течение 60 секунд (TTL кэша разрешения ветки).
         После обновления отправляется fstick.plugin.installation_changed.

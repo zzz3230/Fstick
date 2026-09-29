@@ -31,6 +31,17 @@ public class RegistryClient {
         }
     }
 
+    public BranchInfo getBranch(UUID branchId) {
+        try {
+            return restClient.get()
+                    .uri("/internal/branches/{branchId}", branchId)
+                    .retrieve()
+                    .body(BranchInfo.class);
+        } catch (RestClientResponseException ex) {
+            return null;
+        }
+    }
+
     @Getter @Setter
     public static class InternalPlugin {
         private UUID id;
@@ -43,6 +54,16 @@ public class RegistryClient {
     @Getter @Setter
     public static class BranchView {
         private UUID id;
+        private String status;
+        private String semver;
+    }
+
+    @Getter @Setter
+    public static class BranchInfo {
+        @JsonProperty("branch_id")
+        private UUID branchId;
+        @JsonProperty("plugin_id")
+        private UUID pluginId;
         private String status;
         private String semver;
     }

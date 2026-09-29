@@ -28,7 +28,8 @@ public class InstallationController {
             @RequestBody InstallRequest request
     ) {
         Object result = service.install(request, chatId, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+        HttpStatus status = result instanceof InstallationPendingResponse ? HttpStatus.OK : HttpStatus.CREATED;
+        return ResponseEntity.status(status).body(result);
     }
 
     @GetMapping
@@ -42,7 +43,7 @@ public class InstallationController {
     }
 
     @GetMapping("/{installationId}")
-    public InstallationResponse getById(
+    public InstallationDetailsResponse getById(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID installationId
     ) {
@@ -51,7 +52,7 @@ public class InstallationController {
 
     @PostMapping("/confirm")
     @ResponseStatus(HttpStatus.CREATED)
-    public InstallationWithWarningsResponse confirmInstall(
+    public InstallationResponse confirmInstall(
             @RequestHeader("X-User-Id") UUID userId,
             @RequestBody ConfirmInstallRequest request
     ) {

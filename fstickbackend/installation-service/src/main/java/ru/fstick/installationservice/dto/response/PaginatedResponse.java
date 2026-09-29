@@ -6,17 +6,15 @@ import java.util.List;
 
 @Getter
 public class PaginatedResponse<T> {
-    private final List<T> data;
+    private final List<T> items;
     private final int page;
     private final int limit;
-    private final int totalCount;
-    private final boolean hasNext;
+    private final int total;
 
-    public PaginatedResponse(List<T> data, int page, int limit, int totalCount) {
-        this.data = data;
+    public PaginatedResponse(List<T> items, int page, int limit, int total) {
+        this.items = items;
         this.page = page;
         this.limit = limit;
-        this.totalCount = totalCount;
-        this.hasNext = (long) page * limit < totalCount;
+        this.total = total;
     }
 }
