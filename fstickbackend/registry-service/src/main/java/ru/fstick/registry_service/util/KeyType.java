@@ -6,7 +6,6 @@ import lombok.Getter;
 public enum KeyType {
     SCREENSHOT("screenshot"),
     ICON("icon"),
-    FILE("file"),
     UNDEFINED("undefined");
 
     private final String value;

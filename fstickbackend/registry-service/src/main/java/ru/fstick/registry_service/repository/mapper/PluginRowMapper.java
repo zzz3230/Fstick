@@ -29,6 +29,8 @@ public class PluginRowMapper implements RowMapper<PluginData> {
                 .tags(tags)
                 .description(rs.getString("description"))
                 .iconUrlKey(rs.getString("s3_icon_key"))
+                .devBranchId(rs.getObject("dev_branch_id", UUID.class))
+                .releasedSemver(rs.getString("released_semver"))
                 .createdAt(rs.getTimestamp("created_at").toLocalDateTime().toString())
                 .updatedAt(rs.getTimestamp("updated_at").toLocalDateTime().toString())
                 .build();
