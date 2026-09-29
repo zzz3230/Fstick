@@ -32,6 +32,7 @@
 
     --shadow: 0 1px 2px rgba(20, 28, 40, 0.06), 0 8px 24px -12px rgba(20, 28, 40, 0.12);
     --measure: 68ch;
+    --fix: #0b7a70;        --fix-bg: #d9f2ee;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -61,6 +62,7 @@
       --m-delete: #d98a86;   --m-delete-bg: #2f1f1e;
 
       --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+      --fix: #5fcfc0;        --fix-bg: #10302c;
     }
   }
 
@@ -90,6 +92,7 @@
     --m-delete: #d98a86;   --m-delete-bg: #2f1f1e;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+    --fix: #5fcfc0;        --fix-bg: #10302c;
   }
 
   * { box-sizing: border-box; }
@@ -430,6 +433,46 @@
     font-family: "IBM Plex Mono", monospace;
   }
 
+  /* ---- Revision highlights (2026-09-27) ---- */
+  ins.fix {
+    text-decoration: none;
+    color: inherit;
+    background: var(--fix-bg);
+    box-shadow: inset 0 -1px 0 var(--fix);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  ins.fix[data-r]::after, .fix-tag {
+    content: attr(data-r);
+    font: 600 9.5px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.02em;
+    color: var(--fix);
+    vertical-align: super;
+    margin-left: 2px;
+    white-space: nowrap;
+  }
+  del.fix { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--s-rejected); }
+  .fix-block { border-left: 3px solid var(--fix) !important; }
+  div.fix-block:not(.endpoint):not(.note) { padding-left: 16px; }
+  .fix-block[data-r]::before {
+    content: "новое · " attr(data-r);
+    display: block;
+    font: 600 10.5px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fix);
+    padding: 10px 0 0;
+  }
+  .endpoint.fix-block[data-r]::before { padding: 10px 18px; background: var(--fix-bg); }
+  tr.fix-row > td { background: var(--fix-bg); }
+  tr.fix-row > td:first-child { box-shadow: inset 3px 0 0 var(--fix); }
+  .fix-toggle { right: 104px; }
+  html.fix-off ins.fix { background: none; box-shadow: none; padding: 0; }
+  html.fix-off ins.fix::after, html.fix-off .fix-tag, html.fix-off .fix-block::before, html.fix-off del.fix { display: none; }
+  html.fix-off .fix-block { border-left-color: var(--border) !important; }
+  html.fix-off div.fix-block:not(.endpoint):not(.note) { border-left: 0 !important; padding-left: 0; }
+  html.fix-off tr.fix-row > td { background: var(--surface); box-shadow: none; }
+
   @media (prefers-reduced-motion: reduce) {
     * { scroll-behavior: auto !important; }
   }
@@ -437,6 +480,7 @@
 </style>
 
 <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">тема</button>
+<button class="theme-toggle fix-toggle" id="fixToggle" aria-label="Показать или скрыть правки ревизии">правки: видны</button>
 
 <div class="layout">
 
@@ -448,7 +492,8 @@
       <span><strong>Статус:</strong> дизайн согласован, не реализовано</span>
       <span><strong>Модель версий:</strong> content-addressed, git-образная</span>
       <span><strong>Идентичность:</strong> UUID в ядре · маппер в integration</span>
-      <span><strong>Обновлено:</strong> 2026-09-12</span>
+      <span><strong>Обновлено:</strong> <del class="fix">2026-09-12</del> <ins class="fix">2026-09-27</ins></span>
+      <span><strong>Ревизия:</strong> новый текст <ins class="fix">подсвечен</ins>, удалённый <del class="fix">зачёркнут</del> &mdash; <a href="#revision">&sect;15</a></span>
     </div>
   </header>
 
@@ -473,6 +518,7 @@
         <hr class="toc-hr" />
         <a href="#open"><span class="n">13</span><span>Открытые вопросы</span></a>
         <a href="#decisions"><span class="n">14</span><span>Журнал решений</span></a>
+        <a href="#revision"><span class="n">15</span><span><ins class="fix">Ревизия 2026-09-27</ins></span></a>
       </nav>
     </details>
   </aside>
@@ -496,7 +542,7 @@
         <li>Редактор &mdash; это два текстовых поля (Lua, JS) плюс консоль отладки, которая выводит бэкенд-вывод из того чата, откуда редактор был открыт.</li>
       </ul>
 
-      <p>Инспекция состояния, многофайловые плагины и шаг сборки &mdash; вне рамок. Код &mdash; ровно два файла: один клиентский, один серверный.</p>
+      <p><del class="fix">Инспекция состояния, м</del><ins class="fix">М</ins>ногофайловые плагины и шаг сборки &mdash; вне рамок. Код &mdash; ровно два файла: один клиентский, один серверный. <ins class="fix" data-r="R7">Инспекция состояния <em>входит</em> в рамки: у редактора есть редактируемая JSON-панель состояния для чата, из которого он открыт (&sect;7, &sect;12). История состояния, diff и брейкпоинты &mdash; нет.</ins></p>
 
       <figure class="fig-scroll">
         <svg viewBox="0 0 820 470" role="img" aria-label="Последовательность: редактор обращается к Registry для открытия и сохранения кода; Registry пишет content-addressed блоб и вызывает Runtime для reload; Runtime вытесняет движок и мигрирует состояние; вывод консоли и сигнал reloaded идут обратно в редактор через канал sync.">
@@ -553,7 +599,7 @@
             <text x="597" y="244">5 · пересборка движка (plugin, branch_id) · миграция состояния</text>
 
             <line x1="320" y1="286" x2="755" y2="286" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
-            <text x="325" y="279">6 · fstick.plugin.reloaded</text>
+            <text x="325" y="279">6 · fstick.plugin.reloaded<tspan fill="var(--fix)" font-weight="600"> · если менялся клиент</tspan></text>
             <line x1="755" y1="308" x2="95" y2="308" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ah)" />
             <text x="750" y="301" text-anchor="end" fill="var(--ink-faint)">client_changed → перезапуск DSL</text>
 
@@ -566,7 +612,7 @@
             </g>
           </g>
         </svg>
-        <figcaption>Цикл сохранение / reload / консоль. Шаги 1&ndash;5 &mdash; запрос-ответ; шаги 6&ndash;7 идут по существующему каналу Matrix <code>/sync</code> <code>fstick_events</code>. Путь консоли (акцент) &mdash; единственное место, где дизайн добавляет поведение транспорту; всё остальное переиспользует уже существующий канал.</figcaption>
+        <figcaption>Цикл сохранение / reload / консоль. Шаги 1&ndash;5 &mdash; запрос-ответ; шаги 6&ndash;7 идут по существующему каналу Matrix <code>/sync</code> <code>fstick_events</code>. Путь консоли (акцент) &mdash; единственное место, где дизайн добавляет поведение транспорту; всё остальное переиспользует уже существующий канал. <ins class="fix" data-r="R14">Шаг 6 отправляет Registry (через Integration), только когда менялась клиентская сторона, участникам каждого чата, где установлена эта dev-ветка (&sect;11). Он не ждёт шагов 4&ndash;5.</ins></figcaption>
       </figure>
     </section>
 
@@ -597,7 +643,7 @@
             <tr>
               <td>Авторизация</td>
               <td class="wrap"><code>author_id</code> хранится; <code>X-User-Id</code> доходит до сервисов. Не сверяется. <code>resolveAuthorId()</code> выводит UUID из Matrix ID через <code>nameUUIDFromBytes</code>.</td>
-              <td class="wrap">Проверки владельца нет нигде. Выведенный UUID необратим в Matrix ID &mdash; блокирует адресный push автору.</td>
+              <td class="wrap">Проверки владельца нет нигде. Выведенный UUID необратим в Matrix ID &mdash; блокирует адресный push автору. <ins class="fix" data-r="R22"><code>installations.installed_by</code> &mdash; это <code>VARCHAR</code> с сырым MXID, а не UUID: колонка становится <code>UUID</code>; мигрировать нечего (&sect;3).</ins></td>
             </tr>
             <tr>
               <td>Состояния плагина</td>
@@ -635,7 +681,7 @@
         <span class="eyebrow">Решение · маппер в integration-service</span>
         <h2><span class="num">3</span>Модель идентичности</h2>
       </div>
-      <p class="prose-lead">Ядро хранит <strong>один чистый UUID</strong> на пользователя и ничего больше. Маппер <code>uuid&nbsp;↔&nbsp;mxid</code> живёт в <strong>integration-service</strong> &mdash; единственном компоненте, который уже говорит на Matrix. MXID появляется ровно на двух хопах: вход (Dendrite&nbsp;→&nbsp;Gateway) и выход (integration&nbsp;→&nbsp;Dendrite).</p>
+      <p class="prose-lead">Ядро хранит <strong>один чистый UUID</strong> на пользователя и ничего больше. Маппер <code>uuid&nbsp;↔&nbsp;mxid</code> живёт в <strong>integration-service</strong> &mdash; единственном компоненте, который уже говорит на Matrix. MXID появляется ровно на <del class="fix">двух</del><ins class="fix" data-r="R3">трёх</ins> хопах: вход (Dendrite&nbsp;→&nbsp;Gateway)<del class="fix"> и</del><ins class="fix">,</ins> выход (integration&nbsp;→&nbsp;Dendrite)<ins class="fix"> и обогащение ответа (Gateway&nbsp;→&nbsp;клиент, чтобы UI мог показать <code>@localpart</code>)</ins>.</p>
 
       <p>Суффикс <code>:domain</code> нельзя убрать из проводного протокола Matrix без форка от федерации &mdash; он структурен (<code>sender</code> события, membership комнаты, роутинг). Домен фиксируется одной константой и просто не рендерится; Element и так говорит MXID-ами, так что показ <code>@user_id</code> &mdash; это обрезка, а не новый идентификатор.</p>
 
@@ -644,7 +690,7 @@
           <h4>internal_uuid</h4>
           <div class="ex">9f3c1a2e-…</div>
           <div class="mut">единственный id в ядре</div>
-          <p>Внешний ключ в каждом сервисе Fstick: <code>plugins.author_id</code>, <code>installations.installed_by</code>, владелец ветки. Не покидает бэкенд, не доходит до Dendrite.</p>
+          <p>Внешний ключ в каждом сервисе Fstick: <code>plugins.author_id</code>, <code>installations.installed_by</code>, владелец ветки. <del class="fix">Не покидает бэкенд, не доходит до Dendrite.</del><ins class="fix" data-r="R3">Для клиента непрозрачен: может приходить в ответах API и в <code>GET /api/v1/me</code>, чтобы фронтенд мог сравнивать id, но никогда не рендерится и не доходит до Dendrite.</ins></p>
         </div>
         <div class="idcard">
           <h4>MXID</h4>
@@ -699,17 +745,24 @@
             <text x="164" y="90" text-anchor="middle">/sync</text>
           </g>
         </svg>
-        <figcaption>MXID живёт только на акцентных хопах &mdash; Dendrite&nbsp;→&nbsp;Gateway на входе и integration&nbsp;→&nbsp;Dendrite на выходе. Всё между ними &mdash; <code>internal_uuid</code>. Dendrite уже аутентифицирует и проставляет <code>X-User-Id</code> сегодня (<code>authenticateAndGetUserID</code>); единственный новый шаг &mdash; замена в Gateway.</figcaption>
+        <figcaption>MXID живёт только на акцентных хопах &mdash; Dendrite&nbsp;→&nbsp;Gateway на входе и integration&nbsp;→&nbsp;Dendrite на выходе. Всё между ними &mdash; <code>internal_uuid</code>. <ins class="fix" data-r="R3">Не нарисовано: на обратном пути к клиенту Gateway добавляет <code>mxid</code> рядом с каждым id пользователя в ответе (&sect;9 Gateway) из того же кэша маппера.</ins> Dendrite уже аутентифицирует и проставляет <code>X-User-Id</code> сегодня (<code>authenticateAndGetUserID</code>); единственный новый шаг &mdash; замена в Gateway.</figcaption>
       </figure>
 
       <h3>Маппер</h3>
       <ul>
         <li>Таблица в <strong>integration-service</strong>: <code>internal_uuid</code> (PK) ↔ <code>mxid</code> (unique). Двунаправленная. Ни handle, ни профильного слоя.</li>
         <li><span class="method method--post">POST</span> <code>/api/v1/identity/resolve</code> &nbsp;<code>{ mxid } → { internal_uuid }</code> &mdash; create-or-return, идемпотентно. Здесь <code>internal_uuid</code> пользователя <strong>минтится</strong> при первом контакте.</li>
-        <li><span class="method method--get">GET</span> <code>/api/v1/identity/{internal_uuid}</code> &nbsp;<code>→ { mxid }</code> &mdash; обратное, для исходящего push. Batch-вариант для списков участников.</li>
-        <li>Gateway вызывает <code>resolve</code>, чтобы превратить <code>X-User-Id</code>, который дал Dendrite (это MXID), в <code>internal_uuid</code>, и форвардит уже его. Результат кэшируется в процессе &mdash; связка не меняется, поэтому кэш это LRU без инвалидации. <code>X-User-Matrix-Id</code> <em>не</em> прокидывается; за Gateway он никому не нужен.</li>
+        <li><span class="method method--get">GET</span> <code>/api/v1/identity/{internal_uuid}</code> &nbsp;<code>→ { mxid }</code> &mdash; обратное, для исходящего push.<del class="fix"> Batch-вариант для списков участников.</del> <ins class="fix" data-r="R3">Batch-варианты в обе стороны: <code>resolve-batch</code> (mxid&nbsp;→&nbsp;uuid: списки участников) и <code>lookup-batch</code> (uuid&nbsp;→&nbsp;mxid: обогащение ответов в Gateway).</ins></li>
+        <li>Gateway вызывает <code>resolve</code>, чтобы превратить <code>X-User-Id</code>, который дал Dendrite (это MXID), в <code>internal_uuid</code>, и форвардит уже его. Результат кэшируется в процессе &mdash; связка не меняется, поэтому кэш это LRU без инвалидации. <code>X-User-Matrix-Id</code> <em>не</em> прокидывается; за Gateway он никому не нужен. <ins class="fix" data-r="R3">Gateway также держит обратную мапу (<code>uuid → mxid</code>) и обогащает ею ответы на выходе.</ins></li>
         <li><code>registry.plugins.author_id</code> = <code>internal_uuid</code> (колонка уже <code>UUID</code>). Удалить <code>resolveAuthorId()</code> / <code>nameUUIDFromBytes</code>.</li>
+        <li><ins class="fix" data-r="R3"><span class="method method--get">GET</span> <code>/api/v1/me</code> &rarr; <code>{ internal_uuid, mxid }</code> &mdash; отдаёт сам Gateway из кэша маппера; единственный источник собственного <code>internal_uuid</code> для фронтенда (&sect;12).</ins></li>
+        <li><ins class="fix" data-r="R3">Installation-service по-прежнему зовёт integration для проверки членства в чате, но теперь передаёт <code>internal_uuid</code>; integration сам переводит его в MXID перед запросом к Dendrite.</ins></li>
       </ul>
+
+      <div class="fix-block" data-r="R22">
+      <h3>Без миграции</h3>
+      <p>Продовой базы и легаси-плагинов нет. Схемы переписываются на месте &mdash; <code>plugins.author_id</code> с первой строки хранит <code>internal_uuid</code>, <code>installations.installed_by</code> становится <code>UUID</code> &mdash; а локальные тома пересоздаются. Ни бэкфилла, ни путей совместимости.</p>
+      </div>
 
       <h3>Почему Postgres, а не только Redis</h3>
       <p>Кэш (Redis или в процессе) Gateway держит в любом случае. Вопрос в системе-источнике истины, и она обязана быть Postgres:</p>
@@ -743,13 +796,13 @@
             <tr><td>commit</td><td>каждое сохранение / hot-reload в редакторе <span class="pill pill--dev">фаза&nbsp;2</span></td></tr>
             <tr><td>создать ветку-кандидат</td><td><code>POST /plugins/{id}/publish</code> &mdash; снапшот текущей пары блобов dev-ветки</td></tr>
             <tr><td>статус ветки</td><td><span class="pill pill--wait">WAITING_APPROVE</span> <span class="pill pill--review">APPROVING</span> <span class="pill pill--released">RELEASED</span> <span class="pill pill--rejected">REJECTED</span> <span class="pill pill--cancelled">CANCELLED</span> &mdash; на ветке</td></tr>
-            <tr><td><code>main</code> / release-тег</td><td>ветка со статусом <span class="pill pill--released">RELEASED</span>; установки резолвятся на максимальный SemVer среди них</td></tr>
+            <tr><td><code>main</code> / release-тег</td><td>ветка со статусом <span class="pill pill--released">RELEASED</span>; <del class="fix">установки резолвятся на максимальный SemVer среди них</del><ins class="fix" data-r="R6">установка закреплена за одной из них; новая установка без <code>branch_id</code> по умолчанию берёт максимальный SemVer</ins></td></tr>
           </tbody>
         </table>
       </div>
 
       <h3>Модель данных &mdash; фаза 1 (без истории коммитов)</h3>
-      <pre><code><span class="tok-c">-- одна строка на плагин</span>
+      <pre><code><span class="tok-c">-- <del class="fix">одна строка на плагин</del><ins class="fix" data-r="R11">одна строка на ветку: единственная dev-ветка плагина плюс все кандидаты / релизы</ins></span>
 branches (
   id, plugin_id,
   status            <span class="tok-c">-- WORKING (dev) | WAITING_APPROVE | APPROVING | RELEASED | REJECTED | CANCELLED</span>
@@ -758,18 +811,36 @@ branches (
   runtime_client, runtime_server   <span class="tok-c">-- напр. cl.js@1.0.0 / sv.lua@1.0.0 (версия stdlib)</span>
   base_branch_id,   <span class="tok-c">-- dev-ветка, из которой вырезан кандидат</span>
   reject_reason,    <span class="tok-c">-- ставится только для REJECTED; null для CANCELLED</span>
-  created_at, updated_at
+<ins class="fix" data-r="R11">  changelog,        <span class="tok-c">-- только у кандидатов, из POST /publish</span>
+  submitted_at,     <span class="tok-c">-- только у кандидатов</span>
+  claimed_by,       <span class="tok-c">-- internal_uuid модератора, ставится при claim</span>
+</ins>  created_at, updated_at
 )
+<ins class="fix" data-r="R11"><span class="tok-c">-- UNIQUE (plugin_id) WHERE status = 'WORKING'  : ровно одна dev-ветка на плагин</span>
 
+plugins.last_rejection   <span class="tok-c">-- jsonb { reason, at, semver, branch_id } | null</span>
+
+plugin_moderation_log (
+  id, plugin_id, branch_id,
+  action            <span class="tok-c">-- PUBLISH | CLAIM | APPROVE | REJECT | CANCEL</span>
+  actor_id,         <span class="tok-c">-- internal_uuid</span>
+  reason, at
+)
+</ins><ins class="fix" data-r="R5">
+moderators (
+  internal_uuid PK, granted_by, granted_at
+)
+</ins>
 <span class="tok-c">-- content-addressed, неизменяемо, дедуплицировано</span>
 S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <ul>
         <li>Ровно два блоба на ветку (client + server). Имя файла от клиента отбрасывается.</li>
         <li>sha блобов dev-ветки <em>и есть</em> её HEAD; сохранение их заменяет (старые блобы становятся кандидатами на GC &mdash; см. &sect;13).</li>
-        <li><code>installation</code> ссылается на ветку. Debug-установка указывает на dev-ветку и следует за её sha. Обычная установка указывает на <code>RELEASED</code>-ветку, перенаводится через <code>PATCH</code>.</li>
+        <li><code>installation</code> ссылается на ветку. Debug-установка указывает на dev-ветку и следует за её sha. Обычная установка указывает на <code>RELEASED</code>-ветку<del class="fix">, перенаводится через <code>PATCH</code></del><ins class="fix" data-r="R6"> и закреплена за ней: новый релиз существующие установки <em>не</em> двигает. Обновление &mdash; явный <code>PATCH /api/v1/installations/{id} { branch_id }</code> (&sect;10)</ins>.</li>
         <li>Публичный список магазина: плагины со <code>status = ACTIVE</code> <em>и</em> хотя бы одной <code>RELEASED</code>-веткой. <code>GET /plugins?owned=true</code> возвращает собственные плагины вызывающего, включая dev-only.</li>
-        <li>Легаси-плагины с произвольными именами ключей сохраняют fallback <code>files[0]</code> до бэкфилла.</li>
+        <li><del class="fix">Легаси-плагины с произвольными именами ключей сохраняют fallback <code>files[0]</code> до бэкфилла.</del><ins class="fix" data-r="R22"><strong>Легаси-данных нет</strong>: таблицы <code>versions</code> и <code>files</code> и все пути кода с <code>files[0]</code> удаляются целиком; каждый плагин начинается с ветки <code>WORKING</code>.</ins></li>
+        <li><ins class="fix" data-r="R5"><strong>Роль модератора</strong>: пользователь &mdash; модератор тогда и только тогда, когда его <code>internal_uuid</code> есть в <code>registry.moderators</code>. Первые строки засеваются из конфига; дальше роль выдают существующие модераторы. Registry проверяет её на каждом эндпоинте модерации.</ins></li>
       </ul>
 
       <p><strong>Фаза 2</strong>, когда понадобится diff / revert / история: добавить таблицу <code>commits</code>. Блобы уже content-addressed, так что это заходит без миграции данных.</p>
@@ -837,6 +908,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>При reject</h3>
       <ul>
+        <li><ins class="fix" data-r="R12">Кто может отклонить: из <code>WAITING_APPROVE</code> &mdash; любой модератор; из <code>APPROVING</code> &mdash; только взявший claim (то же правило, что и для approve).</ins></li>
         <li>Ветка <code>status = REJECTED</code>, сохраняется (скрыта, никогда в очереди, никогда не устанавливается).</li>
         <li><code>plugins.last_rejection = { reason, at, semver, branch_id }</code> &mdash; чтобы UI показывал «нужны правки» без скана чата.</li>
         <li>Дописывается строка в <code>plugin_moderation_log</code>.</li>
@@ -866,7 +938,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <ul>
         <li><strong>Content-addressed блобы</strong>: <code>plugins/{pluginId}/blobs/{sha256}</code>. Неизменяемые, никогда не перезаписываются, дедуплицированы. sha <em>и есть</em> идентификатор, которым обмениваются редактор и Runtime.</li>
         <li><strong>Ровно два файла</strong> на ветку &mdash; один клиентский, один серверный. Многофайловых плагинов нет. Это навсегда убирает неоднозначность <code>files[0]</code>.</li>
-        <li><strong>Ни один потребитель кода не получает presigned URL</strong> &mdash; ни редактор, ни Runtime. Код идёт инлайн через Registry в обе стороны (&sect;7, &sect;10), так что авторизация проверяется на каждый запрос и нет TTL, с которым надо гонки.</li>
+        <li><strong>Ни один потребитель кода не получает presigned URL</strong> &mdash; ни редактор, ни Runtime<ins class="fix" data-r="R2">, ни браузеры участников чата, исполняющие <code>cl.js</code> плагина</ins>. Код идёт инлайн через Registry в обе стороны (&sect;7, &sect;10), так что авторизация проверяется на каждый запрос и нет TTL, с которым надо гонки.</li>
         <li>Двухфазная presigned-загрузка остаётся &mdash; но только для иконок, скриншотов и будущих release-бандлов, где файлы крупнее и грузятся один раз.</li>
       </ul>
       <p>Идентификатор на основе sha заодно закрывает два прежних вопроса: вопрос «одноразовой ссылки» исчезает (ссылки нет), а проверка оптимистичной конкурентности при сохранении (&sect;10) &mdash; это просто сравнение sha.</p>
@@ -875,7 +947,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <p>Лимит: <strong>500&nbsp;КБ &mdash; 500&nbsp;000 байт UTF-8 &mdash; на файл</strong>, замеряется на раскодированной строке <code>text</code> после любого transfer-декодирования. Больше &rarr; <code>413 { "error": "file_too_large", "side": "server", "limit": 500000, "actual": 812345 }</code>.</p>
       <ul>
         <li><strong>Лимит на распакованный контент, не на байты в проводе.</strong> Клиент может слать <code>Content-Encoding: gzip</code> (или <code>br</code>); Gateway и Registry сначала декодируют, потом меряют. Сжатие уменьшает загрузку &mdash; потолок оно не поднимает.</li>
-        <li><strong>Декомпрессия сама ограничена</strong>, чтобы обезвредить zip-бомбу: запрос отклоняется с <code>413</code>, как только раскодированный поток проходит <strong>1.2&nbsp;МБ</strong> (два файла по 500&nbsp;КБ + <code>base_sha</code> + JSON-обвязка + запас), что бы ни утверждал <code>Content-Length</code>; отношение decoded/encoded больше ~200 триггерит тот же guard.</li>
+        <li><strong>Декомпрессия сама ограничена</strong>, чтобы обезвредить zip-бомбу: запрос отклоняется с <code>413</code>, как только раскодированный поток проходит <del class="fix"><strong>1.2&nbsp;МБ</strong> (два файла по 500&nbsp;КБ + <code>base_sha</code> + JSON-обвязка + запас)</del><ins class="fix" data-r="R19"><strong>2.2&nbsp;МБ</strong>. JSON-экранирование раздувает исходник ещё до замера: <code>\n</code>, <code>\"</code> и <code>\\</code> занимают по 2 байта, так что два легальных файла по 500&nbsp;КБ могут занять до 2&nbsp;МБ JSON; остальное &mdash; <code>base_sha</code>, обвязка и запас. Клиент обязан слать не-ASCII сырым UTF-8, а не <code>\uXXXX</code> (поведение <code>JSON.stringify</code> по умолчанию); тело с таким экранированием может упереться в лимит раньше и получит тот же <code>413</code></ins>, что бы ни утверждал <code>Content-Length</code>; отношение decoded/encoded больше ~200 триггерит тот же guard.</li>
         <li>Редактор показывает живой счётчик байт в каждом поле и блокирует сохранение локально на лимите; <code>413</code> &mdash; серверный бэкстоп.</li>
       </ul>
 
@@ -910,25 +982,26 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>Кэш движка</h3>
       <p><code>Map&lt;(pluginId, branchId), LuaPluginEngine&gt;</code>. Sha в ключе нет вообще. Runtime никогда не исполняет клиентский код, поэтому <code>client_blob_sha</code> в ключе не имел права быть с самого начала &mdash; правка только клиента вызывала бессмысленную пересборку. <code>RELEASED</code>-ветка, работающая во множестве чатов, и dev-ветка автора &mdash; <strong>разные записи кэша</strong>, ни одна не затирает другую. Состояние плагина по-прежнему кэшируется по <code>(pluginId, chatId)</code> в Redis и подставляется через <code>changeContext</code> перед каждой командой.</p>
-      <p>Загрузка движка &mdash; одна функция, используется везде, где записи нет; холодный кэш после рестарта Runtime &mdash; не особый случай. <code>GET /code/server</code> отдаёт исходник <strong>инлайн</strong> (&sect;10) &mdash; ни presigned-ссылки, ни второго хопа в S3; это чтение делает сам Registry:</p>
+      <p>Загрузка движка &mdash; одна функция, используется везде, где записи нет; холодный кэш после рестарта Runtime &mdash; не особый случай. <del class="fix"><code>GET /code/server</code></del><ins class="fix" data-r="R1"><code>GET /internal/plugins/{id}/code/server</code> &mdash; служебный маршрут Registry: не выставлен через Gateway и не проверяет пользователя &mdash;</ins> отдаёт исходник <strong>инлайн</strong> (&sect;10) &mdash; ни presigned-ссылки, ни второго хопа в S3; это чтение делает сам Registry:</p>
       <pre><code><span class="tok-k">loadEngine</span>(pluginId, branchId):
   <span class="tok-c">если</span> cache.has((pluginId, branchId)): <span class="tok-c">вернуть</span> cache.get(...)
-  { text, sha } = <span class="tok-k">GET</span> registry <span class="tok-s">/plugins/{pluginId}/code/server?branch_id={branchId}</span>
+  { text, sha } = <span class="tok-k">GET</span> registry <span class="tok-s"><del class="fix">/plugins/{pluginId}/code/server</del><ins class="fix" data-r="R1">/internal/plugins/{pluginId}/code/server</ins>?branch_id={branchId}</span>
   engine = compile(text)
   cache.put((pluginId, branchId), engine)
   <span class="tok-c">вернуть</span> engine</code></pre>
 
       <h3>Reload</h3>
-      <p><code>POST /internal/plugins/{pluginId}/reload { chat_id, branch_id }</code> &mdash; вызывается Registry, <strong>только если менялась серверная сторона</strong>. Чисто клиентское сохранение (правили JS, Lua не трогали) до Runtime вообще не доходит &mdash; ему нечего перезагружать, он и так этот код не исполняет. Runtime вытесняет <code>(pluginId, branchId)</code> и тут же заново вызывает <em>ту же</em> <code>loadEngine</code> выше, чтобы пересобрать &mdash; а не получает инлайн-копию нового кода. Две причины:</p>
+      <p><code>POST /internal/plugins/{pluginId}/reload { chat_id, branch_id }</code> &mdash; вызывается Registry, <strong>только если менялась серверная сторона</strong>. Чисто клиентское сохранение (правили JS, Lua не трогали) до Runtime вообще не доходит &mdash; ему нечего перезагружать, он и так этот код не исполняет. Runtime <del class="fix">вытесняет <code>(pluginId, branchId)</code> и тут же заново вызывает <em>ту же</em> <code>loadEngine</code> выше, чтобы пересобрать</del><ins class="fix" data-r="R13">пересобирает <code>(pluginId, branchId)</code> <em>тем же</em> телом «скачать и скомпилировать» из <code>loadEngine</code> выше</ins> &mdash; а не получает инлайн-копию нового кода. <ins class="fix">Старый движок обслуживает команды, пока новый не скомпилирован; затем один <code>cache.put()</code> подменяет его, так что нет окна, в котором параллельная команда скомпилировала бы вторую копию.</ins> Две причины:</p>
       <ul>
         <li><strong>Один пайплайн, а не два.</strong> Если бы reload нёс код инлайн, «движок из reload» и «движок из холодного промаха кэша» были бы разными путями кода, которые могут незаметно разойтись (например, после рестарта Runtime кэш пуст и каждый движок собирается через <code>loadEngine</code> &mdash; если у reload был бы свой инлайн-путь, он оставался бы непроверенным до момента, когда это станет критично).</li>
         <li><strong>Бесплатная сборка мусора для мутируемой ветки.</strong> У dev-ветки один и тот же <code>branch_id</code> навсегда, так что reload &mdash; это обычный <code>cache.put()</code> по уже существующему ключу &mdash; старый <code>LuaPluginEngine</code> просто теряет ссылку и достаётся JVM. Ничего отслеживать, никаких осиротевших sha подметать не нужно. <code>branch_id</code> у <code>RELEASED</code>-ветки вообще никогда не reload’ится (код заморожен); её запись в кэше уходит только обычным idle/LRU-вытеснением.</li>
       </ul>
-      <p>Состояние в Redis сохраняется через reload и проходит через <strong>встроенный авто-мигратор</strong>. Минимальный интервал <strong>3&nbsp;с</strong> на <code>(plugin, chat)</code> → <code>429 { retry_after_ms }</code>. Ответ &mdash; просто <code>{ "reloaded": true }</code> &mdash; Runtime никогда не трогает клиентский код, поэтому ему нечего сказать про <code>client_changed</code>; Registry уже знает это из сохранения, которое сам только что выполнил, и сообщает сам (&sect;10, &sect;11).</p>
-      <p>Итог по числу внутренних запросов на одно сохранение (полные контракты в &sect;10): чисто клиентская правка вообще не задействует Runtime &mdash; только запись в S3 и push <code>fstick.plugin.reloaded</code>, потому что другим открытым вкладкам редактора всё равно нужно узнать, что надо перекачать <code>cl.js</code>. Чисто серверная правка этот push пропускает (&sect;11), но платит за запись, вызов reload и теперь однохоповый запрос кода. Правка обеих сторон платит за всё.</p>
+      <p>Состояние в Redis сохраняется через reload и проходит через <strong>встроенный авто-мигратор</strong>. Минимальный интервал <strong>3&nbsp;с</strong> на <del class="fix"><code>(plugin, chat)</code></del><ins class="fix" data-r="R17"><code>(plugin, branch)</code> &mdash; ту единицу, которая реально пересобирается, так что сменой <code>chat_id</code> его не обойти</ins> → <code>429 { retry_after_ms }</code>. <ins class="fix">Авто-мигратор работает сразу для <code>chat_id</code> из запроса (пропускается, если в этом чате плагин уже не установлен); остальные чаты на той же ветке мигрируются лениво, перед их следующей командой на новом движке.</ins> Ответ &mdash; просто <code>{ "reloaded": true }</code> &mdash; Runtime никогда не трогает клиентский код, поэтому ему нечего сказать про <code>client_changed</code>; Registry уже знает это из сохранения, которое сам только что выполнил, и сообщает сам (&sect;10, &sect;11).</p>
+      <p><ins class="fix" data-r="R16"><strong>Отложенный throttle-ом reload не теряется.</strong> Если вызов reload при сохранении получил <code>429</code>, новый код уже записан, но движок устарел, и следующее сохранение без изменений серверной стороны его не перезагрузит. Registry возвращает <code>reloaded: false</code> с <code>retry_after_ms</code>; когда задержка пройдёт, редактор зовёт явный эндпоинт hot-reload <code>POST /api/v1/plugins/{id}/branches/{bid}/reload</code> (&sect;10). Им же пользуется кнопка Hot-reload; он всегда пробрасывает вызов в Runtime, независимо от того, менялся ли код.</ins></p>
+      <p>Итог по числу внутренних запросов на одно сохранение (полные контракты в &sect;10): чисто клиентская правка вообще не задействует Runtime &mdash; только запись в S3 и push <code>fstick.plugin.reloaded</code>, потому что <del class="fix">другим открытым вкладкам редактора</del><ins class="fix" data-r="R18">каждому клиенту, исполняющему эту dev-ветку,</ins> всё равно нужно узнать, что надо перекачать <code>cl.js</code>. Чисто серверная правка этот push пропускает (&sect;11), но платит за запись, вызов reload<del class="fix"> и теперь однохоповый запрос кода</del><ins class="fix" data-r="R15">, внутренний запрос кода и стоящее за ним чтение S3 в Registry</ins>. Правка обеих сторон платит за всё.</p>
 
       <h3>Редактирование состояния</h3>
-      <p>JSON-панель состояния в редакторе <strong>редактируемая</strong>; Runtime её применяет. <code>PUT /api/v1/plugins/{id}/state?chat_id=</code>, только автор + установка на dev-ветке. Полный JSON (не патч). Невалидный JSON → <code>400</code>. Иначе payload проходит через авто-мигратор и валидацию по схеме, лениво: недостающие поля добираются дефолтами, неизвестные ключи отбрасываются, несовпадения типов коэрсятся &mdash; пишется в Redis, расхождения возвращаются в <code>warnings</code>, затем срабатывает обычный broadcast. <strong>Оптимистичной блокировки нет</strong> &mdash; состояние меняется на каждой команде, так что hash-guard почти всегда конфликтовал бы; вместо него у панели кнопка «обновить».</p>
+      <p>JSON-панель состояния в редакторе <strong>редактируемая</strong>; Runtime её применяет. <code>PUT /api/v1/plugins/{id}/state?chat_id=</code>, только автор + установка на dev-ветке. Полный JSON (не патч). Невалидный JSON → <code>400</code>. Иначе payload проходит через авто-мигратор и валидацию по схеме, лениво: недостающие поля добираются дефолтами, неизвестные ключи отбрасываются, несовпадения типов коэрсятся &mdash; пишется в Redis, расхождения возвращаются в <code>warnings</code>, затем срабатывает обычный broadcast. <strong>Оптимистичной блокировки нет</strong> &mdash; состояние меняется на каждой команде, так что hash-guard почти всегда конфликтовал бы; вместо него у панели кнопка «обновить». <ins class="fix" data-r="R24">Схема &mdash; собственное объявление плагина <code>SetStateSchema</code> / <code>state_schema</code> (<code>backend_stdlib.lua</code>). Мигратор &mdash; новая функция stdlib <code>MigrateState</code>; она также выполняется перед каждой командой, так что остальные чаты мигрируются лениво.</ins></p>
     </section>
 
     <!-- 8 -->
@@ -941,9 +1014,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>Путь &mdash; батчами</h3>
       <ol>
-        <li>Runtime берёт <code>internal_uuid</code> автора прямо из <code>GET registry /plugins/{id}</code> (поле <code>author_id</code> &mdash; никакого MXID) и кэширует его в собственной мелкой мапе <code>Map&lt;pluginId, authorId&gt;</code> &mdash; отдельно от кэша движка (&sect;7) и не тронутой reload’ом, поскольку автор не меняется вместе с кодом.</li>
+        <li>Runtime берёт <code>internal_uuid</code> автора прямо из <code>GET registry <del class="fix">/plugins/{id}</del><ins class="fix" data-r="R1">/internal/plugins/{id}</ins></code> (поле <code>author_id</code> &mdash; никакого MXID<ins class="fix">; публичный маршрут вернул бы <code>404</code> для dev-only плагина, ведь Runtime не автор</ins>) и кэширует его в собственной мелкой мапе <code>Map&lt;pluginId, authorId&gt;</code> &mdash; отдельно от кэша движка (&sect;7) и не тронутой reload’ом, поскольку автор не меняется вместе с кодом.</li>
         <li>Runtime <strong>буферизует</strong> строки <code>print</code>/<code>warn</code> и <code>POST</code>-ит их батчами в <code>integration /api/v1/plugin-console</code> как <code>{ author_id, msgs: [ … ] }</code> &mdash; flush по таймеру ~100&nbsp;мс, при достижении 64 строк или при возврате команды, что раньше.</li>
-        <li>integration резолвит <code>internal_uuid → mxid</code> <em>один раз</em>, оборачивает массив в одно событие <code>fstick.plugin.console</code> <code>{ msgs: [ … ] }</code> и вызывает Dendrite <code>/events/push</code>. Клиент добавляет каждый элемент <code>msgs[]</code> в панель консоли по порядку.</li>
+        <li>integration резолвит <code>internal_uuid → mxid</code> <em>один раз</em>, <ins class="fix" data-r="R20">отбрасывает строки тех <code>chat_id</code>, где автор больше не участник,</ins> оборачивает массив в одно событие <code>fstick.plugin.console</code> <code>{ msgs: [ … ] }</code> и вызывает Dendrite <code>/events/push</code>. Клиент добавляет каждый элемент <code>msgs[]</code> в панель консоли по порядку.</li>
       </ol>
       <p>Отдельно от <code>broadcastPluginState</code> &mdash; трафик консоли бёрстовый и одному получателю. Один резолв, один push, N строк. Именно поэтому маппер сидит в integration: единственный сервис, который уже превращает внутренние id в Matrix-push, делает и резолв, а Runtime никогда не трогает MXID.</p>
 
@@ -966,7 +1039,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Свойство</th><th>Контракт</th></tr></thead>
           <tbody>
             <tr><td>Тип события</td><td><code>fstick.plugin.console</code></td></tr>
-            <tr><td>Получатели</td><td>только автор плагина</td></tr>
+            <tr><td>Получатели</td><td>только автор плагина<ins class="fix" data-r="R20"> и только по чатам, где он всё ещё участник</ins></td></tr>
             <tr><td>Когда</td><td>всегда, для любого исполнения на dev-ветке</td></tr>
             <tr><td>История</td><td>нет &mdash; live с момента подключения</td></tr>
             <tr><td>Команды других пользователей</td><td>включаются (бэкенд-состояние общее)</td></tr>
@@ -992,7 +1065,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <tbody>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins?owned=true</code></td><td>автор</td><td>свои плагины, включая dev-only</td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins</code> (публичный)</td><td>все</td><td>фильтр <code>ACTIVE</code> + есть <code>RELEASED</code>-ветка</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}</code></td><td>все / автор</td><td>не-автор видит только <code>RELEASED</code>-ветки</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}</code></td><td>все / автор</td><td>не-автор видит только <code>RELEASED</code>-ветки<ins class="fix" data-r="R2">; с <code>?chat_id=</code> участники чата, где установлена dev-ветка, видят и её</ins></td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></td><td>автор + dev</td><td>bootstrap редактора: исходники инлайн + sha блобов</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></td><td>автор + dev</td><td>сохранение + триггер reload, только если менялась серверная сторона</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/publish</code></td><td>автор</td><td>dev → новая ветка-кандидат</td></tr>
@@ -1001,7 +1074,11 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></td><td>модератор</td><td><span class="pill pill--wait">WAITING_APPROVE</span> → <span class="pill pill--review">APPROVING</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></td><td>модератор</td><td>→ <span class="pill pill--released">RELEASED</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></td><td>модератор</td><td>→ <span class="pill pill--rejected">REJECTED</span> + уведомление</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server?branch_id=</code></td><td>автор (dev) / все (released)</td><td>добавлен gate; ответ теперь инлайн-исходник, не presigned URL</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server?branch_id=</code></td><td><del class="fix">автор (dev) / все (released)</del><ins class="fix" data-r="R4">автор (любая ветка) / модератор (кандидаты) / все (released)</ins></td><td>добавлен gate; ответ теперь инлайн-исходник, не presigned URL</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R2</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/client?branch_id=&amp;chat_id=</code></td><td>см. &sect;10</td><td>инлайн <code>cl.js</code> для каждого браузера, исполняющего плагин</td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R16</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/reload?chat_id=</code></td><td>автор + dev</td><td>кнопка Hot-reload; всегда пробрасывается в Runtime (с throttle)</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R1</span></td><td class="wrap"><code>/internal/plugins/{id}</code></td><td>внутренний</td><td>метаданные плагина с <code>author_id</code> и статусами веток, для Runtime и Installation</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R1</span></td><td class="wrap"><code>/internal/plugins/{id}/code/server?branch_id=</code></td><td>внутренний</td><td>исходник, который компилирует <code>loadEngine</code>; без проверки пользователя</td></tr>
           </tbody>
         </table>
       </div>
@@ -1012,9 +1089,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <table>
           <thead><tr><th>Метод</th><th>Путь</th><th>Назначение</th></tr></thead>
           <tbody>
-            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>пересобрать движок для <code>branch_id</code>; мин. интервал 3&nbsp;с → <code>429</code>; запускает авто-мигратор состояния</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>пересобрать движок для <code>branch_id</code>; мин. интервал 3&nbsp;с <ins class="fix" data-r="R17">на <code>(plugin, branch)</code></ins> → <code>429</code>; запускает авто-мигратор состояния</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>автор + dev &mdash; перезаписать состояние из редактора</td></tr>
-            <tr><td colspan="3" class="wrap">Хуки <code>print</code>/<code>warn</code> буферизуют строки (<code>level: info|warn</code>, <code>system: false</code>) и <code>POST</code>-ят их батчами (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;мс / 64 строки / конец команды) в <code>integration /plugin-console</code> &mdash; Runtime несёт <code>internal_uuid</code> автора, никогда MXID. Неперехваченные исключения идут тем же путём как <code>level: "error", system: true</code>. Кэш движка ключуется <code>(pluginId, branchId)</code> &mdash; без sha; ветка резолвится по <code>(pluginId, chatId)</code> через Installation, кэш 60&nbsp;с; <code>internal_uuid</code> автора кэшируется отдельно, только по <code>pluginId</code>.</td></tr>
+            <tr><td colspan="3" class="wrap">Хуки <code>print</code>/<code>warn</code> буферизуют строки (<code>level: info|warn</code>, <code>system: false</code>) и <code>POST</code>-ят их батчами (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;мс / 64 строки / конец команды) в <code>integration /plugin-console</code> &mdash; Runtime несёт <code>internal_uuid</code> автора, никогда MXID. Неперехваченные исключения идут тем же путём как <code>level: "error", system: true</code>. Кэш движка ключуется <code>(pluginId, branchId)</code> &mdash; без sha; ветка резолвится по <code>(pluginId, chatId)</code> через Installation, кэш 60&nbsp;с; <code>internal_uuid</code> автора кэшируется отдельно, только по <code>pluginId</code>. <ins class="fix" data-r="R1">И код, и автор берутся из служебных маршрутов Registry <code>/internal/…</code>.</ins></td></tr>
           </tbody>
         </table>
       </div>
@@ -1025,8 +1102,12 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Метод</th><th>Путь</th><th>Назначение</th></tr></thead>
           <tbody>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/identity/resolve</code></td><td><code>{ mxid } → { internal_uuid }</code>, create-or-return; минтит uuid при первом контакте</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/identity/{internal_uuid}</code></td><td><code>→ { mxid }</code>, для исходящего push; batch-вариант для списков участников</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/identity/{internal_uuid}</code></td><td><code>→ { mxid }</code>, для исходящего push<del class="fix">; batch-вариант для списков участников</del></td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R3</span></td><td class="wrap"><code>/api/v1/identity/resolve-batch</code></td><td><code>{ mxids } → map</code>; списки участников</td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R3</span></td><td class="wrap"><code>/api/v1/identity/lookup-batch</code></td><td><code>{ uuids } → map</code>; обогащение ответов в Gateway</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugin-console</code></td><td>резолв <code>internal_uuid → mxid</code> автора, push одного батча <code>{ msgs:[…] }</code> через <code>/events/push</code></td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R21</span></td><td class="wrap"><code>/api/v1/plugin-events/push</code></td><td>Registry → push <code>fstick.plugin.reloaded</code> участникам перечисленных чатов</td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R21</span></td><td class="wrap"><code>/api/v1/dev-room/notify</code></td><td>Registry → сообщение в комнату автора Fstick Developer (released / rejected)</td></tr>
             <tr><td colspan="3" class="wrap">integration получает свой первый датастор (Postgres) под таблицу идентичности &mdash; см. &sect;3. Новые типы событий поверх существующего канала: <code>fstick.plugin.console</code>, <code>fstick.plugin.reloaded</code>. Нового транспорта нет.</td></tr>
           </tbody>
         </table>
@@ -1038,16 +1119,19 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Метод</th><th>Путь</th><th>Назначение</th></tr></thead>
           <tbody>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/internal/installations/resolve?plugin_id=&amp;chat_id=</code></td><td>новый, внутренний &mdash; <code>→ { branch_id, branch_status }</code>; единственный способ, которым Runtime узнаёт, какую ветку исполняет чат (&sect;7)</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R18</span></td><td class="wrap"><code>/internal/installations?branch_id=</code></td><td>новый, внутренний &mdash; <code>→ { chat_ids }</code>; кому слать <code>fstick.plugin.reloaded</code></td></tr>
+            <tr class="fix-row"><td><span class="method method--patch">PATCH</span> <span class="fix-tag">R6</span></td><td class="wrap"><code>/api/v1/installations/{id}</code></td><td>перенавести закреплённую установку на другую ветку (обновление / откат)</td></tr>
           </tbody>
         </table>
       </div>
       <ul>
-        <li><code>POST /installations</code>: получить <code>status</code> ветки + <code>author_id</code> из Registry; если целевая ветка <code>dev</code>, требовать <code>X-User-Id == author_id</code> → иначе <code>403</code>. Released-ветки: кто угодно.</li>
+        <li><code>POST /installations</code>: получить <code>status</code> ветки + <code>author_id</code> из Registry<ins class="fix" data-r="R1"> (<code>GET /internal/plugins/{id}</code>)</ins>; если целевая ветка <code>dev</code>, требовать <code>X-User-Id == author_id</code> → иначе <code>403</code>. Released-ветки: кто угодно. <ins class="fix" data-r="R6"><code>branch_id</code> опционален: без него &mdash; максимальный <code>RELEASED</code> SemVer, закреплённо.</ins></li>
         <li><code>GET /installations</code>: добавить <code>branch_status</code> и <code>author_id</code> в каждый элемент, чтобы фронтенд мог показать <strong>Edit</strong>.</li>
       </ul>
 
       <h3>Gateway</h3>
-      <p>Менять входящий <code>X-User-Id</code> &mdash; MXID, проставленный Dendrite &mdash; на <code>internal_uuid</code> через <code>integration /api/v1/identity/resolve</code>, с кэшем в процессе (LRU, без инвалидации). Форвардить только его; <code>X-User-Matrix-Id</code> не прокидывается. Проксировать новые маршруты: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, действия модерации, <code>PUT …/state</code>, <code>?owned=true</code>.</p>
+      <p>Менять входящий <code>X-User-Id</code> &mdash; MXID, проставленный Dendrite &mdash; на <code>internal_uuid</code> через <code>integration /api/v1/identity/resolve</code>, с кэшем в процессе (LRU, без инвалидации). Форвардить только его; <code>X-User-Matrix-Id</code> не прокидывается. Проксировать новые маршруты: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, действия модерации, <code>PUT …/state</code>, <code>?owned=true</code><ins class="fix" data-r="R21">, <code>…/branches/{bid}/reload</code>, <code>…/branches/{bid}/cancel</code>, <code>GET /moderation/branches</code>, <code>…/code/client</code>, <code>PATCH /installations/{id}</code>; <code>GET /api/v1/me</code> отдавать самому. <code>/internal/**</code> не проксировать никогда</ins>.</p>
+      <p><ins class="fix" data-r="R3"><strong>Обогащение ответов.</strong> На выходе Gateway добавляет MXID рядом с каждым распознанным id пользователя: <code>author_id</code> → <code>author_mxid</code>, <code>installed_by</code> → <code>installed_by_mxid</code>, <code>claimed_by</code> → <code>claimed_by_mxid</code>, <code>author.id</code> → <code>author.mxid</code>. Значения &mdash; из кэша или <code>lookup-batch</code>. Сами сервисы MXID не хранят и не возвращают.</ins></p>
     </section>
 
     <!-- 10 -->
@@ -1060,8 +1144,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <h3>Соглашения</h3>
       <ul>
         <li>Каждый внешний вызов идёт через Gateway с <code>Authorization: Bearer &lt;matrix_token&gt;</code>. Gateway его аутентифицирует и проставляет <code>X-User-Id: &lt;internal_uuid&gt;</code> (&sect;3); контракты ниже &mdash; это логическая форма на границе сервиса.</li>
-        <li>Тело ошибки всегда <code>{ "error": "&lt;snake_code&gt;", "message": "&lt;human&gt;", … }</code>. Коды: <code>400</code> невалидный запрос, <code>401</code> плохой токен, <code>403</code> не автор / не модератор, <code>404</code> неизвестный id или ветка не видна вызывающему, <code>409</code> конфликт состояния, <code>413</code> слишком большой, <code>422</code> семантическая валидация, <code>429</code> throttled.</li>
-        <li>Действия-переходы (<code>claim</code> / <code>approve</code> / <code>reject</code> / <code>cancel</code>) <strong>идемпотентны при повторе</strong>: повтор, который находит ветку уже в целевом состоянии, возвращает <code>200</code> с текущей строкой; действие, невозможное для текущего состояния, возвращает <code>409</code>.</li>
+        <li>Тело ошибки всегда <code>{ "error": "&lt;snake_code&gt;", "message": "&lt;human&gt;", … }</code>. Коды: <code>400</code> невалидный запрос, <code>401</code> плохой токен, <code>403</code> не автор / не модератор<ins class="fix" data-r="R9"> для того, что вызывающий видит</ins>, <code>404</code> неизвестный id или ветка не видна вызывающему<ins class="fix"> &mdash; скрытая ветка всегда <code>404</code>, никогда <code>403</code>, чтобы не выдавать её существование</ins>, <code>409</code> конфликт состояния, <code>413</code> слишком большой, <code>422</code> семантическая валидация, <code>429</code> throttled.</li>
+        <li>Действия-переходы (<code>claim</code> / <code>approve</code> / <code>reject</code> / <code>cancel</code>) <strong>идемпотентны при повторе</strong>: повтор, который находит ветку уже в целевом состоянии, возвращает <code>200</code> с текущей строкой; действие, невозможное для текущего состояния, возвращает <code>409</code>. <ins class="fix" data-r="R8">То есть повторный <code>reject</code> на <code>REJECTED</code>-ветке &mdash; <code>200</code>, а <code>reject</code> на <code>CANCELLED</code>- или <code>RELEASED</code>-ветке &mdash; <code>409</code>.</ins></li>
+        <li><ins class="fix" data-r="R1">Маршруты <code>/internal/**</code> &mdash; только service-to-service: Gateway их никогда не проксирует, <code>X-User-Id</code> не проверяется, доступны только во внутренней сети.</ins></li>
+        <li><ins class="fix" data-r="R5">«Модератор» &mdash; это строка в <code>registry.moderators</code> (&sect;4).</ins></li>
       </ul>
 
       <h3>Registry &mdash; редактор</h3>
@@ -1087,19 +1173,20 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--put">PUT</span><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Ветка:</b> только dev</span><span><b>Лимит:</b> 500 КБ/файл &middot; 1.2 МБ декод. тело &rarr; <code>413</code></span><span><b>Принимает:</b> <code>Content-Encoding: gzip | br</code></span></div>
+          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Ветка:</b> только dev</span><span><b>Лимит:</b> 500 КБ/файл &middot; <del class="fix">1.2 МБ</del><ins class="fix" data-r="R19">2.2 МБ</ins> декод. тело &rarr; <code>413</code></span><span><b>Принимает:</b> <code>Content-Encoding: gzip | br</code></span></div>
           <pre><code><span class="tok-c">// запрос — слать только изменившуюся сторону(ы)</span>
 {
   <span class="tok-k">"client"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
   <span class="tok-k">"server"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
-  <span class="tok-k">"runtime"</span>: { <span class="tok-k">"server"</span>: <span class="tok-s">"sv.lua@2.0.0"</span> }   <span class="tok-c">// опц. — @X = версия stdlib</span>
+  <span class="tok-k">"runtime"</span>: { <span class="tok-k">"server"</span>: <span class="tok-s">"sv.lua@2.0.0"</span> }   <span class="tok-c">// опц. — @X = версия stdlib<ins class="fix" data-r="R23">; пока сервер не поддерживает → 422 runtime_change_unsupported</ins></span>
 }
 
 <span class="tok-c">// 200 — битый код ВСЁ РАВНО сохраняется, с варнингом</span>
 { <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"syntax error at line 12"</span> } ],
   <span class="tok-k">"sha"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> },
   <span class="tok-k">"reloaded"</span>: true,
-  <span class="tok-k">"client_changed"</span>: false }   <span class="tok-c">// Registry сравнивает старый и новый client_blob_sha сам — Runtime не спрашивают</span>
+<ins class="fix" data-r="R16">  <span class="tok-k">"retry_after_ms"</span>: null,      <span class="tok-c">// заполняется, только если reloaded = false</span>
+</ins>  <span class="tok-k">"client_changed"</span>: false }   <span class="tok-c">// Registry сравнивает старый и новый client_blob_sha сам — Runtime не спрашивают</span>
 
 <span class="tok-c">// 409 — кто-то другой сдвинул код; ничего не записано</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"stale_code"</span>,
@@ -1107,7 +1194,22 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
 <span class="tok-c">// 413 — один файл больше 500 000 байт (замер после декода)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"file_too_large"</span>, <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"limit"</span>: 500000, <span class="tok-k">"actual"</span>: 812345 }</code></pre>
-          <p>Сохранение пишет каждую изменённую сторону в <code>blobs/{sha256}</code> и перенаводит dev-ветку. <code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code> вызывается <strong>только если менялась серверная сторона</strong> &mdash; чисто клиентское сохранение до Runtime не доходит вовсе, поскольку он этот код не исполняет (&sect;7). <code>reloaded</code> = <code>true</code>, когда после этого вызова движок гарантированно актуален &mdash; это покрывает и успешный reload, и случай, когда перезагружать было нечего; <code>false</code> только если throttle reload (&sect;7) отложил реально нужную пересборку. <code>client_changed</code> &mdash; собственное сравнение Registry старого и нового client-sha; Runtime об этом не спрашивают (&sect;7).</p>
+          <p>Сохранение пишет каждую изменённую сторону в <code>blobs/{sha256}</code> и перенаводит dev-ветку. <code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code> вызывается <strong>только если менялась серверная сторона</strong> <ins class="fix" data-r="R23">(изменённый <code>runtime.server</code> считается серверным изменением)</ins> &mdash; чисто клиентское сохранение до Runtime не доходит вовсе, поскольку он этот код не исполняет (&sect;7). <code>reloaded</code> = <code>true</code>, когда после этого вызова движок гарантированно актуален &mdash; это покрывает и успешный reload, и случай, когда перезагружать было нечего; <code>false</code> только если throttle reload (&sect;7) отложил реально нужную пересборку. <ins class="fix" data-r="R16">Тогда редактор зовёт <code>POST …/branches/{bid}/reload</code>, когда пройдёт <code>retry_after_ms</code> (ниже).</ins> <ins class="fix" data-r="R25">Reload адресован ветке, а не установке, поэтому работает, даже если плагин удалили из <code>chat_id</code>, пока редактор был открыт; пропускается только немедленная миграция состояния этого чата.</ins> <code>client_changed</code> &mdash; собственное сравнение Registry старого и нового client-sha; Runtime об этом не спрашивают (&sect;7).</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R16">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/reload?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Ветка:</b> только dev</span><span><b>Throttle:</b> 3&nbsp;с / (plugin, branch)</span></div>
+          <pre><code><span class="tok-c">// без тела</span>
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"reloaded"</span>: true }
+
+<span class="tok-c">// 429</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
+          <p>Кнопка Hot-reload. Registry безусловно пробрасывает вызов в <code>/internal/plugins/{id}/reload</code> Runtime &mdash; в отличие от <code>PUT …/code</code>, он не проверяет, менялась ли серверная сторона. Редактор зовёт его и для повтора после сохранения с <code>reloaded: false</code>.</p>
         </div>
       </div>
 
@@ -1133,7 +1235,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 { <span class="tok-k">"items"</span>: [ {
     <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"plugin_name"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"changelog"</span>,
     <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> | <span class="tok-s">"APPROVING"</span>,
-    <span class="tok-k">"author"</span>: { <span class="tok-k">"id"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:…"</span> },
+    <span class="tok-k">"author"</span>: { <span class="tok-k">"id"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:…"</span> },<ins class="fix" data-r="R3">  <span class="tok-c">// mxid добавляет Gateway, не Registry</span></ins>
     <span class="tok-k">"submitted_at"</span>, <span class="tok-k">"claimed_by"</span>: <span class="tok-s">null</span>
   } ],
   <span class="tok-k">"page"</span>: 0, <span class="tok-k">"total"</span>: 7 }</code></pre>
@@ -1159,13 +1261,13 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> модератор</span><span><b>Из:</b> <code>WAITING_APPROVE</code> или <code>APPROVING</code></span></div>
+          <div class="attrs"><span><b>Auth:</b> модератор</span><span><b>Из:</b> <code>WAITING_APPROVE</code> или <code>APPROVING</code></span><span><ins class="fix" data-r="R12"><b>Из APPROVING:</b> только взявший claim &rarr; иначе <code>403 not_claimer</code></ins></span></div>
           <pre><code><span class="tok-c">// запрос</span>
 { <span class="tok-k">"reason"</span>: <span class="tok-s">"…"</span> }        <span class="tok-c">// обязательно, ≤ 2000 символов</span>
 
 <span class="tok-c">// 200</span>
 { <span class="tok-k">"branch_id"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"REJECTED"</span> }</code></pre>
-          <p>Ветка сохраняется (скрыта, не устанавливается). Ставится <code>plugins.last_rejection = { reason, at, semver, branch_id }</code>; строка в moderation-log; автору сообщение в комнату Fstick Developer. <code>resubmit</code> нет &mdash; автор правит dev-ветку и снова зовёт <code>/publish</code>. <code>409</code>, если уже терминальная.</p>
+          <p>Ветка сохраняется (скрыта, не устанавливается). Ставится <code>plugins.last_rejection = { reason, at, semver, branch_id }</code>; строка в moderation-log; автору сообщение в комнату Fstick Developer. <code>resubmit</code> нет &mdash; автор правит dev-ветку и снова зовёт <code>/publish</code>. <del class="fix"><code>409</code>, если уже терминальная.</del><ins class="fix" data-r="R8">Повтор на <code>REJECTED</code>-ветке → <code>200</code>; на <code>RELEASED</code> / <code>CANCELLED</code> → <code>409</code>.</ins></p>
         </div>
       </div>
 
@@ -1173,7 +1275,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></div>
         <div class="endpoint-body">
           <div class="attrs"><span><b>Auth:</b> автор</span><span><b>Из:</b> <code>WAITING_APPROVE</code> или <code>APPROVING</code></span></div>
-          <p>Без тела. Ветка &rarr; <span class="pill pill--cancelled">CANCELLED</span> (сохраняется), строка в moderation-log, выпадает из очереди ревью. Ни <code>last_rejection</code>, ни уведомления &mdash; автор отозвал сам. <code>200 { "branch_id", "status": "CANCELLED" }</code>. <code>409</code>, если уже терминальная (<code>RELEASED</code> / <code>REJECTED</code> / <code>CANCELLED</code>).</p>
+          <p>Без тела. Ветка &rarr; <span class="pill pill--cancelled">CANCELLED</span> (сохраняется), строка в moderation-log, выпадает из очереди ревью. Ни <code>last_rejection</code>, ни уведомления &mdash; автор отозвал сам. <code>200 { "branch_id", "status": "CANCELLED" }</code>. <del class="fix"><code>409</code>, если уже терминальная (<code>RELEASED</code> / <code>REJECTED</code> / <code>CANCELLED</code>).</del><ins class="fix" data-r="R8">Повтор на <code>CANCELLED</code>-ветке → <code>200</code>; на <code>RELEASED</code> / <code>REJECTED</code> → <code>409</code>.</ins></p>
         </div>
       </div>
 
@@ -1199,10 +1301,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> опционально</span><span><b>Не-автор:</b> только <code>RELEASED</code>-ветки &middot; <code>404</code>, если нет ни одной</span></div>
+          <div class="attrs"><span><b>Auth:</b> опционально</span><span><b>Не-автор:</b> только <code>RELEASED</code>-ветки &middot; <code>404</code>, если нет ни одной</span><span><ins class="fix" data-r="R2"><b>С <code>?chat_id=</code>:</b> участник чата, чья установка указывает на dev-ветку, видит и её вместо <code>404</code></ins></span></div>
           <pre><code><span class="tok-c">// 200 (вид автора — все ветки + last_rejection)</span>
 {
-  <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"author_id"</span>, <span class="tok-k">"icon_url"</span>, <span class="tok-k">"description"</span>,
+  <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"author_id"</span>, <ins class="fix" data-r="R3"><span class="tok-k">"author_mxid"</span>, </ins><span class="tok-k">"icon_url"</span>, <span class="tok-k">"description"</span>,
   <span class="tok-k">"branches"</span>: [
     { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">null</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WORKING"</span>, <span class="tok-k">"runtime"</span>: {…} },
     { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.1.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"RELEASED"</span>, <span class="tok-k">"created_at"</span> },
@@ -1230,10 +1332,43 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/server?branch_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> автор (dev / кандидат) &middot; любой (<code>RELEASED</code>)</span><span><b>Вызывающий:</b> <code>loadEngine</code> Runtime (&sect;7), server-to-server</span><span><b>Изменено:</b> инлайн, не presigned</span></div>
+          <div class="attrs"><span><b>Auth:</b> автор (<del class="fix">dev / кандидат</del><ins class="fix" data-r="R4">любая ветка</ins>) &middot; <ins class="fix">модератор (кандидаты) &middot; </ins>любой (<code>RELEASED</code>)</span><span><b>Вызывающий:</b> <del class="fix"><code>loadEngine</code> Runtime (&sect;7), server-to-server</del><ins class="fix" data-r="R1">редактор и UI модерации; Runtime ходит в <code>/internal</code>-двойник ниже</ins></span><span><b>Изменено:</b> инлайн, не presigned</span></div>
           <pre><code><span class="tok-c">// 200</span>
 { <span class="tok-k">"text"</span>: <span class="tok-s">"…lua…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }</code></pre>
-          <p>Добавлен gate: не-<code>RELEASED</code> ветка возвращает <code>403</code> всем, кроме автора. Registry сам читает блоб из S3 и отдаёт текст напрямую &mdash; без presigned URL, без второго хопа, то же правило, что и для транспорта кода в редакторе (&sect;6). Используется для <em>любой</em> ветки, не только released: это единственный путь, которым вызывает <code>loadEngine</code>, будь то холодный промах кэша или reload.</p>
+          <p>Добавлен gate: не-<code>RELEASED</code> ветка возвращает <del class="fix"><code>403</code></del><ins class="fix" data-r="R9"><code>404</code></ins> всем, кроме автора<ins class="fix" data-r="R4"> (и, для кандидата, модератора)</ins>. Registry сам читает блоб из S3 и отдаёт текст напрямую &mdash; без presigned URL, без второго хопа, то же правило, что и для транспорта кода в редакторе (&sect;6). <del class="fix">Используется для <em>любой</em> ветки, не только released: это единственный путь, которым вызывает <code>loadEngine</code>, будь то холодный промах кэша или reload.</del></p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R2">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/client?branch_id=&amp;chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> любой (<code>RELEASED</code>) &middot; автор / модератор (кандидат) &middot; автор или участник <code>chat_id</code>, чья установка указывает на эту ветку (dev)</span><span><b>Изменено:</b> инлайн, не presigned</span></div>
+          <pre><code><span class="tok-c">// 200 — ETag: "sha256:…"; повторный запрос неизменённого кода → 304</span>
+{ <span class="tok-k">"text"</span>: <span class="tok-s">"…js…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }
+
+<span class="tok-c">// 404 — ветка не видна вызывающему</span></code></pre>
+          <p>То, что каждый браузер, исполняющий плагин, грузит как <code>cl.js</code> и перекачивает по <code>fstick.plugin.reloaded</code>. Для dev-ветки Registry проверяет чат через <code>/internal/installations/resolve</code> Installation, а членство в чате &mdash; через integration.</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R1">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/plugins/{id}/code/server?branch_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> <code>loadEngine</code> Runtime (&sect;7)</span><span><b>Доступ:</b> внутренняя сеть, без проверки пользователя</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"text"</span>: <span class="tok-s">"…lua…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }
+<span class="tok-c">// 404 — неизвестный плагин / ветка</span></code></pre>
+          <p>Единственный путь, которым ходит <code>loadEngine</code>, для любой ветки, будь то холодный промах кэша или reload. Проверять пользователя здесь нельзя: команды на dev-ветке запускает любой участник чата, а не только автор (&sect;8), и публичный маршрут им бы отказал.</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R1">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/plugins/{id}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Runtime (поиск автора, &sect;8), Installation (проверка debug-установки)</span><span><b>Доступ:</b> внутренняя сеть, без проверки пользователя</span></div>
+          <pre><code><span class="tok-c">// 200 — все ветки, независимо от статуса</span>
+{ <span class="tok-k">"id"</span>, <span class="tok-k">"status"</span>, <span class="tok-k">"author_id"</span>,
+  <span class="tok-k">"branches"</span>: [ { <span class="tok-k">"id"</span>, <span class="tok-k">"status"</span>, <span class="tok-k">"semver"</span> } ] }</code></pre>
         </div>
       </div>
 
@@ -1259,7 +1394,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/internal/plugins/{id}/reload</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Вызывающий:</b> Registry (внутренний)</span><span><b>Вызывается:</b> только если менялась серверная сторона</span><span><b>Throttle:</b> 3&nbsp;с / (plugin, chat)</span></div>
+          <div class="attrs"><span><b>Вызывающий:</b> Registry (внутренний)</span><span><b>Вызывается:</b> только если менялась серверная сторона<ins class="fix" data-r="R16">, или явным hot-reload</ins></span><span><b>Throttle:</b> 3&nbsp;с / <del class="fix">(plugin, chat)</del><ins class="fix" data-r="R17">(plugin, branch)</ins></span></div>
           <pre><code><span class="tok-c">// запрос</span>
 { <span class="tok-k">"chat_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span> }
 
@@ -1267,10 +1402,23 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 <span class="tok-c">// что и при холодном промахе кэша (§7); состояние авто-мигрировано</span>
 { <span class="tok-k">"reloaded"</span>: true }
 
-<span class="tok-c">// 429 — вызван снова в пределах 3 с (Registry отдаёт reloaded:false редактору)</span>
+<span class="tok-c">// 429 — вызван снова в пределах 3 с (Registry отдаёт reloaded:false редактору<ins class="fix" data-r="R16"> вместе с retry_after_ms</ins>)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
           <p>Здесь нет <code>client_sha</code>/<code>server_sha</code> &mdash; Runtime не ключует по sha (&sect;7) и не сообщает <code>client_changed</code>, поскольку никогда не грузит клиентский код. Этот факт вычисляет и несёт сам Registry (см. выше и &sect;11).</p>
         </div>
+      </div>
+
+      <div class="fix-block" data-r="R3">
+      <h3>Gateway</h3>
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/me</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> токен</span><span><b>Отдаёт:</b> Gateway, из кэша маппера</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"internal_uuid"</span>: <span class="tok-s">"9f3c1a2e-…"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:fstick.local"</span> }</code></pre>
+          <p>Фронтенд запрашивает это раз за сессию и сравнивает <code>internal_uuid</code> с полями <code>author_id</code> (&sect;12). Сам uuid не рендерится.</p>
+        </div>
+      </div>
       </div>
 
       <h3>Integration &mdash; идентичность</h3>
@@ -1308,6 +1456,16 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         </div>
       </div>
 
+      <div class="endpoint fix-block" data-r="R3">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/identity/lookup-batch</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Gateway (обогащение ответов, только промахи кэша)</span></div>
+          <pre><code>{ <span class="tok-k">"uuids"</span>: [ <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-s">"&lt;uuid&gt;"</span> ] }
+<span class="tok-c">// 200 — неизвестные uuid пропускаются</span>
+{ <span class="tok-k">"map"</span>: { <span class="tok-s">"&lt;uuid&gt;"</span>: <span class="tok-s">"@a:x"</span> } }</code></pre>
+        </div>
+      </div>
+
       <h3>Integration &mdash; консоль <span class="pill pill--dev">внутренний</span></h3>
 
       <div class="endpoint">
@@ -1326,7 +1484,31 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 }
 
 <span class="tok-c">// 202 — резолв author_id → mxid, отправлено одно fstick.plugin.console { msgs }</span>
-<span class="tok-c">// 404 — author_id неизвестен → отброшено и залогировано, вызывающему всё равно 202</span></code></pre>
+<del class="fix"><span class="tok-c">// 404 — author_id неизвестен → отброшено и залогировано, вызывающему всё равно 202</span></del><ins class="fix" data-r="R10"><span class="tok-c">// неизвестный author_id → батч отброшен и залогирован; вызывающий всё равно получает 202, никогда 404</span>
+<span class="tok-c">// строки по чатам, из которых автор вышел → отбрасываются (R20)</span></ins></code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R21">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugin-events/push</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Registry (внутренний)</span><span><b>Доставка:</b> fire-and-forget &rarr; <code>202</code></span></div>
+          <pre><code>{ <span class="tok-k">"type"</span>: <span class="tok-s">"fstick.plugin.reloaded"</span>,
+  <span class="tok-k">"chat_ids"</span>: [ <span class="tok-s">"…"</span> ],
+  <span class="tok-k">"content"</span>: { <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span> } }
+<span class="tok-c">// 202 — по одному push на чат, всем участникам; chat_id добавляется в content каждого push</span></code></pre>
+          <p><code>chat_ids</code> Registry берёт из <code>GET /internal/installations?branch_id=</code> Installation (&sect;11).</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R21">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/dev-room/notify</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Registry (внутренний)</span><span><b>Доставка:</b> fire-and-forget &rarr; <code>202</code></span></div>
+          <pre><code>{ <span class="tok-k">"author_id"</span>: <span class="tok-s">"&lt;internal_uuid&gt;"</span>,
+  <span class="tok-k">"kind"</span>: <span class="tok-s">"released"</span> | <span class="tok-s">"rejected"</span>,
+  <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"plugin_name"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"reason"</span> }   <span class="tok-c">// reason: только для rejected</span></code></pre>
+          <p>integration переводит <code>author_id</code> в MXID и пишет в комнату автора Fstick Developer, создавая её при первом использовании (&sect;13 #6).</p>
         </div>
       </div>
 
@@ -1343,6 +1525,16 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         </div>
       </div>
 
+      <div class="endpoint fix-block" data-r="R18">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/installations?branch_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Вызывающий:</b> Registry (внутренний)</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"chat_ids"</span>: [ <span class="tok-s">"…"</span> ] }</code></pre>
+          <p>Все чаты, чья установка указывает на ветку, &mdash; получатели <code>fstick.plugin.reloaded</code>.</p>
+        </div>
+      </div>
+
       <h3>Installation <span class="pill pill--dev">изменено</span></h3>
 
       <div class="endpoint">
@@ -1350,14 +1542,14 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <div class="endpoint-body">
           <div class="attrs"><span><b>Auth:</b> участник чата</span><span><b>Debug-ветка:</b> только автор &rarr; <code>403</code></span></div>
           <pre><code><span class="tok-c">// запрос</span>
-{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span> }
+{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span> }<ins class="fix" data-r="R6">   <span class="tok-c">// branch_id опционален → максимальный RELEASED semver, закреплённо</span></ins>
 
 <span class="tok-c">// 201</span>
 { <span class="tok-k">"installation_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"branch_status"</span> }
 
 <span class="tok-c">// 403 — целевая ветка не RELEASED и вызывающий ≠ автор</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"debug_install_forbidden"</span> }</code></pre>
-          <p>Installation-service читает <code>branch.status</code> + <code>plugin.author_id</code> из Registry для этой проверки.</p>
+          <p>Installation-service читает <code>branch.status</code> + <code>plugin.author_id</code> из Registry <ins class="fix" data-r="R1">(<code>GET /internal/plugins/{id}</code>)</ins> для этой проверки.</p>
         </div>
       </div>
 
@@ -1369,9 +1561,25 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 { <span class="tok-k">"items"</span>: [ {
     <span class="tok-k">"installation_id"</span>, <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span>,
     <span class="tok-k">"branch_status"</span>: <span class="tok-s">"WORKING"</span> | <span class="tok-s">"RELEASED"</span>,
-    <span class="tok-k">"author_id"</span>, <span class="tok-k">"installed_by"</span>, <span class="tok-k">"installed_at"</span>
+    <span class="tok-k">"author_id"</span>, <span class="tok-k">"installed_by"</span>, <span class="tok-k">"installed_at"</span><ins class="fix" data-r="R3">,
+    <span class="tok-k">"author_mxid"</span>, <span class="tok-k">"installed_by_mxid"</span>   <span class="tok-c">// добавляет Gateway</span></ins>
   } ] }</code></pre>
-          <p>Фронтенд показывает <strong>Edit</strong>, когда <code>branch_status === "WORKING" &amp;&amp; author_id === myInternalUuid</code>.</p>
+          <p>Фронтенд показывает <strong>Edit</strong>, когда <code>branch_status === "WORKING" &amp;&amp; author_id === myInternalUuid</code><ins class="fix" data-r="R3"> (из <code>GET /api/v1/me</code>)</ins>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R6">
+        <div class="endpoint-head"><span class="method method--patch">PATCH</span><code>/api/v1/installations/{id}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> участник чата</span><span><b>Debug-ветка:</b> только автор &rarr; <code>403</code></span></div>
+          <pre><code><span class="tok-c">// запрос</span>
+{ <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span> }
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"installation_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"branch_status"</span> }
+
+<span class="tok-c">// 403 debug_install_forbidden · 404 ветка не видна · 422 branch_of_other_plugin</span></code></pre>
+          <p>Обновляет или откатывает закреплённую установку; правила те же, что у <code>POST</code>. Runtime подхватит изменение в пределах своего TTL резолва 60&nbsp;с (&sect;7).</p>
         </div>
       </div>
     </section>
@@ -1398,9 +1606,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 }
 <span class="tok-c">// Runtime → integration:  { "author_id": &lt;internal_uuid&gt;, "msgs": [ … ] }</span>
 <span class="tok-c">// integration переводит author_id → MXID, адресует push, форвардит { msgs } как есть.</span>
-<span class="tok-c">// Клиентское событие id не несёт. Порядок внутри msgs сохраняется.</span>
+<span class="tok-c">// Клиентское событие <del class="fix">id</del><ins class="fix" data-r="R10">author_id</ins> не несёт. Порядок внутри msgs сохраняется.</span>
 
-<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → автору · только когда client_changed истинно</span>
+<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → <del class="fix">автору</del><ins class="fix" data-r="R18">каждому участнику каждого чата, чья установка указывает на эту dev-ветку</ins> · только когда client_changed истинно</span>
 {
   <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
   <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span>          <span class="tok-c">// → перекачать cl.js, перезапустить runDsl</span>
@@ -1408,7 +1616,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 <span class="tok-c">// Отправляет Registry (через Integration), не Runtime — только Registry сравнивает</span>
 <span class="tok-c">// старый и новый client_blob_sha; ответ reload от Runtime этого не несёт.</span>
 <span class="tok-c">// Чисто серверному сохранению нечего обновлять в других открытых вкладках,</span>
-<span class="tok-c">// поэтому Registry вообще не шлёт событие, а не пушит client_changed:false.</span></code></pre>
+<span class="tok-c">// поэтому Registry вообще не шлёт событие, а не пушит client_changed:false.</span>
+<ins class="fix" data-r="R18"><span class="tok-c">// Получатели: Registry → Installation GET /internal/installations?branch_id= → chat_ids</span>
+<span class="tok-c">// → integration POST /plugin-events/push. Перекачивают все, кто исполняет dev-cl.js,</span>
+<span class="tok-c">// а не только вкладки редактора автора; иначе их клиент и новый сервер разойдутся.</span></ins></code></pre>
     </section>
 
     <!-- 12 -->
@@ -1418,17 +1629,18 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <h2><span class="num">12</span>Контракт фронтенда</h2>
       </div>
       <ul>
-        <li><strong>Edit</strong> показывается, когда <code>installation.branch_status === "WORKING"</code> и <code>installation.author_id === myInternalUuid</code>.</li>
+        <li><strong>Edit</strong> показывается, когда <code>installation.branch_status === "WORKING"</code> и <code>installation.author_id === myInternalUuid</code><ins class="fix" data-r="R3">; <code>myInternalUuid</code> берётся из <code>GET /api/v1/me</code>, раз за сессию</ins>.</li>
         <li>Поверхность редактора: два поля кода (client / server), панель консоли, которая добавляет каждый элемент <code>msgs[]</code> события <code>fstick.plugin.console</code> (фильтр по <code>plugin_id</code> + <code>chat_id</code>, тумблер <code>info</code>/<code>warn</code>/<code>error</code>), и сворачиваемая редактируемая JSON-панель состояния с кнопкой «обновить».</li>
         <li>Строки консоли с <code>system: true</code> рендерятся визуально отдельно от собственного вывода плагина через <code>print</code>/<code>warn</code> &mdash; падение не должно выглядеть как то, что напечатал автор.</li>
         <li>Каждое поле кода показывает живой счётчик байт и блокирует сохранение на <strong>500 КБ</strong>; серверный <code>413</code> &mdash; бэкстоп.</li>
-        <li>Два вида: правая панель и отдельное окно, открываемое через <code>window.open</code> на том же origin &mdash; токен авторизации читается из <code>localStorage</code>, как у Matrix-сессии.</li>
+        <li>Два вида: правая панель и отдельное окно, открываемое через <code>window.open</code> на том же origin &mdash; <del class="fix">токен авторизации читается из <code>localStorage</code>, как у Matrix-сессии</del><ins class="fix" data-r="R26">дочернее окно получает access token от opener по <code>postMessage</code> (с проверкой origin), а не читает хранилище напрямую. Element может хранить токен зашифрованным pickle-ключом в IndexedDB, так что его раскладка хранилища &mdash; не контракт</ins>.</li>
         <li>Сохранение держит пару <code>sha</code> из <code>GET …/edit</code>, шлёт их как <code>base_sha</code>; на <code>409</code> сообщает пользователю, что код изменён в другом месте, и просит обновить страницу.</li>
-        <li>Кнопка hot-reload дебаунсится до &ge;&nbsp;3&nbsp;с и обрабатывает <code>429</code>.</li>
-        <li>По <code>fstick.plugin.reloaded</code> с <code>client_changed</code> &mdash; перекачать <code>cl.js</code> и перезапустить <code>runDsl</code>.</li>
+        <li>Кнопка hot-reload дебаунсится до &ge;&nbsp;3&nbsp;с и обрабатывает <code>429</code>. <ins class="fix" data-r="R16">Она зовёт <code>POST …/branches/{bid}/reload</code>. После сохранения с <code>reloaded: false</code> редактор сам вызывает его, когда пройдёт <code>retry_after_ms</code>.</ins></li>
+        <li>По <code>fstick.plugin.reloaded</code> с <code>client_changed</code> &mdash; перекачать <code>cl.js</code> <ins class="fix" data-r="R2">(<code>GET …/code/client?branch_id=&amp;chat_id=</code>)</ins> и перезапустить <code>runDsl</code><ins class="fix" data-r="R18"> &mdash; в каждом клиенте, где плагин активен в этом чате, а не только в редакторе</ins>.</li>
         <li>Совсем новый debug-плагин открывается с шаблонным кодом и шаблонной иконкой.</li>
-        <li>Автор показывается как <code>@localpart</code> &mdash; отрезать <code>:domain</code> от MXID; никогда не рендерить полный MXID или внутренний UUID.</li>
+        <li>Автор показывается как <code>@localpart</code> &mdash; отрезать <code>:domain</code> от <del class="fix">MXID</del><ins class="fix" data-r="R3">поля <code>*_mxid</code>, которое добавляет Gateway</ins>; никогда не рендерить полный MXID или внутренний UUID.</li>
         <li>Пока ветка-кандидат висит (<code>WAITING_APPROVE</code> / <code>APPROVING</code>), в панели управления плагином виден её статус и действие <strong>Отменить заявку</strong> (<code>POST …/branches/{bid}/cancel</code>).</li>
+        <li><ins class="fix" data-r="R5">Пользователи из <code>registry.moderators</code> получают экран ревью: очередь, код кандидата (только чтение, через <code>code/client</code> и <code>code/server</code>) и claim / approve / reject.</ins></li>
       </ul>
     </section>
 
@@ -1449,7 +1661,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td class="tnum">5</td><td class="wrap">История коммитов (фаза 2) &mdash; в первую сборку или отложить?</td><td>отложить; одна модель веток уже даёт <code>REJECTED</code></td></tr>
             <tr><td class="tnum">6</td><td class="wrap">Комната Fstick Developer &mdash; кто её создаёт, одна на автора, что ещё она несёт (release-уведомления, счётчики установок)?</td><td>одна на автора, общий канал dev-уведомлений</td></tr>
             <tr><td class="tnum">7</td><td class="wrap">Валидация панели состояния &mdash; подтверждаем lenient + warnings или строгий <code>422</code> при несовпадении схемы?</td><td>lenient, в тон «сохранять битый код»</td></tr>
-            <tr><td class="tnum">8</td><td class="wrap">Область throttle reload &mdash; на <code>(plugin, chat)</code>, на пользователя или глобально?</td><td>на <code>(plugin, chat)</code></td></tr>
+            <tr><td class="tnum">8</td><td class="wrap"><del class="fix">Область throttle reload &mdash; на <code>(plugin, chat)</code>, на пользователя или глобально?</del><ins class="fix" data-r="R17">Решено: throttle reload &mdash; на <code>(plugin, branch)</code> (&sect;7).</ins></td><td><del class="fix">на <code>(plugin, chat)</code></del><ins class="fix">&mdash;</ins></td></tr>
+            <tr class="fix-row"><td class="tnum">9 <span class="fix-tag">R24</span></td><td class="wrap">Решено: схема состояния &mdash; объявление плагина <code>SetStateSchema</code> / <code>state_schema</code>, которое <code>backend_stdlib.lua</code> уже поддерживает.</td><td>&mdash;</td></tr>
           </tbody>
         </table>
       </div>
@@ -1471,20 +1684,20 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>отказ (reject)</td><td>модератор; статус ветки <code>REJECTED</code> + <code>last_rejection</code> + moderation-log + сообщение в бот-комнату; <code>resubmit</code> нет</td></tr>
             <tr><td>отмена (cancel)</td><td>автор отзывает своего кандидата из <code>WAITING_APPROVE</code>/<code>APPROVING</code> → тумстоун <code>CANCELLED</code>; строка в moderation-log, без уведомления; снимает ограничение «один открытый кандидат»</td></tr>
             <tr><td>debug-установок на автора</td><td>без лимита; <code>chat_id</code> обязателен в вызовах редактора</td></tr>
-            <tr><td>транспорт кода</td><td>инлайн через Registry в обе стороны — и редактор, и <code>loadEngine</code> Runtime; presigned URL и TTL нет нигде</td></tr>
+            <tr><td>транспорт кода</td><td>инлайн через Registry в обе стороны — и редактор, и <code>loadEngine</code> Runtime<ins class="fix" data-r="R2">, и <code>cl.js</code> у каждого участника чата</ins>; presigned URL и TTL нет нигде</td></tr>
             <tr><td>уведомление о сохранении</td><td>новый <code>PUT …/code</code>; не переиспользование <code>commit</code></td></tr>
-            <tr><td>reload → клиент</td><td>переиспользуем канал sync; новый тип <code>fstick.plugin.reloaded</code>, шлётся только при <code>client_changed</code> — чисто серверное сохранение вообще не пушит</td></tr>
-            <tr><td>hot reload в runtime</td><td><code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code>, вызывается только если менялась серверная сторона; пересборка тем же путём <code>loadEngine</code>, что и промах кэша, ответ просто <code>{ reloaded: true }</code>; мин. интервал 3&nbsp;с</td></tr>
-            <tr><td>число внутренних запросов на сохранение</td><td>только client: 3 (запись + событие + push). только server: 3 (запись + reload + инлайн-запрос кода). обе стороны: 6 (2 записи + reload + инлайн-запрос + событие + push). было 6–7 до A+B+C</td></tr>
+            <tr><td>reload → клиент</td><td>переиспользуем канал sync; новый тип <code>fstick.plugin.reloaded</code>, шлётся только при <code>client_changed</code> — чисто серверное сохранение вообще не пушит<ins class="fix" data-r="R18">; получатели &mdash; участники каждого чата, где установлена dev-ветка</ins></td></tr>
+            <tr><td>hot reload в runtime</td><td><code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code>, вызывается только если менялась серверная сторона; пересборка тем же путём <code>loadEngine</code>, что и промах кэша, ответ просто <code>{ reloaded: true }</code>; мин. интервал 3&nbsp;с<ins class="fix" data-r="R17"> на (plugin, branch)</ins><ins class="fix" data-r="R16">; явный <code>POST …/branches/{bid}/reload</code> для кнопки и для повтора после <code>429</code></ins></td></tr>
+            <tr><td>число внутренних запросов на сохранение</td><td><del class="fix">только client: 3 (запись + событие + push). только server: 3 (запись + reload + инлайн-запрос кода). обе стороны: 6 (2 записи + reload + инлайн-запрос + событие + push). было 6–7 до A+B+C</del><ins class="fix" data-r="R15">считаем по хопам, включая чтения S3. только client: 4 (запись в S3 + поиск чатов + запрос на push + по одному push в Dendrite на чат). только server: 4 (запись в S3 + reload + внутренний запрос кода + чтение S3 в Registry). обе стороны: 8. Сравнения «было/стало» не приводим.</ins></td></tr>
             <tr><td>резолв ветки для команд</td><td>клиент никогда не шлёт <code>branch_id</code>; Runtime резолвит <code>(pluginId, chatId) → branch_id</code> через <code>GET internal /installations/resolve</code>, кэш TTL 60&nbsp;с, независимо от кэша движка</td></tr>
             <tr><td>владелец <code>client_changed</code></td><td>вычисляет и сообщает Registry (сравнение старого и нового client-sha); из контракта reload у Runtime убран полностью — Runtime никогда не грузит клиентский код</td></tr>
-            <tr><td>скачивание серверного кода</td><td>gated: автор для dev-ветки, кто угодно для released</td></tr>
+            <tr><td>скачивание серверного кода</td><td><del class="fix">gated: автор для dev-ветки, кто угодно для released</del><ins class="fix" data-r="R4">gated: автор &mdash; любая ветка, модератор &mdash; кандидаты, кто угодно &mdash; released; скрытое → <code>404</code>. Runtime ходит в <code>/internal</code>-маршрут без проверки пользователя (R1)</ins></td></tr>
             <tr><td>имена в S3</td><td>унифицированы — content-addressed <code>blobs/{sha256}</code>, ровно 2 файла</td></tr>
             <tr><td>конкурентность при сохранении</td><td>сравнение content-hash → <code>409 stale_code</code>; серверной таблицы блокировок нет</td></tr>
             <tr><td>битый код при сохранении</td><td>сохраняется, возвращает <code>warnings</code></td></tr>
-            <tr><td>лимит размера файла</td><td><strong>500 КБ (500 000 байт UTF-8) на файл</strong>, замер после transfer-декода; декодированное тело запроса ограничено 1.2 МБ (защита от zip-бомбы). ≈ 500 000 ASCII-символов ≈ 8 000–16 000 строк; gzip ~3–5× в проводе</td></tr>
-            <tr><td>runtime-строка <code>@X</code></td><td>версия stdlib; редактируется из редактора (на сервере пока не реализовано)</td></tr>
-            <tr><td>получатели / тайминг консоли</td><td>только автор; всегда включена; только live; уровни <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
+            <tr><td>лимит размера файла</td><td><strong>500 КБ (500 000 байт UTF-8) на файл</strong>, замер после transfer-декода; декодированное тело запроса ограничено <del class="fix">1.2 МБ</del><ins class="fix" data-r="R19">2.2 МБ с учётом JSON-экранирования</ins> (защита от zip-бомбы). ≈ 500 000 ASCII-символов ≈ 8 000–16 000 строк; gzip ~3–5× в проводе</td></tr>
+            <tr><td>runtime-строка <code>@X</code></td><td>версия stdlib; редактируется из редактора (на сервере пока не реализовано)<ins class="fix" data-r="R23">; до реализации <code>PUT …/code</code> отклоняет смену runtime с <code>422</code>; после &mdash; изменение <code>runtime.server</code> считается серверным изменением</ins></td></tr>
+            <tr><td>получатели / тайминг консоли</td><td>только автор<ins class="fix" data-r="R20"> (пока он участник чата)</ins>; всегда включена; только live; уровни <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
             <tr><td>уровень консоли <code>warn</code></td><td>добавлен; новый Lua-хук <code>warn(msg)</code> рядом с <code>print(msg)</code>, тот же путь батчинга, <code>system: false</code></td></tr>
             <tr><td>флаг <code>system</code> консоли</td><td>булево на строку: <code>false</code> = собственный <code>print</code>/<code>warn</code> плагина; <code>true</code> = сгенерировано Runtime (исключения, уведомления о флуде) &mdash; рендерится в редакторе визуально отдельно</td></tr>
             <tr><td>принты других пользователей</td><td>показываются (бэкенд-состояние общее)</td></tr>
@@ -1496,16 +1709,64 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>редактируемая панель состояния</td><td>да — Runtime её применяет</td></tr>
             <tr><td>публичный список магазина</td><td><code>ACTIVE</code> + есть <code>RELEASED</code>-ветка</td></tr>
             <tr><td>список своих плагинов</td><td><code>GET /plugins?owned=true</code></td></tr>
-            <tr><td>GET одного плагина</td><td>debug-ветка видна только автору; released — кому угодно</td></tr>
+            <tr><td>GET одного плагина</td><td>debug-ветка видна только автору<ins class="fix" data-r="R2"> и участникам чата, где она установлена, через <code>?chat_id=</code></ins>; released — кому угодно</td></tr>
             <tr><td>со-мейнтейнеры</td><td>не поддерживаются</td></tr>
-            <tr><td>ответ installations</td><td>добавляет <code>branch_status</code>, <code>author_id</code></td></tr>
-            <tr><td>авторизация отдельного окна</td><td>тот же origin + токен из <code>localStorage</code></td></tr>
+            <tr><td>ответ installations</td><td>добавляет <code>branch_status</code>, <code>author_id</code><ins class="fix" data-r="R6">; установки закреплены за веткой, обновление через <code>PATCH</code></ins></td></tr>
+            <tr><td>авторизация отдельного окна</td><td>тот же origin + <del class="fix">токен из <code>localStorage</code></del><ins class="fix" data-r="R26">токен передаёт opener через <code>postMessage</code></ins></td></tr>
             <tr><td>пустой плагин / новый debug-плагин</td><td><code>GET …/edit</code> возвращает шаблоны; назначается шаблонная иконка</td></tr>
-            <tr><td>uninstall при открытом редакторе</td><td>разрешён — сессии редактора нет</td></tr>
-            <tr><td>рейт-лимит reload</td><td>минимум 3&nbsp;с</td></tr>
-            <tr><td>идентичность &mdash; ядро</td><td>чистый <code>internal_uuid</code> везде; MXID только на двух хопах (Dendrite→Gateway на вход, integration→Dendrite на выход); фронтенд показывает <code>@localpart</code>; handle нет</td></tr>
+            <tr><td>uninstall при открытом редакторе</td><td>разрешён — сессии редактора нет<ins class="fix" data-r="R25">; сохранение всё равно перезагружает ветку, пропускается только немедленная миграция состояния этого чата</ins></td></tr>
+            <tr><td>рейт-лимит reload</td><td>минимум 3&nbsp;с<ins class="fix" data-r="R17"> на (plugin, branch)</ins></td></tr>
+            <tr><td>идентичность &mdash; ядро</td><td>чистый <code>internal_uuid</code> везде; MXID только на <del class="fix">двух хопах (Dendrite→Gateway на вход, integration→Dendrite на выход)</del><ins class="fix" data-r="R3">трёх хопах (Dendrite→Gateway на вход, integration→Dendrite на выход, обогащение Gateway→клиент); <code>internal_uuid</code> доходит до клиента как непрозрачный id (<code>GET /me</code>), но не рендерится</ins>; фронтенд показывает <code>@localpart</code>; handle нет</td></tr>
+            <tr class="fix-row"><td>роль модератора <span class="fix-tag">R5</span></td><td>таблица <code>registry.moderators</code> по <code>internal_uuid</code>; засевается из конфига</td></tr>
+            <tr class="fix-row"><td>повторы переходов <span class="fix-tag">R8</span></td><td>повтор в текущее состояние → <code>200</code>; любое другое терминальное → <code>409</code></td></tr>
+            <tr class="fix-row"><td>скрытые ресурсы <span class="fix-tag">R9</span></td><td>всегда <code>404</code>, никогда <code>403</code></td></tr>
+            <tr class="fix-row"><td>служебные чтения <span class="fix-tag">R1</span></td><td>Registry <code>/internal/plugins/{id}</code> и <code>/internal/…/code/server</code>; не проксируются, пользователя не проверяют</td></tr>
+            <tr class="fix-row"><td>легаси-данные <span class="fix-tag">R22</span></td><td>нет &mdash; ни продовых данных, ни легаси-плагинов: схемы переписываются на месте, тома пересоздаются; ни бэкфилла, ни пути <code>files[0]</code></td></tr>
             <tr><td>идентичность &mdash; маппер</td><td>таблица <code>uuid ↔ mxid</code> у integration-service в <strong>Postgres</strong> (источник истины); Gateway кэширует лукапы в процессе; Redis только read-кэш, никогда не хранилище</td></tr>
             <tr><td>идентичность &mdash; провижининг</td><td>integration минтит <code>internal_uuid</code> при первом промахе <code>identity/resolve</code> (идемпотентно через <code>UNIQUE(mxid)</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 15 -->
+    <section id="revision">
+      <div class="sec-head">
+        <span class="eyebrow">Приложение</span>
+        <h2><span class="num">15</span>Ревизия 2026-09-27</h2>
+      </div>
+      <p>Противоречия и пробелы, исправленные в этой ревизии. В тексте новая формулировка <ins class="fix">подсвечена</ins> с тегом, удалённая <del class="fix">зачёркнута</del>, а новые блоки помечены <em>новое</em>. Кнопка <strong>правки</strong> (справа вверху) скрывает всю разметку для чистого чтения.</p>
+      <p>Решения, принятые с автором: <code>internal_uuid</code> может доходить до клиента как непрозрачный id (<code>GET /me</code> + обогащение в Gateway); установки закреплены и обновляются через <code>PATCH</code>; модераторы &mdash; таблица в Registry; обратная совместимость и миграция данных не нужны (продовых данных нет).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Тег</th><th>Где</th><th>Исправление</th></tr></thead>
+          <tbody>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R1</span></td><td><a href="#runtime">&sect;7, 8, 9, 10</a></td><td class="wrap">Runtime не мог загрузить код dev-ветки и узнать её автора: публичные маршруты отдают не-авторам 403/404, а Runtime действует от имени любого участника чата. Добавлены <code>/internal/plugins/{id}</code> и <code>/internal/…/code/server</code> без проверки пользователя.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R2</span></td><td><a href="#contracts">&sect;6, 9, 10, 12, 14</a></td><td class="wrap">Транспорт клиентского кода не был определён, хотя браузерам участников чата нужен <code>cl.js</code>. Добавлен инлайн <code>GET …/code/client</code> и <code>?chat_id=</code> в <code>GET /plugins/{id}</code> для участников чата с dev-веткой.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R3</span></td><td><a href="#identity">&sect;3, 9, 10, 12, 14</a></td><td class="wrap">Документ утверждал, что internal_uuid «не покидает бэкенд», но отдавал его клиентам и сравнивал в UI. Добавлены <code>GET /api/v1/me</code>, обогащение ответов в Gateway (<code>*_mxid</code>) и <code>lookup-batch</code>; хопов с MXID теперь три.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R4</span></td><td><a href="#contracts">&sect;9, 10, 14</a></td><td class="wrap">Модераторы не могли читать код кандидата, а правила доступа к <code>code/server</code> в &sect;9 и &sect;10 расходились. Правила выровнены, модераторы добавлены.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R5</span></td><td><a href="#versions">&sect;4, 10, 12, 14</a></td><td class="wrap">Роль модератора нигде не была определена. Добавлены таблица <code>registry.moderators</code> и экран ревью.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R6</span></td><td><a href="#versions">&sect;4, 9, 10, 14</a></td><td class="wrap">Установки описывались и как плавающие («на максимальный SemVer»), и как закреплённые (<code>PATCH</code>). Теперь закреплённые, с явным контрактом <code>PATCH /installations/{id}</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R7</span></td><td><a href="#scope">&sect;1</a></td><td class="wrap">&sect;1 исключал инспекцию состояния, а &sect;7 и &sect;12 добавляют редактируемую панель состояния. Рамки обновлены.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R8</span></td><td><a href="#contracts">&sect;10, 14</a></td><td class="wrap">Reject и cancel говорили «409, если уже терминальная», что противоречило соглашению о повторах. Выровнено: повтор в то же состояние → 200.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R9</span></td><td><a href="#contracts">&sect;10</a></td><td class="wrap"><code>code/server</code> отдавал 403 для скрытых веток, а по соглашению нужен 404. Теперь 404.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R10</span></td><td><a href="#contracts">&sect;10, 11</a></td><td class="wrap">Контракт консоли называл одновременно 404 и 202, а «id не несёт» было двусмысленно. Уточнено.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R11</span></td><td><a href="#versions">&sect;4</a></td><td class="wrap">«Одна строка на плагин» для <code>branches</code> неверно. Добавлены недостающие <code>changelog</code>, <code>submitted_at</code>, <code>claimed_by</code>, <code>last_rejection</code>, <code>plugin_moderation_log</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R12</span></td><td><a href="#moderation">&sect;5, 10</a></td><td class="wrap">Любой модератор мог отклонить ветку, взятую другим. Теперь из <code>APPROVING</code> &mdash; только взявший claim.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R13</span></td><td><a href="#runtime">&sect;7</a></td><td class="wrap">Reload описывался и как «вытеснить, потом загрузить», и как «put по существующему ключу». Теперь: сначала сборка, потом атомарная подмена.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R14</span></td><td><a href="#scope">&sect;1, рисунок</a></td><td class="wrap">Диаграмма не показывала, что шаг 6 идёт от Registry и условный.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R15</span></td><td><a href="#decisions">&sect;7, 14</a></td><td class="wrap">Подсчёт запросов пропускал чтение S3 в Registry и содержал непроверяемое «было 6&ndash;7». Пересчитано.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R16</span></td><td><a href="#runtime">&sect;7, 9, 10, 12</a></td><td class="wrap">Reload, отложенный throttle-ом, оставлял устаревший движок без пути восстановления, а у «кнопки Hot-reload» не было API. Добавлены <code>POST …/branches/{bid}/reload</code> и <code>retry_after_ms</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R17</span></td><td><a href="#runtime">&sect;7, 9, 10, 13, 14</a></td><td class="wrap">Throttle был на (plugin, chat), а движок &mdash; на ветку, так что смена чата обходила ограничение. Теперь на (plugin, branch); миграция состояния в остальных чатах ленивая.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R18</span></td><td><a href="#events">&sect;7, 9, 10, 11, 12</a></td><td class="wrap"><code>fstick.plugin.reloaded</code> шёл только автору, и остальные участники чата оставались со старым <code>cl.js</code>. Теперь событие получают все чаты, где установлена dev-ветка.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R19</span></td><td><a href="#storage">&sect;6, 10, 14</a></td><td class="wrap">Лимит тела 1.2&nbsp;МБ мог отклонить два легальных файла по 500&nbsp;КБ после JSON-экранирования. Теперь 2.2&nbsp;МБ и обязательный сырой UTF-8.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R20</span></td><td><a href="#console">&sect;8, 10, 14</a></td><td class="wrap">Строки консоли продолжали идти автору, вышедшему из чата. Теперь фильтруются по членству.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R21</span></td><td><a href="#changes">&sect;9, 10</a></td><td class="wrap">Эндпоинты использовались, но не были определены: push из integration для <code>reloaded</code>, уведомление в dev-комнату и недостающие маршруты Gateway.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R22</span></td><td><a href="#identity">&sect;2, 3, 4, 6, 13, 14</a></td><td class="wrap">Обратная совместимость не нужна (продовых данных и легаси-плагинов нет): <code>installed_by</code> становится <code>UUID</code>, а <code>versions</code> / <code>files</code> / <code>files[0]</code> удаляются целиком. <em>Ревизия 2026-09-28: прежний план миграции и открытый вопрос #10 убраны.</em></td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R23</span></td><td><a href="#contracts">&sect;10, 14</a></td><td class="wrap"><code>runtime</code> в <code>PUT …/code</code> при «не реализовано» было не определено. Теперь явный 422 до реализации, после &mdash; считается серверным изменением.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R24</span></td><td><a href="#runtime">&sect;7, 13</a></td><td class="wrap">Мигратору состояния нужен источник схемы. Он использует уже существующее объявление плагина <code>SetStateSchema</code> и выполняется перед каждой командой. <em>Ревизия 2026-09-28: прежний текст ошибочно утверждал, что схемы нет; открытый вопрос #9 решён.</em></td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R25</span></td><td><a href="#contracts">&sect;10, 14</a></td><td class="wrap">Поведение сохранения после удаления плагина из <code>chat_id</code> не было определено.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R26</span></td><td><a href="#frontend">&sect;12, 14</a></td><td class="wrap">Отдельное окно полагалось на раскладку <code>localStorage</code> Element, которую новые версии Element не гарантируют. Теперь opener передаёт токен через <code>postMessage</code>.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1514,7 +1775,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   </main>
 
   <footer class="foot">
-    Fstick · Интеграция редактора плагинов · проектная записка, обновлено 2026-09-12 · заменяет разделы API в fstick_specification.md там, где они расходятся · EN-версия: plugin-editor-integration.html
+    Fstick · Интеграция редактора плагинов · проектная записка, обновлено <del class="fix">2026-09-12</del> <ins class="fix">2026-09-27</ins> · заменяет разделы API в fstick_specification.md там, где они расходятся · EN-версия: plugin-editor-integration.html
   </footer>
 
 </div>
@@ -1540,6 +1801,26 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       var next = current() === "dark" ? "light" : "dark";
       apply(next);
       try { localStorage.setItem(KEY, next); } catch (e) {}
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    var KEY = "fstick-editor-doc-fixes";
+    var root = document.documentElement;
+    var btn = document.getElementById("fixToggle");
+    function apply(on) {
+      root.classList.toggle("fix-off", !on);
+      btn.textContent = on ? "правки: видны" : "правки: скрыты";
+    }
+    var on = true;
+    try { on = localStorage.getItem(KEY) !== "off"; } catch (e) {}
+    apply(on);
+    btn.addEventListener("click", function () {
+      on = !on;
+      apply(on);
+      try { localStorage.setItem(KEY, on ? "on" : "off"); } catch (e) {}
     });
   })();
 </script>

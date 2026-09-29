@@ -32,6 +32,7 @@
 
     --shadow: 0 1px 2px rgba(20, 28, 40, 0.06), 0 8px 24px -12px rgba(20, 28, 40, 0.12);
     --measure: 68ch;
+    --fix: #0b7a70;        --fix-bg: #d9f2ee;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -61,6 +62,7 @@
       --m-delete: #d98a86;   --m-delete-bg: #2f1f1e;
 
       --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+      --fix: #5fcfc0;        --fix-bg: #10302c;
     }
   }
 
@@ -90,6 +92,7 @@
     --m-delete: #d98a86;   --m-delete-bg: #2f1f1e;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+    --fix: #5fcfc0;        --fix-bg: #10302c;
   }
 
   * { box-sizing: border-box; }
@@ -430,6 +433,46 @@
     font-family: "IBM Plex Mono", monospace;
   }
 
+  /* ---- Revision highlights (2026-09-27) ---- */
+  ins.fix {
+    text-decoration: none;
+    color: inherit;
+    background: var(--fix-bg);
+    box-shadow: inset 0 -1px 0 var(--fix);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  ins.fix[data-r]::after, .fix-tag {
+    content: attr(data-r);
+    font: 600 9.5px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.02em;
+    color: var(--fix);
+    vertical-align: super;
+    margin-left: 2px;
+    white-space: nowrap;
+  }
+  del.fix { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--s-rejected); }
+  .fix-block { border-left: 3px solid var(--fix) !important; }
+  div.fix-block:not(.endpoint):not(.note) { padding-left: 16px; }
+  .fix-block[data-r]::before {
+    content: "new · " attr(data-r);
+    display: block;
+    font: 600 10.5px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fix);
+    padding: 10px 0 0;
+  }
+  .endpoint.fix-block[data-r]::before { padding: 10px 18px; background: var(--fix-bg); }
+  tr.fix-row > td { background: var(--fix-bg); }
+  tr.fix-row > td:first-child { box-shadow: inset 3px 0 0 var(--fix); }
+  .fix-toggle { right: 104px; }
+  html.fix-off ins.fix { background: none; box-shadow: none; padding: 0; }
+  html.fix-off ins.fix::after, html.fix-off .fix-tag, html.fix-off .fix-block::before, html.fix-off del.fix { display: none; }
+  html.fix-off .fix-block { border-left-color: var(--border) !important; }
+  html.fix-off div.fix-block:not(.endpoint):not(.note) { border-left: 0 !important; padding-left: 0; }
+  html.fix-off tr.fix-row > td { background: var(--surface); box-shadow: none; }
+
   @media (prefers-reduced-motion: reduce) {
     * { scroll-behavior: auto !important; }
   }
@@ -437,6 +480,7 @@
 </style>
 
 <button class="theme-toggle" id="themeToggle" aria-label="Toggle colour theme">theme</button>
+<button class="theme-toggle fix-toggle" id="fixToggle" aria-label="Toggle revision highlights">changes: shown</button>
 
 <div class="layout">
 
@@ -448,7 +492,8 @@
       <span><strong>Status:</strong> design agreed, not implemented</span>
       <span><strong>Branch model:</strong> content-addressed, git-shaped</span>
       <span><strong>Identity:</strong> UUID core · mapper in integration</span>
-      <span><strong>Updated:</strong> 2026-09-12</span>
+      <span><strong>Updated:</strong> <del class="fix">2026-09-12</del> <ins class="fix">2026-09-27</ins></span>
+      <span><strong>Revision:</strong> new text <ins class="fix">highlighted</ins>, removed text <del class="fix">struck through</del> &mdash; <a href="#revision">&sect;15</a></span>
     </div>
   </header>
 
@@ -473,6 +518,7 @@
         <hr class="toc-hr" />
         <a href="#open"><span class="n">13</span><span>Open questions</span></a>
         <a href="#decisions"><span class="n">14</span><span>Decisions log</span></a>
+        <a href="#revision"><span class="n">15</span><span><ins class="fix">Revision 2026-09-27</ins></span></a>
       </nav>
     </details>
   </aside>
@@ -496,7 +542,7 @@
         <li>The editor is two text fields (Lua, JS) plus a debug console that prints backend output from the chat the editor was opened from.</li>
       </ul>
 
-      <p>Nothing about state inspection, multi-file plugins, or a build step is in scope. Code is exactly two files: one client, one server.</p>
+      <p>Nothing about <del class="fix">state inspection, </del>multi-file plugins<del class="fix">,</del> or a build step is in scope. Code is exactly two files: one client, one server. <ins class="fix" data-r="R7">State inspection <em>is</em> in scope: the editor has an editable JSON state panel for the chat it was opened from (&sect;7, &sect;12). State history, diffing and breakpoints are not.</ins></p>
 
       <figure class="fig-scroll">
         <svg viewBox="0 0 820 470" role="img" aria-label="Sequence: the editor calls Registry to open and save code; Registry writes a content-addressed blob and calls Runtime to reload; Runtime evicts its engine and migrates state; console prints and the reloaded signal travel back to the editor through the sync pipeline.">
@@ -561,7 +607,7 @@
 
             <!-- 6 reloaded -->
             <line x1="320" y1="286" x2="755" y2="286" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)" />
-            <text x="325" y="279">6 · fstick.plugin.reloaded</text>
+            <text x="325" y="279">6 · fstick.plugin.reloaded<tspan fill="var(--fix)" font-weight="600"> · if client changed</tspan></text>
             <line x1="755" y1="308" x2="95" y2="308" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ah)" />
             <text x="750" y="301" text-anchor="end" fill="var(--ink-faint)">client_changed → re-run DSL</text>
 
@@ -575,7 +621,7 @@
             </g>
           </g>
         </svg>
-        <figcaption>The save / reload / console loop. Steps 1&ndash;5 are request&ndash;response; steps 6&ndash;7 ride the existing Matrix <code>/sync</code> <code>fstick_events</code> channel. The console path (accent) is the one piece of transport this design adds behaviour to &mdash; everything else reuses a pipe that already exists.</figcaption>
+        <figcaption>The save / reload / console loop. Steps 1&ndash;5 are request&ndash;response; steps 6&ndash;7 ride the existing Matrix <code>/sync</code> <code>fstick_events</code> channel. The console path (accent) is the one piece of transport this design adds behaviour to &mdash; everything else reuses a pipe that already exists. <ins class="fix" data-r="R14">Step 6 is sent by Registry (through Integration), only when the client side changed, to the members of every chat running that dev branch (&sect;11). It does not wait on steps 4&ndash;5.</ins></figcaption>
       </figure>
     </section>
 
@@ -606,7 +652,7 @@
             <tr>
               <td>Authorisation</td>
               <td class="wrap"><code>author_id</code> stored; <code>X-User-Id</code> reaches services. Never compared. <code>resolveAuthorId()</code> derives a UUID from the Matrix ID via <code>nameUUIDFromBytes</code>.</td>
-              <td class="wrap">No ownership check anywhere. The derived UUID is not reversible to a Matrix ID &mdash; blocks author-targeted push.</td>
+              <td class="wrap">No ownership check anywhere. The derived UUID is not reversible to a Matrix ID &mdash; blocks author-targeted push. <ins class="fix" data-r="R22"><code>installations.installed_by</code> is a <code>VARCHAR</code> holding the raw MXID, not a UUID &mdash; the column becomes <code>UUID</code>; there is no data to migrate (&sect;3).</ins></td>
             </tr>
             <tr>
               <td>Plugin states</td>
@@ -644,7 +690,7 @@
         <span class="eyebrow">Decision · mapper in integration-service</span>
         <h2><span class="num">3</span>Identity model</h2>
       </div>
-      <p class="prose-lead">The core stores <strong>one pure UUID</strong> per user and nothing else. The <code>uuid&nbsp;↔&nbsp;mxid</code> mapper lives in <strong>integration-service</strong> &mdash; the one component that already speaks Matrix. An MXID appears on exactly two hops: inbound (Dendrite&nbsp;→&nbsp;Gateway) and outbound (integration&nbsp;→&nbsp;Dendrite).</p>
+      <p class="prose-lead">The core stores <strong>one pure UUID</strong> per user and nothing else. The <code>uuid&nbsp;↔&nbsp;mxid</code> mapper lives in <strong>integration-service</strong> &mdash; the one component that already speaks Matrix. An MXID appears on exactly <del class="fix">two</del><ins class="fix" data-r="R3">three</ins> hops: inbound (Dendrite&nbsp;→&nbsp;Gateway)<del class="fix"> and</del><ins class="fix">,</ins> outbound (integration&nbsp;→&nbsp;Dendrite)<ins class="fix">, and display enrichment (Gateway&nbsp;→&nbsp;client, so the UI can render <code>@localpart</code>)</ins>.</p>
 
       <p>The <code>:domain</code> suffix cannot leave the Matrix wire protocol without forking away from federation &mdash; it is structural (event <code>sender</code>, room membership, routing). The domain is fixed to one constant and simply not rendered; Element already speaks MXIDs, so showing <code>@user_id</code> is a trim, not a new identifier.</p>
 
@@ -653,7 +699,7 @@
           <h4>internal_uuid</h4>
           <div class="ex">9f3c1a2e-…</div>
           <div class="mut">the only id in the core</div>
-          <p>The foreign key in every Fstick service: <code>plugins.author_id</code>, <code>installations.installed_by</code>, branch owner. Never leaves the backend, never reaches Dendrite.</p>
+          <p>The foreign key in every Fstick service: <code>plugins.author_id</code>, <code>installations.installed_by</code>, branch owner. <del class="fix">Never leaves the backend, never reaches Dendrite.</del><ins class="fix" data-r="R3">Opaque to the client: it may appear in API responses and in <code>GET /api/v1/me</code> so the frontend can compare ids, but it is never rendered and never reaches Dendrite.</ins></p>
         </div>
         <div class="idcard">
           <h4>MXID</h4>
@@ -713,17 +759,24 @@
             <text x="164" y="90" text-anchor="middle">/sync</text>
           </g>
         </svg>
-        <figcaption>The MXID lives only on the accented hops &mdash; Dendrite&nbsp;→&nbsp;Gateway inbound and integration&nbsp;→&nbsp;Dendrite outbound. Everything between them is <code>internal_uuid</code>. Dendrite already authenticates and injects <code>X-User-Id</code> today (<code>authenticateAndGetUserID</code>); the only new step is the Gateway swap.</figcaption>
+        <figcaption>The MXID lives only on the accented hops &mdash; Dendrite&nbsp;→&nbsp;Gateway inbound and integration&nbsp;→&nbsp;Dendrite outbound. Everything between them is <code>internal_uuid</code>. <ins class="fix" data-r="R3">Not drawn: on the way back to the client the Gateway adds an <code>mxid</code> next to each user id in a response (&sect;9 Gateway), from the same mapper cache.</ins> Dendrite already authenticates and injects <code>X-User-Id</code> today (<code>authenticateAndGetUserID</code>); the only new step is the Gateway swap.</figcaption>
       </figure>
 
       <h3>The mapper</h3>
       <ul>
         <li>Table in <strong>integration-service</strong>: <code>internal_uuid</code> (PK) ↔ <code>mxid</code> (unique). Bidirectional. No handle, no profile layer.</li>
         <li><span class="method method--post">POST</span> <code>/api/v1/identity/resolve</code> &nbsp;<code>{ mxid } → { internal_uuid }</code> &mdash; create-or-return, idempotent. This is where a user's <code>internal_uuid</code> is <strong>minted</strong>, on first contact.</li>
-        <li><span class="method method--get">GET</span> <code>/api/v1/identity/{internal_uuid}</code> &nbsp;<code>→ { mxid }</code> &mdash; the reverse, for outbound push. Batch variant for member lists.</li>
-        <li>Gateway calls <code>resolve</code> to turn the <code>X-User-Id</code> Dendrite gave it (an MXID) into <code>internal_uuid</code>, then forwards that. Result cached in-process &mdash; the binding never changes, so the cache is an LRU with no invalidation. <code>X-User-Matrix-Id</code> is <em>not</em> propagated; nothing past the Gateway needs it.</li>
+        <li><span class="method method--get">GET</span> <code>/api/v1/identity/{internal_uuid}</code> &nbsp;<code>→ { mxid }</code> &mdash; the reverse, for outbound push.<del class="fix"> Batch variant for member lists.</del> <ins class="fix" data-r="R3">Batch variants in both directions: <code>resolve-batch</code> (mxid&nbsp;→&nbsp;uuid: member lists) and <code>lookup-batch</code> (uuid&nbsp;→&nbsp;mxid: Gateway response enrichment).</ins></li>
+        <li>Gateway calls <code>resolve</code> to turn the <code>X-User-Id</code> Dendrite gave it (an MXID) into <code>internal_uuid</code>, then forwards that. Result cached in-process &mdash; the binding never changes, so the cache is an LRU with no invalidation. <code>X-User-Matrix-Id</code> is <em>not</em> propagated; nothing past the Gateway needs it. <ins class="fix" data-r="R3">The Gateway also keeps the reverse map (<code>uuid → mxid</code>) and uses it to enrich responses on the way out.</ins></li>
         <li><code>registry.plugins.author_id</code> = <code>internal_uuid</code> (column is already <code>UUID</code>). Delete <code>resolveAuthorId()</code> / <code>nameUUIDFromBytes</code>.</li>
+        <li><ins class="fix" data-r="R3"><span class="method method--get">GET</span> <code>/api/v1/me</code> &rarr; <code>{ internal_uuid, mxid }</code> &mdash; served by the Gateway from its mapper cache; the frontend's only source for its own <code>internal_uuid</code> (&sect;12).</ins></li>
+        <li><ins class="fix" data-r="R3">Installation-service keeps calling integration for chat-membership checks, now passing <code>internal_uuid</code>; integration maps it to the MXID before asking Dendrite.</ins></li>
       </ul>
+
+      <div class="fix-block" data-r="R22">
+      <h3>No migration</h3>
+      <p>There is no production database and no legacy plugin. Schemas are rewritten in place &mdash; <code>plugins.author_id</code> holds an <code>internal_uuid</code> from the first row, <code>installations.installed_by</code> becomes <code>UUID</code> &mdash; and local volumes are recreated. No backfill, no compatibility paths.</p>
+      </div>
 
       <h3>Why Postgres, not just Redis</h3>
       <p>Gateway keeps a Redis or in-process <em>cache</em> either way. The question is the system of record, and that has to be Postgres:</p>
@@ -757,13 +810,13 @@
             <tr><td>commit</td><td>each editor save / hot-reload <span class="pill pill--dev">phase&nbsp;2</span></td></tr>
             <tr><td>create a candidate branch</td><td><code>POST /plugins/{id}/publish</code> &mdash; snapshots the dev branch's current blob pair</td></tr>
             <tr><td>branch status</td><td><span class="pill pill--wait">WAITING_APPROVE</span> <span class="pill pill--review">APPROVING</span> <span class="pill pill--released">RELEASED</span> <span class="pill pill--rejected">REJECTED</span> <span class="pill pill--cancelled">CANCELLED</span> &mdash; on the branch</td></tr>
-            <tr><td><code>main</code> / release tag</td><td>a branch with status <span class="pill pill--released">RELEASED</span>; installs resolve to the highest SemVer among them</td></tr>
+            <tr><td><code>main</code> / release tag</td><td>a branch with status <span class="pill pill--released">RELEASED</span>; <del class="fix">installs resolve to the highest SemVer among them</del><ins class="fix" data-r="R6">an install is pinned to one of them; a new install without <code>branch_id</code> defaults to the highest SemVer</ins></td></tr>
           </tbody>
         </table>
       </div>
 
       <h3>Data model &mdash; phase 1 (no commit history)</h3>
-      <pre><code><span class="tok-c">-- one row per plugin</span>
+      <pre><code><span class="tok-c">-- <del class="fix">one row per plugin</del><ins class="fix" data-r="R11">one row per branch: the plugin's single dev branch plus every candidate / release</ins></span>
 branches (
   id, plugin_id,
   status            <span class="tok-c">-- WORKING (dev) | WAITING_APPROVE | APPROVING | RELEASED | REJECTED | CANCELLED</span>
@@ -772,18 +825,36 @@ branches (
   runtime_client, runtime_server   <span class="tok-c">-- e.g. cl.js@1.0.0 / sv.lua@1.0.0 (stdlib version)</span>
   base_branch_id,   <span class="tok-c">-- dev branch a candidate was cut from</span>
   reject_reason,    <span class="tok-c">-- set on REJECTED only; null for CANCELLED</span>
-  created_at, updated_at
+<ins class="fix" data-r="R11">  changelog,        <span class="tok-c">-- candidates only, from POST /publish</span>
+  submitted_at,     <span class="tok-c">-- candidates only</span>
+  claimed_by,       <span class="tok-c">-- moderator internal_uuid, set on claim</span>
+</ins>  created_at, updated_at
 )
+<ins class="fix" data-r="R11"><span class="tok-c">-- UNIQUE (plugin_id) WHERE status = 'WORKING'  : exactly one dev branch per plugin</span>
 
+plugins.last_rejection   <span class="tok-c">-- jsonb { reason, at, semver, branch_id } | null</span>
+
+plugin_moderation_log (
+  id, plugin_id, branch_id,
+  action            <span class="tok-c">-- PUBLISH | CLAIM | APPROVE | REJECT | CANCEL</span>
+  actor_id,         <span class="tok-c">-- internal_uuid</span>
+  reason, at
+)
+</ins><ins class="fix" data-r="R5">
+moderators (
+  internal_uuid PK, granted_by, granted_at
+)
+</ins>
 <span class="tok-c">-- content-addressed, immutable, deduplicated</span>
 S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <ul>
         <li>Exactly two blobs per branch (client + server). The client-supplied filename is discarded.</li>
         <li>The dev branch's blob shas <em>are</em> its HEAD; a save replaces them (old blobs become GC candidates &mdash; see &sect;13).</li>
-        <li>An <code>installation</code> references a branch. A debug install points at the dev branch and follows its shas. A normal install points at a <code>RELEASED</code> branch, re-pointed via <code>PATCH</code>.</li>
+        <li>An <code>installation</code> references a branch. A debug install points at the dev branch and follows its shas. A normal install points at a <code>RELEASED</code> branch<del class="fix">, re-pointed via <code>PATCH</code></del><ins class="fix" data-r="R6"> and stays pinned to it: a new release does <em>not</em> move existing installs. Upgrading is an explicit <code>PATCH /api/v1/installations/{id} { branch_id }</code> (&sect;10)</ins>.</li>
         <li>Public marketplace list: plugins with <code>status = ACTIVE</code> <em>and</em> at least one <code>RELEASED</code> branch. <code>GET /plugins?owned=true</code> returns the caller's own plugins including dev-only ones.</li>
-        <li>Legacy plugins with arbitrary key names keep the <code>files[0]</code> fallback until backfilled.</li>
+        <li><del class="fix">Legacy plugins with arbitrary key names keep the <code>files[0]</code> fallback until backfilled.</del><ins class="fix" data-r="R22"><strong>No legacy data</strong>: the <code>versions</code> and <code>files</code> tables and every <code>files[0]</code> code path are deleted outright; each plugin starts life with a <code>WORKING</code> branch.</ins></li>
+        <li><ins class="fix" data-r="R5"><strong>Moderator role</strong>: a user is a moderator if and only if their <code>internal_uuid</code> is in <code>registry.moderators</code>. The first rows are seeded from config; after that, existing moderators grant the role. Registry checks it on every moderation endpoint.</ins></li>
       </ul>
 
       <p><strong>Phase 2</strong>, when diff / revert / history is wanted: add a <code>commits</code> table. Blobs are already content-addressed, so it lands with no data migration.</p>
@@ -851,6 +922,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>On reject</h3>
       <ul>
+        <li><ins class="fix" data-r="R12">Who may reject: any moderator from <code>WAITING_APPROVE</code>; from <code>APPROVING</code> only the moderator who claimed it (same rule as approve).</ins></li>
         <li>Branch <code>status = REJECTED</code>, retained (hidden, never in the queue, never installable).</li>
         <li><code>plugins.last_rejection = { reason, at, semver, branch_id }</code> &mdash; so the UI shows "needs changes" without scanning chat.</li>
         <li>A <code>plugin_moderation_log</code> row is appended.</li>
@@ -880,7 +952,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <ul>
         <li><strong>Content-addressed blobs</strong>: <code>plugins/{pluginId}/blobs/{sha256}</code>. Immutable, never overwritten, deduplicated. The sha <em>is</em> the identifier the editor and Runtime pass around.</li>
         <li><strong>Exactly two files</strong> per branch &mdash; one client, one server. No multi-file plugins. This removes the <code>files[0]</code> ambiguity for good.</li>
-        <li><strong>No consumer of code ever receives a presigned URL</strong> &mdash; not the editor, not Runtime. Code travels inline through Registry in both directions (&sect;7, &sect;10), so authorisation is checked per request and there is no TTL to race.</li>
+        <li><strong>No consumer of code ever receives a presigned URL</strong> &mdash; not the editor, not Runtime<ins class="fix" data-r="R2">, not the browsers of chat members running the plugin's <code>cl.js</code></ins>. Code travels inline through Registry in both directions (&sect;7, &sect;10), so authorisation is checked per request and there is no TTL to race.</li>
         <li>The presigned two-phase upload stays &mdash; but only for icons, screenshots, and any future release bundles, where files are larger and uploaded once.</li>
       </ul>
       <p>The sha-based identifier also settles two earlier questions at once: the "one-time link" question disappears (no link), and the optimistic-concurrency check on save (&sect;10) is just a sha comparison.</p>
@@ -889,7 +961,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <p>Limit: <strong>500&nbsp;KB &mdash; 500&nbsp;000 bytes of UTF-8 &mdash; per file</strong>, measured on the decoded <code>text</code> string after any transfer decoding. Over &rarr; <code>413 { "error": "file_too_large", "side": "server", "limit": 500000, "actual": 812345 }</code>.</p>
       <ul>
         <li><strong>The limit is on decompressed content, not wire bytes.</strong> The client may send <code>Content-Encoding: gzip</code> (or <code>br</code>); Gateway and Registry decode first, then measure. Compression shrinks the upload &mdash; it does not raise the ceiling.</li>
-        <li><strong>Decompression is itself bounded</strong> to defuse a zip bomb: the request is rejected with <code>413</code> as soon as the decoded stream passes <strong>1.2&nbsp;MB</strong> (two 500&nbsp;KB files + <code>base_sha</code> + JSON framing + headroom), whatever <code>Content-Length</code> claims, and a decoded/encoded ratio over ~200 trips the same guard.</li>
+        <li><strong>Decompression is itself bounded</strong> to defuse a zip bomb: the request is rejected with <code>413</code> as soon as the decoded stream passes <del class="fix"><strong>1.2&nbsp;MB</strong> (two 500&nbsp;KB files + <code>base_sha</code> + JSON framing + headroom)</del><ins class="fix" data-r="R19"><strong>2.2&nbsp;MB</strong>. JSON escaping inflates source text before it can be measured: <code>\n</code>, <code>\"</code> and <code>\\</code> take 2 bytes each, so two legal 500&nbsp;KB files can occupy up to 2&nbsp;MB of JSON; the rest covers <code>base_sha</code>, framing and headroom. Clients must send non-ASCII as raw UTF-8, not <code>\uXXXX</code> escapes (the <code>JSON.stringify</code> default); a body that escapes it anyway may hit the cap early and gets the same <code>413</code></ins>, whatever <code>Content-Length</code> claims, and a decoded/encoded ratio over ~200 trips the same guard.</li>
         <li>The editor shows a live byte counter per pane and blocks Save locally at the limit; the <code>413</code> is the server-side backstop.</li>
       </ul>
 
@@ -924,25 +996,26 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>Engine cache</h3>
       <p><code>Map&lt;(pluginId, branchId), LuaPluginEngine&gt;</code>. No sha in the key. Runtime never executes client code, so <code>client_blob_sha</code> was never a legitimate part of this key &mdash; a client-only edit used to force a pointless rebuild. A <code>RELEASED</code> branch running in many chats and the author's dev branch are <strong>different cache entries</strong> &mdash; neither clobbers the other. Plugin state stays keyed by <code>(pluginId, chatId)</code> in Redis and is swapped in via <code>changeContext</code> before each command.</p>
-      <p>One function loads an engine, used everywhere an entry is missing &mdash; a cold cache after a Runtime restart is not a special case. <code>GET /code/server</code> returns the source <strong>inline</strong> (&sect;10) &mdash; no presigned URL, no second hop to S3; Registry does that read itself:</p>
+      <p>One function loads an engine, used everywhere an entry is missing &mdash; a cold cache after a Runtime restart is not a special case. <del class="fix"><code>GET /code/server</code></del><ins class="fix" data-r="R1"><code>GET /internal/plugins/{id}/code/server</code> &mdash; Registry's service-to-service route: not exposed through the Gateway and not gated by user &mdash;</ins> returns the source <strong>inline</strong> (&sect;10) &mdash; no presigned URL, no second hop to S3; Registry does that read itself:</p>
       <pre><code><span class="tok-k">loadEngine</span>(pluginId, branchId):
   <span class="tok-c">if</span> cache.has((pluginId, branchId)): <span class="tok-c">return</span> cache.get(...)
-  { text, sha } = <span class="tok-k">GET</span> registry <span class="tok-s">/plugins/{pluginId}/code/server?branch_id={branchId}</span>
+  { text, sha } = <span class="tok-k">GET</span> registry <span class="tok-s"><del class="fix">/plugins/{pluginId}/code/server</del><ins class="fix" data-r="R1">/internal/plugins/{pluginId}/code/server</ins>?branch_id={branchId}</span>
   engine = compile(text)
   cache.put((pluginId, branchId), engine)
   <span class="tok-c">return</span> engine</code></pre>
 
       <h3>Reload</h3>
-      <p><code>POST /internal/plugins/{pluginId}/reload { chat_id, branch_id }</code> &mdash; called by Registry <strong>only when the server side changed</strong>. A client-only save (JS edited, Lua untouched) never reaches Runtime at all &mdash; there is nothing for it to reload, since it doesn't execute client code in the first place. Runtime evicts <code>(pluginId, branchId)</code> and immediately re-invokes the <em>same</em> <code>loadEngine</code> above to rebuild it &mdash; not an inlined copy of the new code. Two reasons:</p>
+      <p><code>POST /internal/plugins/{pluginId}/reload { chat_id, branch_id }</code> &mdash; called by Registry <strong>only when the server side changed</strong>. A client-only save (JS edited, Lua untouched) never reaches Runtime at all &mdash; there is nothing for it to reload, since it doesn't execute client code in the first place. Runtime <del class="fix">evicts <code>(pluginId, branchId)</code> and immediately re-invokes</del><ins class="fix" data-r="R13">rebuilds <code>(pluginId, branchId)</code> through</ins> the <em>same</em> <ins class="fix">fetch-and-compile body of</ins> <code>loadEngine</code> above<del class="fix"> to rebuild it</del> &mdash; not an inlined copy of the new code. <ins class="fix">The old engine keeps serving commands until the new one has compiled; then a single <code>cache.put()</code> swaps it in, so there is no window in which a concurrent command compiles a second copy.</ins> Two reasons:</p>
       <ul>
         <li><strong>One pipeline, not two.</strong> If reload instead carried the code inline, "engine came from a reload" and "engine came from a cold cache miss" would be different code paths that can silently drift apart (e.g. after a Runtime restart, the cache is empty and every engine is rebuilt through <code>loadEngine</code> &mdash; if reload had its own inline path, that path would go untested until the one moment it matters).</li>
         <li><strong>Free GC for the mutable branch.</strong> The dev branch keeps the same <code>branch_id</code> forever, so reload is a plain <code>cache.put()</code> on a key that already exists &mdash; the old <code>LuaPluginEngine</code> is simply dereferenced and left to the JVM. Nothing to track, no orphaned shas to sweep. A <code>RELEASED</code> branch's <code>branch_id</code> never reloads at all (its code is frozen); its cache entry only ever leaves via ordinary idle/LRU eviction.</li>
       </ul>
-      <p>Redis state is preserved across a reload and passed through the <strong>built-in auto-migrator</strong>. Minimum interval <strong>3&nbsp;s</strong> per <code>(plugin, chat)</code> → <code>429 { retry_after_ms }</code>. The response is just <code>{ "reloaded": true }</code> &mdash; Runtime never touches client code, so it has no opinion on <code>client_changed</code>; Registry already knows that from the save it just performed and reports it itself (&sect;10, &sect;11).</p>
-      <p>Net effect on a save's internal call count (&sect;10, &sect;14 have the numbers): a client-only edit never involves Runtime at all &mdash; just the S3 write plus the <code>fstick.plugin.reloaded</code> push, since other open editor tabs still need to know to re-fetch <code>cl.js</code>. A server-only edit skips that push (&sect;11) but pays for the write, the reload call, and the now single-hop code fetch. Only an edit that touches both sides pays for everything.</p>
+      <p>Redis state is preserved across a reload and passed through the <strong>built-in auto-migrator</strong>. Minimum interval <strong>3&nbsp;s</strong> per <del class="fix"><code>(plugin, chat)</code></del><ins class="fix" data-r="R17"><code>(plugin, branch)</code> &mdash; the unit that actually gets rebuilt, so switching <code>chat_id</code> cannot bypass it</ins> → <code>429 { retry_after_ms }</code>. <ins class="fix">The auto-migrator runs eagerly for the <code>chat_id</code> in the request (skipped if that chat no longer has the plugin installed); every other chat on the same branch is migrated lazily, before its next command runs on the new engine.</ins> The response is just <code>{ "reloaded": true }</code> &mdash; Runtime never touches client code, so it has no opinion on <code>client_changed</code>; Registry already knows that from the save it just performed and reports it itself (&sect;10, &sect;11).</p>
+      <p><ins class="fix" data-r="R16"><strong>A throttled reload is not lost.</strong> If the save's reload call gets <code>429</code>, the new code is already stored but the engine is stale, and a later save with an unchanged server side would not reload it. Registry returns <code>reloaded: false</code> with <code>retry_after_ms</code>; once that delay has passed, the editor calls the explicit hot-reload endpoint <code>POST /api/v1/plugins/{id}/branches/{bid}/reload</code> (&sect;10). The Hot-reload button uses the same endpoint, which always forwards to Runtime whether or not the code changed.</ins></p>
+      <p>Net effect on a save's internal call count (&sect;10, &sect;14 have the numbers): a client-only edit never involves Runtime at all &mdash; just the S3 write plus the <code>fstick.plugin.reloaded</code> push, since <del class="fix">other open editor tabs still need</del><ins class="fix" data-r="R18">every client running that dev branch still needs</ins> to know to re-fetch <code>cl.js</code>. A server-only edit skips that push (&sect;11) but pays for the write, the reload call, <del class="fix">and the now single-hop code fetch</del><ins class="fix" data-r="R15">the internal code fetch, and Registry's S3 read behind it</ins>. Only an edit that touches both sides pays for everything.</p>
 
       <h3>State editing</h3>
-      <p>The editor's JSON state panel is <strong>editable</strong>; Runtime applies it. <code>PUT /api/v1/plugins/{id}/state?chat_id=</code>, author + dev-branch install only. Full JSON (not a patch). Invalid JSON → <code>400</code>. Otherwise the payload runs through the auto-migrator and schema validation, leniently: missing fields defaulted, unknown keys dropped, type mismatches coerced &mdash; written to Redis, discrepancies returned as <code>warnings</code>, then the normal broadcast fires. <strong>No optimistic lock</strong> &mdash; state changes on every command, so a hash guard would almost always conflict; the panel gets a refresh button instead.</p>
+      <p>The editor's JSON state panel is <strong>editable</strong>; Runtime applies it. <code>PUT /api/v1/plugins/{id}/state?chat_id=</code>, author + dev-branch install only. Full JSON (not a patch). Invalid JSON → <code>400</code>. Otherwise the payload runs through the auto-migrator and schema validation, leniently: missing fields defaulted, unknown keys dropped, type mismatches coerced &mdash; written to Redis, discrepancies returned as <code>warnings</code>, then the normal broadcast fires. <strong>No optimistic lock</strong> &mdash; state changes on every command, so a hash guard would almost always conflict; the panel gets a refresh button instead. <ins class="fix" data-r="R24">The schema is the plugin's own <code>SetStateSchema</code> / <code>state_schema</code> declaration (<code>backend_stdlib.lua</code>). The migrator is a new stdlib function <code>MigrateState</code>; it also runs before every command, which migrates the other chats lazily.</ins></p>
     </section>
 
     <!-- 8 -->
@@ -955,9 +1028,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
       <h3>Path &mdash; batched</h3>
       <ol>
-        <li>Runtime takes the author's <code>internal_uuid</code> straight from <code>GET registry /plugins/{id}</code> (the <code>author_id</code> field &mdash; no MXID anywhere) and caches it in its own small map, <code>Map&lt;pluginId, authorId&gt;</code> &mdash; independent of the engine cache (&sect;7) and untouched by reload, since the author never changes with the code.</li>
+        <li>Runtime takes the author's <code>internal_uuid</code> straight from <code>GET registry <del class="fix">/plugins/{id}</del><ins class="fix" data-r="R1">/internal/plugins/{id}</ins></code> (the <code>author_id</code> field &mdash; no MXID anywhere<ins class="fix">; the public route would return <code>404</code> for a dev-only plugin, since Runtime is not the author</ins>) and caches it in its own small map, <code>Map&lt;pluginId, authorId&gt;</code> &mdash; independent of the engine cache (&sect;7) and untouched by reload, since the author never changes with the code.</li>
         <li>Runtime <strong>buffers</strong> <code>print</code>/<code>warn</code> lines and <code>POST</code>s them in batches to <code>integration /api/v1/plugin-console</code> as <code>{ author_id, msgs: [ … ] }</code> &mdash; flushed on a ~100&nbsp;ms timer, when the buffer hits 64 lines, or when the command returns, whichever is first.</li>
-        <li>integration resolves <code>internal_uuid → mxid</code> <em>once</em>, wraps the array into a single <code>fstick.plugin.console</code> event <code>{ msgs: [ … ] }</code>, and calls Dendrite <code>/events/push</code>. The client appends every <code>msgs[]</code> entry to the console pane in order.</li>
+        <li>integration resolves <code>internal_uuid → mxid</code> <em>once</em>, <ins class="fix" data-r="R20">drops any line for a <code>chat_id</code> the author is no longer a member of,</ins> wraps the array into a single <code>fstick.plugin.console</code> event <code>{ msgs: [ … ] }</code>, and calls Dendrite <code>/events/push</code>. The client appends every <code>msgs[]</code> entry to the console pane in order.</li>
       </ol>
       <p>Kept separate from <code>broadcastPluginState</code> &mdash; console traffic is bursty and single-recipient. One resolve, one push, N lines. This is why the mapper sits in integration: the one service that already turns internal ids into Matrix pushes does the resolution, and Runtime never handles an MXID.</p>
 
@@ -980,7 +1053,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Property</th><th>Contract</th></tr></thead>
           <tbody>
             <tr><td>Event type</td><td><code>fstick.plugin.console</code></td></tr>
-            <tr><td>Recipients</td><td>plugin author only</td></tr>
+            <tr><td>Recipients</td><td>plugin author only<ins class="fix" data-r="R20">, and only for chats the author is still a member of</ins></td></tr>
             <tr><td>When</td><td>always, for any dev-branch execution</td></tr>
             <tr><td>History</td><td>none &mdash; live from connection time</td></tr>
             <tr><td>Other users' commands</td><td>included (backend state is shared)</td></tr>
@@ -1006,7 +1079,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <tbody>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins?owned=true</code></td><td>author</td><td>own plugins, incl. dev-only</td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins</code> (public)</td><td>all</td><td>filter <code>ACTIVE</code> + has <code>RELEASED</code> branch</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}</code></td><td>all / author</td><td>non-author sees only <code>RELEASED</code> branches</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}</code></td><td>all / author</td><td>non-author sees only <code>RELEASED</code> branches<ins class="fix" data-r="R2">; with <code>?chat_id=</code>, members of a chat running the dev branch see that branch too</ins></td></tr>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/edit?chat_id=</code></td><td>author + dev</td><td>editor bootstrap: source inline + blob shas</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></td><td>author + dev</td><td>save + trigger reload, only if the server side changed</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/publish</code></td><td>author</td><td>dev → new candidate branch</td></tr>
@@ -1015,7 +1088,11 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/claim</code></td><td>moderator</td><td><span class="pill pill--wait">WAITING_APPROVE</span> → <span class="pill pill--review">APPROVING</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/approve</code></td><td>moderator</td><td>→ <span class="pill pill--released">RELEASED</span></td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></td><td>moderator</td><td>→ <span class="pill pill--rejected">REJECTED</span> + notify</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server?branch_id=</code></td><td>author (dev) / all (released)</td><td>gate added; response is now inline source, not a presigned URL</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/server?branch_id=</code></td><td><del class="fix">author (dev) / all (released)</del><ins class="fix" data-r="R4">author (any branch) / moderator (candidates) / all (released)</ins></td><td>gate added; response is now inline source, not a presigned URL</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R2</span></td><td class="wrap"><code>/api/v1/plugins/{id}/code/client?branch_id=&amp;chat_id=</code></td><td>see &sect;10</td><td>inline <code>cl.js</code> for every browser running the plugin</td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R16</span></td><td class="wrap"><code>/api/v1/plugins/{id}/branches/{bid}/reload?chat_id=</code></td><td>author + dev</td><td>Hot-reload button; always forwards to Runtime (throttled)</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R1</span></td><td class="wrap"><code>/internal/plugins/{id}</code></td><td>internal</td><td>plugin metadata incl. <code>author_id</code> and branch statuses, for Runtime and Installation</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R1</span></td><td class="wrap"><code>/internal/plugins/{id}/code/server?branch_id=</code></td><td>internal</td><td>the source <code>loadEngine</code> compiles; no user gate</td></tr>
           </tbody>
         </table>
       </div>
@@ -1026,9 +1103,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <table>
           <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>rebuild the engine for <code>branch_id</code>; 3s min interval → <code>429</code>; runs state auto-migrator</td></tr>
+            <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/internal/plugins/{id}/reload</code></td><td>rebuild the engine for <code>branch_id</code>; 3s min interval <ins class="fix" data-r="R17">per <code>(plugin, branch)</code></ins> → <code>429</code>; runs state auto-migrator</td></tr>
             <tr><td><span class="method method--put">PUT</span></td><td class="wrap"><code>/api/v1/plugins/{id}/state?chat_id=</code></td><td>author + dev &mdash; overwrite state from the editor</td></tr>
-            <tr><td colspan="3" class="wrap"><code>print</code>/<code>warn</code> hooks buffer lines (<code>level: info|warn</code>, <code>system: false</code>) and <code>POST</code> them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Uncaught exceptions go the same route as <code>level: "error", system: true</code>. Engine cache keyed <code>(pluginId, branchId)</code> &mdash; no sha; branch resolved per <code>(pluginId, chatId)</code> via Installation, cached 60s; author <code>internal_uuid</code> cached separately, by <code>pluginId</code> alone.</td></tr>
+            <tr><td colspan="3" class="wrap"><code>print</code>/<code>warn</code> hooks buffer lines (<code>level: info|warn</code>, <code>system: false</code>) and <code>POST</code> them in batches (<code>{ author_id, msgs:[…] }</code>, ~100&nbsp;ms / 64 lines / command end) to <code>integration /plugin-console</code> &mdash; Runtime carries the author's <code>internal_uuid</code>, never an MXID. Uncaught exceptions go the same route as <code>level: "error", system: true</code>. Engine cache keyed <code>(pluginId, branchId)</code> &mdash; no sha; branch resolved per <code>(pluginId, chatId)</code> via Installation, cached 60s; author <code>internal_uuid</code> cached separately, by <code>pluginId</code> alone. <ins class="fix" data-r="R1">Code and author both come from Registry's <code>/internal/…</code> routes.</ins></td></tr>
           </tbody>
         </table>
       </div>
@@ -1039,8 +1116,12 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
           <tbody>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/identity/resolve</code></td><td><code>{ mxid } → { internal_uuid }</code>, create-or-return; mints the uuid on first contact</td></tr>
-            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/identity/{internal_uuid}</code></td><td><code>→ { mxid }</code>, for outbound push; batch variant for member lists</td></tr>
+            <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/api/v1/identity/{internal_uuid}</code></td><td><code>→ { mxid }</code>, for outbound push<del class="fix">; batch variant for member lists</del></td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R3</span></td><td class="wrap"><code>/api/v1/identity/resolve-batch</code></td><td><code>{ mxids } → map</code>; member lists</td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R3</span></td><td class="wrap"><code>/api/v1/identity/lookup-batch</code></td><td><code>{ uuids } → map</code>; Gateway response enrichment</td></tr>
             <tr><td><span class="method method--post">POST</span></td><td class="wrap"><code>/api/v1/plugin-console</code></td><td>resolve author <code>internal_uuid → mxid</code>, push one batch <code>{ msgs:[…] }</code> via <code>/events/push</code></td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R21</span></td><td class="wrap"><code>/api/v1/plugin-events/push</code></td><td>Registry → push <code>fstick.plugin.reloaded</code> to the members of the listed chats</td></tr>
+            <tr class="fix-row"><td><span class="method method--post">POST</span> <span class="fix-tag">R21</span></td><td class="wrap"><code>/api/v1/dev-room/notify</code></td><td>Registry → message in the author's Fstick Developer room (released / rejected)</td></tr>
             <tr><td colspan="3" class="wrap">integration gains its first datastore (Postgres) for the identity table &mdash; see &sect;3. New sync event types over the existing pipe: <code>fstick.plugin.console</code>, <code>fstick.plugin.reloaded</code>. No new transport.</td></tr>
           </tbody>
         </table>
@@ -1052,16 +1133,19 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
           <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
           <tbody>
             <tr><td><span class="method method--get">GET</span></td><td class="wrap"><code>/internal/installations/resolve?plugin_id=&amp;chat_id=</code></td><td>new, internal &mdash; <code>→ { branch_id, branch_status }</code>; the only way Runtime learns which branch a chat runs (&sect;7)</td></tr>
+            <tr class="fix-row"><td><span class="method method--get">GET</span> <span class="fix-tag">R18</span></td><td class="wrap"><code>/internal/installations?branch_id=</code></td><td>new, internal &mdash; <code>→ { chat_ids }</code>; who must receive <code>fstick.plugin.reloaded</code></td></tr>
+            <tr class="fix-row"><td><span class="method method--patch">PATCH</span> <span class="fix-tag">R6</span></td><td class="wrap"><code>/api/v1/installations/{id}</code></td><td>re-point a pinned install to another branch (upgrade / downgrade)</td></tr>
           </tbody>
         </table>
       </div>
       <ul>
-        <li><code>POST /installations</code>: fetch branch <code>status</code> + <code>author_id</code> from Registry; if the target branch is <code>dev</code>, require <code>X-User-Id == author_id</code> → else <code>403</code>. Released branches: anyone.</li>
+        <li><code>POST /installations</code>: fetch branch <code>status</code> + <code>author_id</code> from Registry<ins class="fix" data-r="R1"> (<code>GET /internal/plugins/{id}</code>)</ins>; if the target branch is <code>dev</code>, require <code>X-User-Id == author_id</code> → else <code>403</code>. Released branches: anyone. <ins class="fix" data-r="R6"><code>branch_id</code> is optional: omitted → the highest <code>RELEASED</code> SemVer, pinned.</ins></li>
         <li><code>GET /installations</code>: add <code>branch_status</code> and <code>author_id</code> per item so the frontend can show <strong>Edit</strong>.</li>
       </ul>
 
       <h3>Gateway</h3>
-      <p>Swap the inbound <code>X-User-Id</code> &mdash; an MXID set by Dendrite &mdash; to <code>internal_uuid</code> via <code>integration /api/v1/identity/resolve</code>, cached in-process (LRU, no invalidation). Forward only that; <code>X-User-Matrix-Id</code> is not propagated. Proxy the new routes: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, the moderation actions, <code>PUT …/state</code>, <code>?owned=true</code>.</p>
+      <p>Swap the inbound <code>X-User-Id</code> &mdash; an MXID set by Dendrite &mdash; to <code>internal_uuid</code> via <code>integration /api/v1/identity/resolve</code>, cached in-process (LRU, no invalidation). Forward only that; <code>X-User-Matrix-Id</code> is not propagated. Proxy the new routes: <code>…/branches/{bid}/edit</code>, <code>…/branches/{bid}/code</code>, <code>/publish</code>, the moderation actions, <code>PUT …/state</code>, <code>?owned=true</code><ins class="fix" data-r="R21">, <code>…/branches/{bid}/reload</code>, <code>…/branches/{bid}/cancel</code>, <code>GET /moderation/branches</code>, <code>…/code/client</code>, <code>PATCH /installations/{id}</code>; serve <code>GET /api/v1/me</code> itself. Never proxy <code>/internal/**</code></ins>.</p>
+      <p><ins class="fix" data-r="R3"><strong>Response enrichment.</strong> On the way out the Gateway adds an MXID next to every user id it recognises: <code>author_id</code> → <code>author_mxid</code>, <code>installed_by</code> → <code>installed_by_mxid</code>, <code>claimed_by</code> → <code>claimed_by_mxid</code>, <code>author.id</code> → <code>author.mxid</code>. Values come from its cache or <code>lookup-batch</code>. Services never store or return MXIDs themselves.</ins></p>
     </section>
 
     <!-- 10 -->
@@ -1074,8 +1158,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <h3>Conventions</h3>
       <ul>
         <li>Every external call goes through the Gateway with <code>Authorization: Bearer &lt;matrix_token&gt;</code>. The Gateway authenticates it and injects <code>X-User-Id: &lt;internal_uuid&gt;</code> (&sect;3); contracts below are the logical shape at the service boundary.</li>
-        <li>Error body is always <code>{ "error": "&lt;snake_code&gt;", "message": "&lt;human&gt;", … }</code>. Codes: <code>400</code> malformed, <code>401</code> bad token, <code>403</code> not the author / not a moderator, <code>404</code> unknown id or branch not visible to the caller, <code>409</code> state conflict, <code>413</code> too large, <code>422</code> semantic validation, <code>429</code> throttled.</li>
-        <li>The transition actions (<code>claim</code> / <code>approve</code> / <code>reject</code> / <code>cancel</code>) are <strong>idempotent on retry</strong>: a repeat that finds the branch already in the target state returns <code>200</code> with the current row; an action invalid for the current state returns <code>409</code>.</li>
+        <li>Error body is always <code>{ "error": "&lt;snake_code&gt;", "message": "&lt;human&gt;", … }</code>. Codes: <code>400</code> malformed, <code>401</code> bad token, <code>403</code> not the author / not a moderator<ins class="fix" data-r="R9"> on something the caller can see</ins>, <code>404</code> unknown id or branch not visible to the caller<ins class="fix"> &mdash; a hidden branch is always <code>404</code>, never <code>403</code>, so its existence does not leak</ins>, <code>409</code> state conflict, <code>413</code> too large, <code>422</code> semantic validation, <code>429</code> throttled.</li>
+        <li>The transition actions (<code>claim</code> / <code>approve</code> / <code>reject</code> / <code>cancel</code>) are <strong>idempotent on retry</strong>: a repeat that finds the branch already in the target state returns <code>200</code> with the current row; an action invalid for the current state returns <code>409</code>. <ins class="fix" data-r="R8">So a repeated <code>reject</code> on a <code>REJECTED</code> branch is <code>200</code>, while <code>reject</code> on a <code>CANCELLED</code> or <code>RELEASED</code> branch is <code>409</code>.</ins></li>
+        <li><ins class="fix" data-r="R1">Routes under <code>/internal/**</code> are service-to-service only: never proxied by the Gateway, not gated by <code>X-User-Id</code>, reachable only on the internal network.</ins></li>
+        <li><ins class="fix" data-r="R5">"Moderator" means a row in <code>registry.moderators</code> (&sect;4).</ins></li>
       </ul>
 
       <h3>Registry &mdash; editor</h3>
@@ -1101,19 +1187,20 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--put">PUT</span><code>/api/v1/plugins/{id}/branches/{bid}/code?chat_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev only</span><span><b>Limit:</b> 500 KB/file &middot; 1.2 MB decoded body &rarr; <code>413</code></span><span><b>Accepts:</b> <code>Content-Encoding: gzip | br</code></span></div>
+          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev only</span><span><b>Limit:</b> 500 KB/file &middot; <del class="fix">1.2 MB</del><ins class="fix" data-r="R19">2.2 MB</ins> decoded body &rarr; <code>413</code></span><span><b>Accepts:</b> <code>Content-Encoding: gzip | br</code></span></div>
           <pre><code><span class="tok-c">// request — send only the side(s) that changed</span>
 {
   <span class="tok-k">"client"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
   <span class="tok-k">"server"</span>:  { <span class="tok-k">"text"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"base_sha"</span>: <span class="tok-s">"sha256:…"</span> },
-  <span class="tok-k">"runtime"</span>: { <span class="tok-k">"server"</span>: <span class="tok-s">"sv.lua@2.0.0"</span> }   <span class="tok-c">// optional — @X = stdlib version</span>
+  <span class="tok-k">"runtime"</span>: { <span class="tok-k">"server"</span>: <span class="tok-s">"sv.lua@2.0.0"</span> }   <span class="tok-c">// optional — @X = stdlib version<ins class="fix" data-r="R23">; until server support lands → 422 runtime_change_unsupported</ins></span>
 }
 
 <span class="tok-c">// 200 — broken code IS saved, with a warning</span>
 { <span class="tok-k">"warnings"</span>: [ { <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"message"</span>: <span class="tok-s">"syntax error at line 12"</span> } ],
   <span class="tok-k">"sha"</span>: { <span class="tok-k">"client"</span>: <span class="tok-s">"sha256:…"</span>, <span class="tok-k">"server"</span>: <span class="tok-s">"sha256:…"</span> },
   <span class="tok-k">"reloaded"</span>: true,
-  <span class="tok-k">"client_changed"</span>: false }   <span class="tok-c">// Registry compares old vs new client_blob_sha — Runtime is never asked</span>
+<ins class="fix" data-r="R16">  <span class="tok-k">"retry_after_ms"</span>: null,      <span class="tok-c">// set only when reloaded is false</span>
+</ins>  <span class="tok-k">"client_changed"</span>: false }   <span class="tok-c">// Registry compares old vs new client_blob_sha — Runtime is never asked</span>
 
 <span class="tok-c">// 409 — someone else moved the code; nothing was written</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"stale_code"</span>,
@@ -1121,7 +1208,22 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 
 <span class="tok-c">// 413 — one file over 500 000 bytes (measured after decode)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"file_too_large"</span>, <span class="tok-k">"side"</span>: <span class="tok-s">"server"</span>, <span class="tok-k">"limit"</span>: 500000, <span class="tok-k">"actual"</span>: 812345 }</code></pre>
-          <p>Save writes each changed side to <code>blobs/{sha256}</code> and repoints the dev branch. <code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code> is called <strong>only if the server side changed</strong> &mdash; a client-only save never touches Runtime, since it never executes client code (&sect;7). <code>reloaded</code> is <code>true</code> whenever the engine is guaranteed current after this call &mdash; that covers a successful reload <em>and</em> the case where nothing needed reloading; it's <code>false</code> only if the reload throttle (&sect;7) deferred an actually-needed rebuild. <code>client_changed</code> is Registry's own comparison of the client blob sha before/after &mdash; Runtime is never asked (&sect;7).</p>
+          <p>Save writes each changed side to <code>blobs/{sha256}</code> and repoints the dev branch. <code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code> is called <strong>only if the server side changed</strong> <ins class="fix" data-r="R23">(a changed <code>runtime.server</code> counts as a server change)</ins> &mdash; a client-only save never touches Runtime, since it never executes client code (&sect;7). <code>reloaded</code> is <code>true</code> whenever the engine is guaranteed current after this call &mdash; that covers a successful reload <em>and</em> the case where nothing needed reloading; it's <code>false</code> only if the reload throttle (&sect;7) deferred an actually-needed rebuild. <ins class="fix" data-r="R16">In that case the editor calls <code>POST …/branches/{bid}/reload</code> once <code>retry_after_ms</code> has passed (below).</ins> <ins class="fix" data-r="R25">The reload targets the branch, not the installation, so it still works if the plugin was uninstalled from <code>chat_id</code> while the editor was open; only the eager state migration for that chat is skipped.</ins> <code>client_changed</code> is Registry's own comparison of the client blob sha before/after &mdash; Runtime is never asked (&sect;7).</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R16">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/reload?chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> author</span><span><b>Branch:</b> dev only</span><span><b>Throttle:</b> 3s / (plugin, branch)</span></div>
+          <pre><code><span class="tok-c">// no body</span>
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"reloaded"</span>: true }
+
+<span class="tok-c">// 429</span>
+{ <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
+          <p>The Hot-reload button. Registry forwards to Runtime's <code>/internal/plugins/{id}/reload</code> unconditionally &mdash; unlike <code>PUT …/code</code>, it does not check whether the server side changed. The editor also calls it to retry after a save returned <code>reloaded: false</code>.</p>
         </div>
       </div>
 
@@ -1147,7 +1249,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 { <span class="tok-k">"items"</span>: [ {
     <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"plugin_name"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"changelog"</span>,
     <span class="tok-k">"status"</span>: <span class="tok-s">"WAITING_APPROVE"</span> | <span class="tok-s">"APPROVING"</span>,
-    <span class="tok-k">"author"</span>: { <span class="tok-k">"id"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:…"</span> },
+    <span class="tok-k">"author"</span>: { <span class="tok-k">"id"</span>: <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:…"</span> },<ins class="fix" data-r="R3">  <span class="tok-c">// mxid added by the Gateway, not Registry</span></ins>
     <span class="tok-k">"submitted_at"</span>, <span class="tok-k">"claimed_by"</span>: <span class="tok-s">null</span>
   } ],
   <span class="tok-k">"page"</span>: 0, <span class="tok-k">"total"</span>: 7 }</code></pre>
@@ -1173,13 +1275,13 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/reject</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> moderator</span><span><b>From:</b> <code>WAITING_APPROVE</code> or <code>APPROVING</code></span></div>
+          <div class="attrs"><span><b>Auth:</b> moderator</span><span><b>From:</b> <code>WAITING_APPROVE</code> or <code>APPROVING</code></span><span><ins class="fix" data-r="R12"><b>From APPROVING:</b> the claimer only &rarr; else <code>403 not_claimer</code></ins></span></div>
           <pre><code><span class="tok-c">// request</span>
 { <span class="tok-k">"reason"</span>: <span class="tok-s">"…"</span> }        <span class="tok-c">// required, ≤ 2000 chars</span>
 
 <span class="tok-c">// 200</span>
 { <span class="tok-k">"branch_id"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"REJECTED"</span> }</code></pre>
-          <p>Branch retained (hidden, not installable). <code>plugins.last_rejection = { reason, at, semver, branch_id }</code> set; moderation-log row; author messaged in the Fstick Developer room. No <code>resubmit</code> &mdash; the author edits the dev branch and calls <code>/publish</code> again. <code>409</code> if already terminal.</p>
+          <p>Branch retained (hidden, not installable). <code>plugins.last_rejection = { reason, at, semver, branch_id }</code> set; moderation-log row; author messaged in the Fstick Developer room. No <code>resubmit</code> &mdash; the author edits the dev branch and calls <code>/publish</code> again. <del class="fix"><code>409</code> if already terminal.</del><ins class="fix" data-r="R8">Repeat on a <code>REJECTED</code> branch → <code>200</code>; on <code>RELEASED</code> / <code>CANCELLED</code> → <code>409</code>.</ins></p>
         </div>
       </div>
 
@@ -1187,7 +1289,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugins/{id}/branches/{bid}/cancel</code></div>
         <div class="endpoint-body">
           <div class="attrs"><span><b>Auth:</b> author</span><span><b>From:</b> <code>WAITING_APPROVE</code> or <code>APPROVING</code></span></div>
-          <p>No body. Branch &rarr; <span class="pill pill--cancelled">CANCELLED</span> (retained), moderation-log row, drops out of the review queue. No <code>last_rejection</code>, no notification &mdash; the author withdrew it. <code>200 { "branch_id", "status": "CANCELLED" }</code>. <code>409</code> if already terminal (<code>RELEASED</code> / <code>REJECTED</code> / <code>CANCELLED</code>).</p>
+          <p>No body. Branch &rarr; <span class="pill pill--cancelled">CANCELLED</span> (retained), moderation-log row, drops out of the review queue. No <code>last_rejection</code>, no notification &mdash; the author withdrew it. <code>200 { "branch_id", "status": "CANCELLED" }</code>. <del class="fix"><code>409</code> if already terminal (<code>RELEASED</code> / <code>REJECTED</code> / <code>CANCELLED</code>).</del><ins class="fix" data-r="R8">Repeat on a <code>CANCELLED</code> branch → <code>200</code>; on <code>RELEASED</code> / <code>REJECTED</code> → <code>409</code>.</ins></p>
         </div>
       </div>
 
@@ -1213,10 +1315,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> optional</span><span><b>Non-author:</b> <code>RELEASED</code> branches only &middot; <code>404</code> if none</span></div>
+          <div class="attrs"><span><b>Auth:</b> optional</span><span><b>Non-author:</b> <code>RELEASED</code> branches only &middot; <code>404</code> if none</span><span><ins class="fix" data-r="R2"><b>With <code>?chat_id=</code>:</b> a member of a chat whose installation points at the dev branch also sees that branch, instead of <code>404</code></ins></span></div>
           <pre><code><span class="tok-c">// 200 (author view — all branches + last_rejection)</span>
 {
-  <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"author_id"</span>, <span class="tok-k">"icon_url"</span>, <span class="tok-k">"description"</span>,
+  <span class="tok-k">"id"</span>, <span class="tok-k">"name"</span>, <span class="tok-k">"author_id"</span>, <ins class="fix" data-r="R3"><span class="tok-k">"author_mxid"</span>, </ins><span class="tok-k">"icon_url"</span>, <span class="tok-k">"description"</span>,
   <span class="tok-k">"branches"</span>: [
     { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">null</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"WORKING"</span>, <span class="tok-k">"runtime"</span>: {…} },
     { <span class="tok-k">"id"</span>, <span class="tok-k">"semver"</span>: <span class="tok-s">"1.1.0"</span>, <span class="tok-k">"status"</span>: <span class="tok-s">"RELEASED"</span>, <span class="tok-k">"created_at"</span> },
@@ -1244,10 +1346,43 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/server?branch_id=</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Auth:</b> author (dev / candidate) &middot; any user (<code>RELEASED</code>)</span><span><b>Caller:</b> Runtime's <code>loadEngine</code> (&sect;7), server-to-server</span><span><b>Changed:</b> inline, not presigned</span></div>
+          <div class="attrs"><span><b>Auth:</b> author (<del class="fix">dev / candidate</del><ins class="fix" data-r="R4">any branch</ins>) &middot; <ins class="fix">moderator (candidates) &middot; </ins>any user (<code>RELEASED</code>)</span><span><b>Caller:</b> <del class="fix">Runtime's <code>loadEngine</code> (&sect;7), server-to-server</del><ins class="fix" data-r="R1">editor and moderation UI; Runtime uses the <code>/internal</code> twin below</ins></span><span><b>Changed:</b> inline, not presigned</span></div>
           <pre><code><span class="tok-c">// 200</span>
 { <span class="tok-k">"text"</span>: <span class="tok-s">"…lua…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }</code></pre>
-          <p>Gate added: a non-<code>RELEASED</code> branch returns <code>403</code> to anyone but the author. Registry reads the blob from S3 itself and returns the text directly &mdash; no presigned URL, no second hop, same rule as the editor's own code transport (&sect;6). Used for <em>any</em> branch, not just released ones: it's the one path <code>loadEngine</code> calls, whether the trigger is a cold cache miss or a reload.</p>
+          <p>Gate added: a non-<code>RELEASED</code> branch returns <del class="fix"><code>403</code></del><ins class="fix" data-r="R9"><code>404</code></ins> to anyone but the author<ins class="fix" data-r="R4"> (and, for a candidate, a moderator)</ins>. Registry reads the blob from S3 itself and returns the text directly &mdash; no presigned URL, no second hop, same rule as the editor's own code transport (&sect;6). <del class="fix">Used for <em>any</em> branch, not just released ones: it's the one path <code>loadEngine</code> calls, whether the trigger is a cold cache miss or a reload.</del></p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R2">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/plugins/{id}/code/client?branch_id=&amp;chat_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> any user (<code>RELEASED</code>) &middot; author / moderator (candidate) &middot; author, or a member of <code>chat_id</code> whose installation points at this branch (dev)</span><span><b>Changed:</b> inline, not presigned</span></div>
+          <pre><code><span class="tok-c">// 200 — ETag: "sha256:…"; unchanged re-fetch → 304</span>
+{ <span class="tok-k">"text"</span>: <span class="tok-s">"…js…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }
+
+<span class="tok-c">// 404 — branch not visible to the caller</span></code></pre>
+          <p>What every browser running the plugin loads as <code>cl.js</code>, and re-fetches on <code>fstick.plugin.reloaded</code>. For a dev branch, Registry checks the chat with Installation's <code>/internal/installations/resolve</code> and chat membership through integration.</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R1">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/plugins/{id}/code/server?branch_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Runtime's <code>loadEngine</code> (&sect;7)</span><span><b>Access:</b> internal network, no user gate</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"text"</span>: <span class="tok-s">"…lua…"</span>, <span class="tok-k">"sha"</span>: <span class="tok-s">"sha256:…"</span> }
+<span class="tok-c">// 404 — unknown plugin / branch</span></code></pre>
+          <p>The one path <code>loadEngine</code> calls, for any branch, whether the trigger is a cold cache miss or a reload. It cannot be user-gated: commands on a dev branch are run by any member of the chat, not only the author (&sect;8), so the public route would refuse them.</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R1">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/plugins/{id}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Runtime (author lookup, &sect;8), Installation (debug-install check)</span><span><b>Access:</b> internal network, no user gate</span></div>
+          <pre><code><span class="tok-c">// 200 — all branches, regardless of status</span>
+{ <span class="tok-k">"id"</span>, <span class="tok-k">"status"</span>, <span class="tok-k">"author_id"</span>,
+  <span class="tok-k">"branches"</span>: [ { <span class="tok-k">"id"</span>, <span class="tok-k">"status"</span>, <span class="tok-k">"semver"</span> } ] }</code></pre>
         </div>
       </div>
 
@@ -1273,7 +1408,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       <div class="endpoint">
         <div class="endpoint-head"><span class="method method--post">POST</span><code>/internal/plugins/{id}/reload</code></div>
         <div class="endpoint-body">
-          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span><span><b>Called:</b> only if the server side changed</span><span><b>Throttle:</b> 3s / (plugin, chat)</span></div>
+          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span><span><b>Called:</b> only if the server side changed<ins class="fix" data-r="R16">, or by the explicit hot-reload</ins></span><span><b>Throttle:</b> 3s / <del class="fix">(plugin, chat)</del><ins class="fix" data-r="R17">(plugin, branch)</ins></span></div>
           <pre><code><span class="tok-c">// request</span>
 { <span class="tok-k">"chat_id"</span>: <span class="tok-s">"…"</span>, <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span> }
 
@@ -1281,10 +1416,23 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 <span class="tok-c">// path a cold cache miss would use (§7); state auto-migrated</span>
 { <span class="tok-k">"reloaded"</span>: true }
 
-<span class="tok-c">// 429 — called again within 3s (Registry surfaces reloaded:false to the editor)</span>
+<span class="tok-c">// 429 — called again within 3s (Registry surfaces reloaded:false to the editor<ins class="fix" data-r="R16">, with retry_after_ms</ins>)</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"reload_throttled"</span>, <span class="tok-k">"retry_after_ms"</span>: 2100 }</code></pre>
           <p>No <code>client_sha</code>/<code>server_sha</code> here &mdash; Runtime doesn't key on shas (&sect;7) and doesn't report <code>client_changed</code>, since it never loads client code. Registry computes and carries that fact itself (see above and &sect;11).</p>
         </div>
+      </div>
+
+      <div class="fix-block" data-r="R3">
+      <h3>Gateway</h3>
+      <div class="endpoint">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/api/v1/me</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> token</span><span><b>Served by:</b> Gateway, from its mapper cache</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"internal_uuid"</span>: <span class="tok-s">"9f3c1a2e-…"</span>, <span class="tok-k">"mxid"</span>: <span class="tok-s">"@ilya:fstick.local"</span> }</code></pre>
+          <p>The frontend fetches this once per session and compares <code>internal_uuid</code> against <code>author_id</code> fields (&sect;12). It never renders it.</p>
+        </div>
+      </div>
       </div>
 
       <h3>Integration &mdash; identity</h3>
@@ -1322,6 +1470,16 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         </div>
       </div>
 
+      <div class="endpoint fix-block" data-r="R3">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/identity/lookup-batch</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Gateway (response enrichment, cache misses only)</span></div>
+          <pre><code>{ <span class="tok-k">"uuids"</span>: [ <span class="tok-s">"&lt;uuid&gt;"</span>, <span class="tok-s">"&lt;uuid&gt;"</span> ] }
+<span class="tok-c">// 200 — unknown uuids are omitted</span>
+{ <span class="tok-k">"map"</span>: { <span class="tok-s">"&lt;uuid&gt;"</span>: <span class="tok-s">"@a:x"</span> } }</code></pre>
+        </div>
+      </div>
+
       <h3>Integration &mdash; console <span class="pill pill--dev">internal</span></h3>
 
       <div class="endpoint">
@@ -1340,7 +1498,31 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 }
 
 <span class="tok-c">// 202 — resolved author_id → mxid, pushed one fstick.plugin.console { msgs }</span>
-<span class="tok-c">// 404 — author_id unknown → dropped and logged, still 202 to the caller</span></code></pre>
+<del class="fix"><span class="tok-c">// 404 — author_id unknown → dropped and logged, still 202 to the caller</span></del><ins class="fix" data-r="R10"><span class="tok-c">// unknown author_id → batch dropped and logged; the caller still gets 202, never 404</span>
+<span class="tok-c">// lines for chats the author has left → dropped (R20)</span></ins></code></pre>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R21">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/plugin-events/push</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span><span><b>Delivery:</b> fire-and-forget &rarr; <code>202</code></span></div>
+          <pre><code>{ <span class="tok-k">"type"</span>: <span class="tok-s">"fstick.plugin.reloaded"</span>,
+  <span class="tok-k">"chat_ids"</span>: [ <span class="tok-s">"…"</span> ],
+  <span class="tok-k">"content"</span>: { <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span> } }
+<span class="tok-c">// 202 — one push per chat, to every member; chat_id is added to content per push</span></code></pre>
+          <p>Registry gets <code>chat_ids</code> from Installation's <code>GET /internal/installations?branch_id=</code> (&sect;11).</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R21">
+        <div class="endpoint-head"><span class="method method--post">POST</span><code>/api/v1/dev-room/notify</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span><span><b>Delivery:</b> fire-and-forget &rarr; <code>202</code></span></div>
+          <pre><code>{ <span class="tok-k">"author_id"</span>: <span class="tok-s">"&lt;internal_uuid&gt;"</span>,
+  <span class="tok-k">"kind"</span>: <span class="tok-s">"released"</span> | <span class="tok-s">"rejected"</span>,
+  <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"plugin_name"</span>, <span class="tok-k">"semver"</span>, <span class="tok-k">"reason"</span> }   <span class="tok-c">// reason: rejected only</span></code></pre>
+          <p>integration maps <code>author_id</code> to an MXID and posts into the author's Fstick Developer room, provisioning it on first use (&sect;13 #6).</p>
         </div>
       </div>
 
@@ -1357,6 +1539,16 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         </div>
       </div>
 
+      <div class="endpoint fix-block" data-r="R18">
+        <div class="endpoint-head"><span class="method method--get">GET</span><code>/internal/installations?branch_id=</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Caller:</b> Registry (internal)</span></div>
+          <pre><code><span class="tok-c">// 200</span>
+{ <span class="tok-k">"chat_ids"</span>: [ <span class="tok-s">"…"</span> ] }</code></pre>
+          <p>Every chat whose installation points at the branch &mdash; the recipients of <code>fstick.plugin.reloaded</code>.</p>
+        </div>
+      </div>
+
       <h3>Installation <span class="pill pill--dev">changed</span></h3>
 
       <div class="endpoint">
@@ -1364,14 +1556,14 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <div class="endpoint-body">
           <div class="attrs"><span><b>Auth:</b> chat member</span><span><b>Debug branch:</b> author only &rarr; <code>403</code></span></div>
           <pre><code><span class="tok-c">// request</span>
-{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span> }
+{ <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span> }<ins class="fix" data-r="R6">   <span class="tok-c">// branch_id optional → highest RELEASED semver, pinned</span></ins>
 
 <span class="tok-c">// 201</span>
 { <span class="tok-k">"installation_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"branch_status"</span> }
 
 <span class="tok-c">// 403 — target branch is not RELEASED and caller ≠ author</span>
 { <span class="tok-k">"error"</span>: <span class="tok-s">"debug_install_forbidden"</span> }</code></pre>
-          <p>Installation-service reads <code>branch.status</code> + <code>plugin.author_id</code> from Registry to make this check.</p>
+          <p>Installation-service reads <code>branch.status</code> + <code>plugin.author_id</code> from Registry <ins class="fix" data-r="R1">(<code>GET /internal/plugins/{id}</code>)</ins> to make this check.</p>
         </div>
       </div>
 
@@ -1383,9 +1575,25 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 { <span class="tok-k">"items"</span>: [ {
     <span class="tok-k">"installation_id"</span>, <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"branch_id"</span>,
     <span class="tok-k">"branch_status"</span>: <span class="tok-s">"WORKING"</span> | <span class="tok-s">"RELEASED"</span>,
-    <span class="tok-k">"author_id"</span>, <span class="tok-k">"installed_by"</span>, <span class="tok-k">"installed_at"</span>
+    <span class="tok-k">"author_id"</span>, <span class="tok-k">"installed_by"</span>, <span class="tok-k">"installed_at"</span><ins class="fix" data-r="R3">,
+    <span class="tok-k">"author_mxid"</span>, <span class="tok-k">"installed_by_mxid"</span>   <span class="tok-c">// added by the Gateway</span></ins>
   } ] }</code></pre>
-          <p>The frontend shows <strong>Edit</strong> when <code>branch_status === "WORKING" &amp;&amp; author_id === myInternalUuid</code>.</p>
+          <p>The frontend shows <strong>Edit</strong> when <code>branch_status === "WORKING" &amp;&amp; author_id === myInternalUuid</code><ins class="fix" data-r="R3"> (from <code>GET /api/v1/me</code>)</ins>.</p>
+        </div>
+      </div>
+
+      <div class="endpoint fix-block" data-r="R6">
+        <div class="endpoint-head"><span class="method method--patch">PATCH</span><code>/api/v1/installations/{id}</code></div>
+        <div class="endpoint-body">
+          <div class="attrs"><span><b>Auth:</b> chat member</span><span><b>Debug branch:</b> author only &rarr; <code>403</code></span></div>
+          <pre><code><span class="tok-c">// request</span>
+{ <span class="tok-k">"branch_id"</span>: <span class="tok-s">"…"</span> }
+
+<span class="tok-c">// 200</span>
+{ <span class="tok-k">"installation_id"</span>, <span class="tok-k">"branch_id"</span>, <span class="tok-k">"branch_status"</span> }
+
+<span class="tok-c">// 403 debug_install_forbidden · 404 branch not visible · 422 branch_of_other_plugin</span></code></pre>
+          <p>Upgrades or downgrades a pinned install; same rules as <code>POST</code>. Runtime picks up the change within its 60&nbsp;s resolve TTL (&sect;7).</p>
         </div>
       </div>
     </section>
@@ -1412,9 +1620,9 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 }
 <span class="tok-c">// Runtime → integration:  { "author_id": &lt;internal_uuid&gt;, "msgs": [ … ] }</span>
 <span class="tok-c">// integration maps author_id → MXID, addresses the push, forwards { msgs } as-is.</span>
-<span class="tok-c">// The client-facing event carries no id. Ordering within msgs is preserved.</span>
+<span class="tok-c">// The client-facing event carries no <del class="fix">id</del><ins class="fix" data-r="R10">author_id</ins>. Ordering within msgs is preserved.</span>
 
-<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → author · fired only when client_changed is true</span>
+<span class="tok-k">fstick.plugin.reloaded</span>         <span class="tok-c">// → <del class="fix">author</del><ins class="fix" data-r="R18">every member of every chat whose installation points at this dev branch</ins> · fired only when client_changed is true</span>
 {
   <span class="tok-k">"plugin_id"</span>, <span class="tok-k">"chat_id"</span>, <span class="tok-k">"branch_id"</span>,
   <span class="tok-k">"client_changed"</span>: <span class="tok-s">true</span>          <span class="tok-c">// → re-fetch cl.js, re-run runDsl</span>
@@ -1422,7 +1630,10 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
 <span class="tok-c">// Fired by Registry (via Integration), not Runtime — Registry is the only party</span>
 <span class="tok-c">// that compares old vs new client_blob_sha; Runtime's /reload never reports it.</span>
 <span class="tok-c">// A server-only save has nothing for another open editor tab to refresh, so</span>
-<span class="tok-c">// Registry skips the event entirely rather than pushing client_changed:false.</span></code></pre>
+<span class="tok-c">// Registry skips the event entirely rather than pushing client_changed:false.</span>
+<ins class="fix" data-r="R18"><span class="tok-c">// Recipients: Registry → Installation GET /internal/installations?branch_id= → chat_ids</span>
+<span class="tok-c">// → integration POST /plugin-events/push. Everyone running the dev cl.js re-fetches it,</span>
+<span class="tok-c">// not only the author's editor tabs; otherwise their client and the new server drift apart.</span></ins></code></pre>
     </section>
 
     <!-- 12 -->
@@ -1432,17 +1643,18 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
         <h2><span class="num">12</span>Frontend contract</h2>
       </div>
       <ul>
-        <li><strong>Edit</strong> shows when <code>installation.branch_status === "WORKING"</code> and <code>installation.author_id === myInternalUuid</code>.</li>
+        <li><strong>Edit</strong> shows when <code>installation.branch_status === "WORKING"</code> and <code>installation.author_id === myInternalUuid</code><ins class="fix" data-r="R3">; <code>myInternalUuid</code> comes from <code>GET /api/v1/me</code>, fetched once per session</ins>.</li>
         <li>Editor surface: two code panes (client / server), a console pane that appends each <code>msgs[]</code> entry of a <code>fstick.plugin.console</code> event (filtered by <code>plugin_id</code> + <code>chat_id</code>, <code>info</code>/<code>warn</code>/<code>error</code> toggle), and a collapsible editable JSON state panel with a refresh button.</li>
         <li>Console lines with <code>system: true</code> render visually distinct from the plugin's own <code>print</code>/<code>warn</code> output &mdash; a crash shouldn't look like something the author printed.</li>
         <li>Each code pane shows a live byte counter and blocks Save at <strong>500 KB</strong>; the server <code>413</code> is the backstop.</li>
-        <li>Two views: the right-hand panel, and a separate window opened with <code>window.open</code> on the same origin &mdash; auth token read from <code>localStorage</code>, same as the Matrix session.</li>
+        <li>Two views: the right-hand panel, and a separate window opened with <code>window.open</code> on the same origin &mdash; <del class="fix">auth token read from <code>localStorage</code>, same as the Matrix session</del><ins class="fix" data-r="R26">the child window gets the access token from its opener over <code>postMessage</code> (origin-checked) instead of reading storage directly. Element may keep the token encrypted with a pickle key in IndexedDB, so its storage layout is not a contract</ins>.</li>
         <li>Save holds the <code>sha</code> pair from <code>GET …/edit</code>, sends them as <code>base_sha</code>; on <code>409</code> it tells the user the code changed elsewhere and to reload.</li>
-        <li>Hot-reload button is debounced to &ge;&nbsp;3&nbsp;s and handles <code>429</code>.</li>
-        <li>On <code>fstick.plugin.reloaded</code> with <code>client_changed</code>, re-fetch <code>cl.js</code> and re-run <code>runDsl</code>.</li>
+        <li>Hot-reload button is debounced to &ge;&nbsp;3&nbsp;s and handles <code>429</code>. <ins class="fix" data-r="R16">It calls <code>POST …/branches/{bid}/reload</code>. After a save that returned <code>reloaded: false</code>, the editor calls it automatically once <code>retry_after_ms</code> has passed.</ins></li>
+        <li>On <code>fstick.plugin.reloaded</code> with <code>client_changed</code>, re-fetch <code>cl.js</code> <ins class="fix" data-r="R2">(<code>GET …/code/client?branch_id=&amp;chat_id=</code>)</ins> and re-run <code>runDsl</code><ins class="fix" data-r="R18"> &mdash; in every client that has the plugin active in that chat, not only in the editor</ins>.</li>
         <li>A brand-new debug plugin opens with template code and a template icon.</li>
-        <li>The author is shown as <code>@localpart</code> &mdash; strip <code>:domain</code> from the MXID; never render the full MXID or the internal UUID.</li>
+        <li>The author is shown as <code>@localpart</code> &mdash; strip <code>:domain</code> from the <del class="fix">MXID</del><ins class="fix" data-r="R3"><code>*_mxid</code> field the Gateway adds</ins>; never render the full MXID or the internal UUID.</li>
         <li>When a candidate branch is pending (<code>WAITING_APPROVE</code> / <code>APPROVING</code>), the plugin's management view shows its status and a <strong>Cancel submission</strong> action (<code>POST …/branches/{bid}/cancel</code>).</li>
+        <li><ins class="fix" data-r="R5">Users in <code>registry.moderators</code> get a review view: the queue, candidate code (read-only, via <code>code/client</code> and <code>code/server</code>), and claim / approve / reject.</ins></li>
       </ul>
     </section>
 
@@ -1463,7 +1675,8 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td class="tnum">5</td><td class="wrap">Commit history (phase 2) &mdash; in the first build or deferred?</td><td>deferred; branch model alone gives <code>REJECTED</code></td></tr>
             <tr><td class="tnum">6</td><td class="wrap">Fstick Developer room &mdash; who provisions it, one per author, what else does it carry (release notices, install counts)?</td><td>one per author, general dev-notifications channel</td></tr>
             <tr><td class="tnum">7</td><td class="wrap">State-panel validation &mdash; confirmed lenient + warnings, or strict <code>422</code> on schema mismatch?</td><td>lenient, matches "save broken code"</td></tr>
-            <tr><td class="tnum">8</td><td class="wrap">Reload throttle scope &mdash; per <code>(plugin, chat)</code>, per user, or global?</td><td>per <code>(plugin, chat)</code></td></tr>
+            <tr><td class="tnum">8</td><td class="wrap"><del class="fix">Reload throttle scope &mdash; per <code>(plugin, chat)</code>, per user, or global?</del><ins class="fix" data-r="R17">Resolved: reload throttle is per <code>(plugin, branch)</code> (&sect;7).</ins></td><td><del class="fix">per <code>(plugin, chat)</code></del><ins class="fix">&mdash;</ins></td></tr>
+            <tr class="fix-row"><td class="tnum">9 <span class="fix-tag">R24</span></td><td class="wrap">Resolved: the state schema is the plugin's <code>SetStateSchema</code> / <code>state_schema</code> declaration, already supported by <code>backend_stdlib.lua</code>.</td><td>&mdash;</td></tr>
           </tbody>
         </table>
       </div>
@@ -1485,20 +1698,20 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>rejection</td><td>moderator; branch status <code>REJECTED</code> + <code>last_rejection</code> + moderation log + bot-room message; no <code>resubmit</code></td></tr>
             <tr><td>cancellation</td><td>author withdraws own candidate from <code>WAITING_APPROVE</code>/<code>APPROVING</code> → <code>CANCELLED</code> tombstone; moderation-log row, no notification; clears the one-open-candidate guard</td></tr>
             <tr><td>debug installs per author</td><td>unlimited; <code>chat_id</code> required on editor calls</td></tr>
-            <tr><td>code transport</td><td>inline through Registry both ways — editor <em>and</em> Runtime's <code>loadEngine</code>; no presigned URL, no TTL, anywhere</td></tr>
+            <tr><td>code transport</td><td>inline through Registry both ways — editor <em>and</em> Runtime's <code>loadEngine</code><ins class="fix" data-r="R2"> and every chat member's <code>cl.js</code></ins>; no presigned URL, no TTL, anywhere</td></tr>
             <tr><td>save notification</td><td>new <code>PUT …/code</code>; not a reuse of <code>commit</code></td></tr>
-            <tr><td>reload → client</td><td>reuse the sync pipe; new type <code>fstick.plugin.reloaded</code>, fired only when <code>client_changed</code> &mdash; a server-only save doesn't push at all</td></tr>
-            <tr><td>runtime hot reload</td><td><code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code>, called only when the server side changed; rebuilds via the same <code>loadEngine</code> path a cache miss uses, response just <code>{ reloaded: true }</code>; 3s min interval</td></tr>
-            <tr><td>internal call count on save</td><td>client-only: 3 (write + reloaded-event + push). server-only: 3 (write + reload + inline code fetch). both changed: 6 (2 writes + reload + inline fetch + event + push). down from 6&ndash;7 across the board before A+B+C</td></tr>
+            <tr><td>reload → client</td><td>reuse the sync pipe; new type <code>fstick.plugin.reloaded</code>, fired only when <code>client_changed</code> &mdash; a server-only save doesn't push at all<ins class="fix" data-r="R18">; recipients are the members of every chat running the dev branch</ins></td></tr>
+            <tr><td>runtime hot reload</td><td><code>POST /internal/plugins/{id}/reload { chat_id, branch_id }</code>, called only when the server side changed; rebuilds via the same <code>loadEngine</code> path a cache miss uses, response just <code>{ reloaded: true }</code>; 3s min interval<ins class="fix" data-r="R17"> per (plugin, branch)</ins><ins class="fix" data-r="R16">; explicit <code>POST …/branches/{bid}/reload</code> for the button and to retry after <code>429</code></ins></td></tr>
+            <tr><td>internal call count on save</td><td><del class="fix">client-only: 3 (write + reloaded-event + push). server-only: 3 (write + reload + inline code fetch). both changed: 6 (2 writes + reload + inline fetch + event + push). down from 6&ndash;7 across the board before A+B+C</del><ins class="fix" data-r="R15">counted per hop, S3 reads included. client-only: 4 (S3 write + chat lookup + push request + one Dendrite push per chat). server-only: 4 (S3 write + reload + internal code fetch + Registry S3 read). both: 8. No before/after comparison is claimed.</ins></td></tr>
             <tr><td>branch resolution for commands</td><td>client never sends <code>branch_id</code>; Runtime resolves <code>(pluginId, chatId) → branch_id</code> via <code>GET internal /installations/resolve</code>, cached 60s TTL, independent of the engine cache</td></tr>
             <tr><td><code>client_changed</code> ownership</td><td>computed and reported by Registry (old vs new client blob sha); dropped from Runtime's reload contract entirely — Runtime never loads client code</td></tr>
-            <tr><td>server code download</td><td>gated: author for dev branch, anyone for released</td></tr>
+            <tr><td>server code download</td><td><del class="fix">gated: author for dev branch, anyone for released</del><ins class="fix" data-r="R4">gated: author any branch, moderator candidates, anyone released; hidden → <code>404</code>. Runtime uses the ungated <code>/internal</code> route (R1)</ins></td></tr>
             <tr><td>S3 names</td><td>unified — content-addressed <code>blobs/{sha256}</code>, exactly 2 files</td></tr>
             <tr><td>concurrency on save</td><td>content-hash compare → <code>409 stale_code</code>; no server-side lock table</td></tr>
             <tr><td>broken code on save</td><td>saved, returns <code>warnings</code></td></tr>
-            <tr><td>file size limit</td><td><strong>500 KB (500 000 bytes UTF-8) per file</strong>, measured after transfer decode; decoded request body capped at 1.2 MB (zip-bomb guard). ≈ 500 000 ASCII chars ≈ 8 000–16 000 lines; gzips ~3–5× on the wire</td></tr>
-            <tr><td>runtime string <code>@X</code></td><td>stdlib version; editable from the editor (not yet implemented server-side)</td></tr>
-            <tr><td>console recipients / timing</td><td>author only; always on; live only; levels <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
+            <tr><td>file size limit</td><td><strong>500 KB (500 000 bytes UTF-8) per file</strong>, measured after transfer decode; decoded request body capped at <del class="fix">1.2 MB</del><ins class="fix" data-r="R19">2.2 MB, allowing for JSON escaping</ins> (zip-bomb guard). ≈ 500 000 ASCII chars ≈ 8 000–16 000 lines; gzips ~3–5× on the wire</td></tr>
+            <tr><td>runtime string <code>@X</code></td><td>stdlib version; editable from the editor (not yet implemented server-side)<ins class="fix" data-r="R23">; until implemented, <code>PUT …/code</code> rejects a runtime change with <code>422</code>; once implemented, a <code>runtime.server</code> change counts as a server change</ins></td></tr>
+            <tr><td>console recipients / timing</td><td>author only<ins class="fix" data-r="R20"> (while still a member of the chat)</ins>; always on; live only; levels <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
             <tr><td>console <code>warn</code> level</td><td>added; new Lua hook <code>warn(msg)</code> alongside <code>print(msg)</code>, same batching path, <code>system: false</code></td></tr>
             <tr><td>console <code>system</code> flag</td><td>boolean per line: <code>false</code> = plugin's own <code>print</code>/<code>warn</code>; <code>true</code> = Runtime-generated (exceptions, flood notices) — rendered visually distinct in the editor</td></tr>
             <tr><td>other users' prints</td><td>shown (shared backend state)</td></tr>
@@ -1510,16 +1723,64 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
             <tr><td>editable state panel</td><td>yes — Runtime applies it</td></tr>
             <tr><td>marketplace public list</td><td><code>ACTIVE</code> + has a <code>RELEASED</code> branch</td></tr>
             <tr><td>author's own list</td><td><code>GET /plugins?owned=true</code></td></tr>
-            <tr><td>single-plugin GET</td><td>debug branch visible to author only; released to anyone</td></tr>
+            <tr><td>single-plugin GET</td><td>debug branch visible to author only<ins class="fix" data-r="R2"> and to members of a chat running it, via <code>?chat_id=</code></ins>; released to anyone</td></tr>
             <tr><td>co-maintainers</td><td>not supported</td></tr>
-            <tr><td>installations response</td><td>adds <code>branch_status</code>, <code>author_id</code></td></tr>
-            <tr><td>separate window auth</td><td>same origin + <code>localStorage</code> token</td></tr>
+            <tr><td>installations response</td><td>adds <code>branch_status</code>, <code>author_id</code><ins class="fix" data-r="R6">; installs are pinned to a branch, upgraded via <code>PATCH</code></ins></td></tr>
+            <tr><td>separate window auth</td><td>same origin + <del class="fix"><code>localStorage</code> token</del><ins class="fix" data-r="R26">token handed over by the opener via <code>postMessage</code></ins></td></tr>
             <tr><td>empty plugin / new debug plugin</td><td><code>GET …/edit</code> returns templates; template icon assigned</td></tr>
-            <tr><td>uninstall while editor open</td><td>allowed — there is no editor session</td></tr>
-            <tr><td>reload rate limit</td><td>3 s minimum</td></tr>
-            <tr><td>identity &mdash; core</td><td>pure <code>internal_uuid</code> everywhere; MXID only on two hops (Dendrite→Gateway in, integration→Dendrite out); frontend shows <code>@localpart</code>; no handle</td></tr>
+            <tr><td>uninstall while editor open</td><td>allowed — there is no editor session<ins class="fix" data-r="R25">; a save still reloads the branch, only that chat's eager state migration is skipped</ins></td></tr>
+            <tr><td>reload rate limit</td><td>3 s minimum<ins class="fix" data-r="R17"> per (plugin, branch)</ins></td></tr>
+            <tr><td>identity &mdash; core</td><td>pure <code>internal_uuid</code> everywhere; MXID only on <del class="fix">two hops (Dendrite→Gateway in, integration→Dendrite out)</del><ins class="fix" data-r="R3">three hops (Dendrite→Gateway in, integration→Dendrite out, Gateway→client enrichment); <code>internal_uuid</code> reaches the client as an opaque id (<code>GET /me</code>) but is never rendered</ins>; frontend shows <code>@localpart</code>; no handle</td></tr>
+            <tr class="fix-row"><td>moderator role <span class="fix-tag">R5</span></td><td><code>registry.moderators</code> table keyed by <code>internal_uuid</code>; seeded from config</td></tr>
+            <tr class="fix-row"><td>transition retries <span class="fix-tag">R8</span></td><td>repeat into the current state → <code>200</code>; any other terminal state → <code>409</code></td></tr>
+            <tr class="fix-row"><td>hidden resources <span class="fix-tag">R9</span></td><td>always <code>404</code>, never <code>403</code></td></tr>
+            <tr class="fix-row"><td>service-to-service reads <span class="fix-tag">R1</span></td><td>Registry <code>/internal/plugins/{id}</code> and <code>/internal/…/code/server</code>; never proxied, never user-gated</td></tr>
+            <tr class="fix-row"><td>legacy data <span class="fix-tag">R22</span></td><td>none &mdash; no production data, no legacy plugins: schemas rewritten in place, volumes recreated; no backfill, no <code>files[0]</code> path</td></tr>
             <tr><td>identity &mdash; mapper</td><td><code>uuid ↔ mxid</code> table owned by integration-service in <strong>Postgres</strong> (system of record); Gateway caches lookups in-process; Redis only ever a read cache, never the store</td></tr>
             <tr><td>identity &mdash; provisioning</td><td>integration mints <code>internal_uuid</code> on first <code>identity/resolve</code> miss (idempotent via <code>UNIQUE(mxid)</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 15 -->
+    <section id="revision">
+      <div class="sec-head">
+        <span class="eyebrow">Appendix</span>
+        <h2><span class="num">15</span>Revision 2026-09-27</h2>
+      </div>
+      <p>Contradictions and gaps fixed in this revision. In the text, new wording is <ins class="fix">highlighted</ins> with its tag, removed wording is <del class="fix">struck through</del>, and new blocks carry a <em>new</em> label. The <strong>changes</strong> button (top right) hides all of it for a clean read.</p>
+      <p>Decisions taken with the author: <code>internal_uuid</code> may reach the client as an opaque id (<code>GET /me</code> + Gateway enrichment); installs are pinned and upgraded with <code>PATCH</code>; moderators are a Registry table; no backward compatibility or data migration is needed (no production data).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tag</th><th>Where</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R1</span></td><td><a href="#runtime">&sect;7, 8, 9, 10</a></td><td class="wrap">Runtime could not load a dev branch's code or look up its author: the public routes return 403/404 to non-authors, and Runtime acts for any chat member. Added ungated <code>/internal/plugins/{id}</code> and <code>/internal/…/code/server</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R2</span></td><td><a href="#contracts">&sect;6, 9, 10, 12, 14</a></td><td class="wrap">Transport for client code was undefined, although chat members' browsers need <code>cl.js</code>. Added inline <code>GET …/code/client</code>, plus <code>?chat_id=</code> on <code>GET /plugins/{id}</code> for members of a chat running the dev branch.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R3</span></td><td><a href="#identity">&sect;3, 9, 10, 12, 14</a></td><td class="wrap">The doc said "internal_uuid never leaves the backend" but returned it to clients and compared it in the UI. Added <code>GET /api/v1/me</code>, Gateway response enrichment (<code>*_mxid</code>), <code>lookup-batch</code>; MXID hops are now three.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R4</span></td><td><a href="#contracts">&sect;9, 10, 14</a></td><td class="wrap">Moderators could not read candidate code, and <code>code/server</code> access rules differed between &sect;9 and &sect;10. Unified the rules and added moderators.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R5</span></td><td><a href="#versions">&sect;4, 10, 12, 14</a></td><td class="wrap">The moderator role was never defined. Added the <code>registry.moderators</code> table and a review view.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R6</span></td><td><a href="#versions">&sect;4, 9, 10, 14</a></td><td class="wrap">Installs were described as both floating ("resolve to highest SemVer") and pinned (<code>PATCH</code>). Now pinned, with an explicit <code>PATCH /installations/{id}</code> contract.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R7</span></td><td><a href="#scope">&sect;1</a></td><td class="wrap">&sect;1 excluded state inspection, while &sect;7 and &sect;12 add an editable state panel. Scope updated.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R8</span></td><td><a href="#contracts">&sect;10, 14</a></td><td class="wrap">Reject and cancel said "409 if already terminal", contradicting the retry convention. Aligned: a repeat into the same state → 200.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R9</span></td><td><a href="#contracts">&sect;10</a></td><td class="wrap"><code>code/server</code> returned 403 for hidden branches, while the conventions say 404. Now 404.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R10</span></td><td><a href="#contracts">&sect;10, 11</a></td><td class="wrap">The console contract said both 404 and 202, and "carries no id" was ambiguous. Clarified.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R11</span></td><td><a href="#versions">&sect;4</a></td><td class="wrap">"One row per plugin" was wrong for <code>branches</code>. Added the missing <code>changelog</code>, <code>submitted_at</code>, <code>claimed_by</code>, <code>last_rejection</code>, <code>plugin_moderation_log</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R12</span></td><td><a href="#moderation">&sect;5, 10</a></td><td class="wrap">Any moderator could reject a branch claimed by another. Now the claimer only, from <code>APPROVING</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R13</span></td><td><a href="#runtime">&sect;7</a></td><td class="wrap">Reload was described as both "evict then load" and "put on existing key". Now build first, then atomic swap.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R14</span></td><td><a href="#scope">&sect;1 figure</a></td><td class="wrap">The diagram did not show that step 6 comes from Registry and is conditional.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R15</span></td><td><a href="#decisions">&sect;7, 14</a></td><td class="wrap">Call counts omitted Registry's S3 read and made an unverifiable "down from 6&ndash;7" claim. Recounted.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R16</span></td><td><a href="#runtime">&sect;7, 9, 10, 12</a></td><td class="wrap">A throttled reload left a stale engine with no recovery path, and the "Hot-reload button" had no API. Added <code>POST …/branches/{bid}/reload</code> and <code>retry_after_ms</code>.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R17</span></td><td><a href="#runtime">&sect;7, 9, 10, 13, 14</a></td><td class="wrap">The throttle was per (plugin, chat) while the engine is per branch, so switching chats bypassed it. Now per (plugin, branch); state migration in other chats is lazy.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R18</span></td><td><a href="#events">&sect;7, 9, 10, 11, 12</a></td><td class="wrap"><code>fstick.plugin.reloaded</code> went only to the author, so other chat members kept stale <code>cl.js</code>. Now sent to every chat running the dev branch.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R19</span></td><td><a href="#storage">&sect;6, 10, 14</a></td><td class="wrap">The 1.2&nbsp;MB body cap could reject two legal 500&nbsp;KB files after JSON escaping. Now 2.2&nbsp;MB, with raw UTF-8 required.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R20</span></td><td><a href="#console">&sect;8, 10, 14</a></td><td class="wrap">Console lines kept flowing to an author who had left the chat. Now filtered by membership.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R21</span></td><td><a href="#changes">&sect;9, 10</a></td><td class="wrap">Endpoints used but never defined: integration push for <code>reloaded</code>, the dev-room notify, and missing Gateway routes.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R22</span></td><td><a href="#identity">&sect;2, 3, 4, 6, 13, 14</a></td><td class="wrap">No backward compatibility is needed (no production data, no legacy plugins): <code>installed_by</code> becomes <code>UUID</code> and <code>versions</code> / <code>files</code> / <code>files[0]</code> are deleted outright. <em>Revised 2026-09-28: the earlier migration plan and open question #10 were dropped.</em></td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R23</span></td><td><a href="#contracts">&sect;10, 14</a></td><td class="wrap"><code>runtime</code> in <code>PUT …/code</code> vs "not implemented" was unspecified. Now an explicit 422 until implemented; later it counts as a server change.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R24</span></td><td><a href="#runtime">&sect;7, 13</a></td><td class="wrap">The state migrator needed a schema source. It uses the plugin's existing <code>SetStateSchema</code> declaration and runs before every command. <em>Revised 2026-09-28: the earlier text wrongly said no schema existed; open question #9 is resolved.</em></td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R25</span></td><td><a href="#contracts">&sect;10, 14</a></td><td class="wrap">Behaviour of a save after the plugin was uninstalled from <code>chat_id</code> was unspecified.</td></tr>
+            <tr><td><span class="fix-tag" style="vertical-align:baseline;font-size:11px">R26</span></td><td><a href="#frontend">&sect;12, 14</a></td><td class="wrap">The separate window relied on Element's <code>localStorage</code> layout, which newer Element versions do not guarantee. The opener now hands the token over via <code>postMessage</code>.</td></tr>
           </tbody>
         </table>
       </div>
@@ -1528,7 +1789,7 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
   </main>
 
   <footer class="foot">
-    Fstick · Plugin Editor Integration · design note, updated 2026-09-12 · supersedes the API sections of fstick_specification.md where they conflict · RU: plugin-editor-integration.ru.html
+    Fstick · Plugin Editor Integration · design note, updated <del class="fix">2026-09-12</del> <ins class="fix">2026-09-27</ins> · supersedes the API sections of fstick_specification.md where they conflict · RU: plugin-editor-integration.ru.html
   </footer>
 
 </div>
@@ -1554,6 +1815,26 @@ S3: plugins/{plugin_id}/blobs/{sha256}</code></pre>
       var next = current() === "dark" ? "light" : "dark";
       apply(next);
       try { localStorage.setItem(KEY, next); } catch (e) {}
+    });
+  })();
+</script>
+
+<script>
+  (function () {
+    var KEY = "fstick-editor-doc-fixes";
+    var root = document.documentElement;
+    var btn = document.getElementById("fixToggle");
+    function apply(on) {
+      root.classList.toggle("fix-off", !on);
+      btn.textContent = on ? "changes: shown" : "changes: hidden";
+    }
+    var on = true;
+    try { on = localStorage.getItem(KEY) !== "off"; } catch (e) {}
+    apply(on);
+    btn.addEventListener("click", function () {
+      on = !on;
+      apply(on);
+      try { localStorage.setItem(KEY, on ? "on" : "off"); } catch (e) {}
     });
   })();
 </script>
