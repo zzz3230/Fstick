@@ -382,6 +382,28 @@ paths:
           description: If-None-Match equals the current sha
         "404":
           $ref: "#/components/responses/BranchNotFound"
+  /internal/branches/{branchId}:
+    get:
+      tags:
+      - internal-branches-controller
+      summary: Branch status, semver and owning plugin (service-to-service, no user gate)
+      operationId: getInternalBranch
+      parameters:
+      - name: branchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBranchResponse"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
   /internal/plugins/{pluginId}:
     get:
       tags:
@@ -802,6 +824,20 @@ components:
         sha:
           type: string
           example: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    InternalBranchResponse:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        plugin_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        semver:
+          type: string
+          nullable: true
     InternalPluginResponse:
       type: object
       properties:
