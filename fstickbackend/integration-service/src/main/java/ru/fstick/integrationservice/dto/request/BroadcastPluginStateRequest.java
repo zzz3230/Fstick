@@ -2,12 +2,14 @@ package ru.fstick.integrationservice.dto.request;
 
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 public class BroadcastPluginStateRequest {
     private String pluginId;
     private String chatId;
     /** null → shared (broadcast to all members), non-null → push only to this user */
-    private String userId;
+    private UUID userId;
     private String[] userScopedFields;
     private Object state;
 }

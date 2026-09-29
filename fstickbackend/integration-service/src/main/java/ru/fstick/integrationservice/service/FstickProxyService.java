@@ -17,21 +17,30 @@ import ru.fstick.integrationservice.dto.request.SendMessageRequest;
 import ru.fstick.integrationservice.dto.response.ChatMemberResponse;
 import ru.fstick.integrationservice.dto.response.ChatMemberRole;
 import ru.fstick.integrationservice.dto.response.ChatMembersResponse;
+import ru.fstick.integrationservice.exception.ApiException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
+import java.util.UUID;
 
 @Service
 public class FstickProxyService {
 
     private final RestClient restClient;
 
+    private final IdentityService identityService;
+
     @Autowired
-    public FstickProxyService(@Value("${fstick.proxy.base-url:http://localhost:8008/fstick}") String baseUrl) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+    public FstickProxyService(@Value("${fstick.proxy.base-url:http://localhost:8008/fstick}") String baseUrl,
+                              IdentityService identityService) {
+        this(RestClient.builder().baseUrl(baseUrl).build(), identityService);
+    }
+
+    FstickProxyService(RestClient restClient, IdentityService identityService) {
+        this.restClient = restClient;
+        this.identityService = identityService;
     }
 
     public void broadcastPluginState(BroadcastPluginStateRequest req) {
@@ -48,19 +57,20 @@ public class FstickProxyService {
         if (req.getUserId() != null) {
             // 1. Адресная отправка конкретному пользователю
             stateContent.put("state", prepareStateForUser(baseState, req.getUserId(), req.getUserScopedFields()));
-            pushStateEvent(req.getUserId(), stateContent);
+            pushStateEvent(mxidOf(req.getUserId()), stateContent);
         } else {
             // 2. Бродкаст всем участникам чата
-            ChatMembersResponse members = getChatMembers(req.getChatId());
-            for (ChatMemberResponse member : members.getMembers()) {
+            List<UpstreamChatMemberResponse> members = fetchMembers(req.getChatId());
+            Map<String, UUID> uuids = identityService.resolveBatch(
+                    members.stream().map(m -> m.userId).toList());
+            for (UpstreamChatMemberResponse member : members) {
                 try {
-                    String targetUserId = member.getUserId();
-
                     // Для каждого пользователя собираем его персональный stateContent
                     Map<String, Object> userSpecificContent = new HashMap<>(stateContent);
-                    userSpecificContent.put("state", prepareStateForUser(baseState, targetUserId, req.getUserScopedFields()));
+                    userSpecificContent.put("state",
+                            prepareStateForUser(baseState, uuids.get(member.userId), req.getUserScopedFields()));
 
-                    pushStateEvent(targetUserId, userSpecificContent);
+                    pushStateEvent(member.userId, userSpecificContent);
                 } catch (Exception ex) {
                     // Log and continue — don't abort the whole broadcast
                 }
@@ -72,7 +82,7 @@ public class FstickProxyService {
      * Метод адаптирует переданный state под конкретного userId,
      * схлопывая поля из userScopedFields до приватных данных этого пользователя.
      */
-    private Map<String, Object> prepareStateForUser(Map<String, Object> baseState, String userId, String[] userScopedFields) {
+    private Map<String, Object> prepareStateForUser(Map<String, Object> baseState, UUID userId, String[] userScopedFields) {
         if (baseState.isEmpty()) {
             return baseState;
         }
@@ -91,7 +101,7 @@ public class FstickProxyService {
                 if (fieldContent instanceof Map) {
                     Map<String, Object> usersMap = (Map<String, Object>) fieldContent;
                     // Достаем данные конкретного пользователя. Если их нет — можно вернуть null или пустой Map
-                    Object userPrivateData = usersMap.get(userId);
+                    Object userPrivateData = userId == null ? null : usersMap.get(userId.toString());
 
                     // Заменяем мапу со всеми юзерами на объект конкретного юзера
                     filteredState.put(field, userPrivateData);
@@ -102,9 +112,9 @@ public class FstickProxyService {
         return filteredState;
     }
 
-    private void pushStateEvent(String userId, Map<String, Object> content) {
+    private void pushStateEvent(String mxid, Map<String, Object> content) {
         Map<String, Object> body = new HashMap<>();
-        body.put("user_id", userId);
+        body.put("user_id", mxid);
         body.put("type", "fstick.plugin.state");
         body.put("content", content);
 
@@ -122,6 +132,26 @@ public class FstickProxyService {
     }
 
     public ChatMembersResponse getChatMembers(String chatId) {
+        List<UpstreamChatMemberResponse> upstreamMembers = fetchMembers(chatId);
+        Map<String, UUID> uuids = identityService.resolveBatch(
+                upstreamMembers.stream().map(m -> m.userId).toList());
+
+        List<ChatMemberResponse> members = new ArrayList<>();
+        for (UpstreamChatMemberResponse m : upstreamMembers) {
+            ChatMemberResponse r = new ChatMemberResponse();
+            r.setUserId(uuids.get(m.userId));
+            r.setMember(m.isMember);
+            r.setRole(parseRole(m.role));
+            members.add(r);
+        }
+
+        ChatMembersResponse response = new ChatMembersResponse();
+        response.setChatId(chatId);
+        response.setMembers(members);
+        return response;
+    }
+
+    private List<UpstreamChatMemberResponse> fetchMembers(String chatId) {
         try {
             UpstreamChatMembersResponse upstream = restClient.get()
                     .uri("/api/v1/chats/" + chatId + "/members")
@@ -129,25 +159,9 @@ public class FstickProxyService {
                     .body(UpstreamChatMembersResponse.class);
 
             if (upstream == null || upstream.members == null) {
-                ChatMembersResponse empty = new ChatMembersResponse();
-                empty.setChatId(chatId);
-                empty.setMembers(List.of());
-                return empty;
+                return List.of();
             }
-
-            List<ChatMemberResponse> members = new ArrayList<>();
-            for (UpstreamChatMemberResponse m : upstream.members) {
-                ChatMemberResponse r = new ChatMemberResponse();
-                r.setUserId(m.userId);
-                r.setMember(m.isMember);
-                r.setRole(parseRole(m.role));
-                members.add(r);
-            }
-
-            ChatMembersResponse response = new ChatMembersResponse();
-            response.setChatId(upstream.chatId != null ? upstream.chatId : chatId);
-            response.setMembers(members);
-            return response;
+            return upstream.members;
         } catch (RestClientResponseException ex) {
             throw new ResponseStatusException(ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
         } catch (RestClientException ex) {
@@ -155,10 +169,11 @@ public class FstickProxyService {
         }
     }
 
-    public ChatMemberResponse getChatMember(String chatId, String userId) {
+    public ChatMemberResponse getChatMember(String chatId, UUID userId) {
+        String mxid = mxidOf(userId);
         try {
             UpstreamChatMemberResponse upstream = restClient.get()
-                    .uri("/api/v1/chats/" + chatId + "/members/" + userId)
+                    .uri("/api/v1/chats/" + chatId + "/members/" + mxid)
                     .retrieve()
                     .body(UpstreamChatMemberResponse.class);
 
@@ -167,7 +182,7 @@ public class FstickProxyService {
             }
 
             ChatMemberResponse response = new ChatMemberResponse();
-            response.setUserId(upstream.userId != null ? upstream.userId : userId);
+            response.setUserId(userId);
             response.setMember(upstream.isMember);
             response.setRole(parseRole(upstream.role));
             return response;
@@ -209,7 +224,7 @@ public class FstickProxyService {
         }
 
         Map<String, Object> body = new HashMap<>();
-        body.put("user_id", request.getUserId());
+        body.put("user_id", mxidOf(request.getUserId()));
         body.put("type", request.getEventName());
         body.put("content", content);
 
@@ -224,6 +239,14 @@ public class FstickProxyService {
         } catch (RestClientException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to call fstick API", ex);
         }
+    }
+
+    private String mxidOf(UUID userId) {
+        if (userId == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid_user_id", "user_id is required");
+        }
+        return identityService.lookup(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "unknown_user", "Unknown user"));
     }
 
     private ChatMemberRole parseRole(String rawRole) {
@@ -250,11 +273,11 @@ public class FstickProxyService {
     }
 
     @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-    private static final class UpstreamChatMembersResponse {
+    static final class UpstreamChatMembersResponse {
         @JsonProperty("chat_id")
-        private String chatId;
+        String chatId;
 
         @JsonProperty("members")
-        private List<UpstreamChatMemberResponse> members;
+        List<UpstreamChatMemberResponse> members;
     }
 }

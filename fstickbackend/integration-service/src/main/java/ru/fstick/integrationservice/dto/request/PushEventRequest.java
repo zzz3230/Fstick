@@ -7,7 +7,7 @@ import java.util.UUID;
 
 @Data
 public class PushEventRequest {
-    private String userId;
+    private UUID userId;
     private UUID pluginId;
     private String chatId;
     private String eventName;
