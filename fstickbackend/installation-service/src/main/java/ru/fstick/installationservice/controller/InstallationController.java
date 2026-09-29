@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.fstick.installationservice.dto.request.ConfirmInstallRequest;
 import ru.fstick.installationservice.dto.request.InstallRequest;
+import ru.fstick.installationservice.dto.request.PatchInstallationRequest;
 import ru.fstick.installationservice.dto.response.*;
 import ru.fstick.installationservice.service.InstallationService;
 
@@ -55,6 +56,15 @@ public class InstallationController {
             @RequestBody ConfirmInstallRequest request
     ) {
         return service.confirmInstall(request.getConfirmationToken(), userId);
+    }
+
+    @PatchMapping("/{installationId}")
+    public InstallationBranchResponse changeBranch(
+            @RequestHeader("X-User-Id") UUID userId,
+            @PathVariable UUID installationId,
+            @RequestBody PatchInstallationRequest request
+    ) {
+        return service.changeBranch(installationId, request.getBranchId(), userId);
     }
 
     @DeleteMapping("/{installationId}")

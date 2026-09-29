@@ -20,28 +20,30 @@ public class RegistryClient {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
     }
 
-    public PluginViewExtend getPlugin(UUID pluginId) {
+    public InternalPlugin getPlugin(UUID pluginId) {
         try {
             return restClient.get()
-                    .uri("/api/v1/plugins/{pluginId}", pluginId)
+                    .uri("/internal/plugins/{pluginId}", pluginId)
                     .retrieve()
-                    .body(PluginViewExtend.class);
+                    .body(InternalPlugin.class);
         } catch (RestClientResponseException ex) {
             return null;
         }
     }
 
     @Getter @Setter
-    public static class PluginViewExtend {
+    public static class InternalPlugin {
         private UUID id;
         private String status;
-        private List<VersionView> versions;
+        @JsonProperty("author_id")
+        private UUID authorId;
+        private List<BranchView> branches;
     }
 
     @Getter @Setter
-    public static class VersionView {
-        @JsonProperty("version_id")
-        private UUID versionId;
-        private String version;
+    public static class BranchView {
+        private UUID id;
+        private String status;
+        private String semver;
     }
 }

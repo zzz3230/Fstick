@@ -3,16 +3,22 @@ package ru.fstick.installationservice.client;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class IntegrationClient {
+
+    private static final String INSTALLATION_CHANGED = "fstick.plugin.installation_changed";
 
     private final RestClient restClient;
 
@@ -47,18 +53,35 @@ public class IntegrationClient {
     }
 
     public void notifyPluginInstalled(UUID userId, UUID pluginId,
-                                      String chatId, UUID versionId, UUID installationId) {
+                                      String chatId, UUID branchId, UUID installationId) {
         pushEvent(userId, pluginId, chatId, "PLUGIN_INSTALLED", Map.of(
-                "versionId", versionId.toString(),
-                "installationId", installationId.toString()
+                "branch_id", branchId.toString(),
+                "installation_id", installationId.toString()
         ));
     }
 
     public void notifyPluginUninstalled(UUID userId, UUID pluginId,
                                         String chatId, UUID installationId) {
         pushEvent(userId, pluginId, chatId, "PLUGIN_UNINSTALLED", Map.of(
-                "installationId", installationId.toString()
+                "installation_id", installationId.toString()
         ));
+    }
+
+    public void pushInstallationChanged(String chatId, UUID pluginId,
+                                        UUID installationId, UUID branchId) {
+        Map<String, Object> content = new HashMap<>();
+        content.put("plugin_id", pluginId.toString());
+        content.put("installation_id", installationId.toString());
+        content.put("branch_id", branchId != null ? branchId.toString() : null);
+        try {
+            restClient.post()
+                    .uri("/api/v1/plugin-events/push")
+                    .body(new PluginEventRequest(INSTALLATION_CHANGED, List.of(chatId), content))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ex) {
+            log.warn("Failed to push {} for chat {}: {}", INSTALLATION_CHANGED, chatId, ex.getMessage());
+        }
     }
 
     private void pushEvent(UUID userId, UUID pluginId, String chatId,
@@ -69,6 +92,12 @@ public class IntegrationClient {
                 .retrieve()
                 .toBodilessEntity();
     }
+
+    record PluginEventRequest(
+            String type,
+            @JsonProperty("chat_ids") List<String> chatIds,
+            Map<String, Object> content
+    ) {}
 
     record PushEventRequest(
             @JsonProperty("user_id") UUID userId,
