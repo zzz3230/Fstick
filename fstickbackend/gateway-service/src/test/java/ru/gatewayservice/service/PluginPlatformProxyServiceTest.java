@@ -2,215 +2,148 @@ package ru.gatewayservice.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import ru.gatewayservice.routing.Downstream;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import java.nio.charset.StandardCharsets;
 
-@ExtendWith(MockitoExtension.class)
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
 class PluginPlatformProxyServiceTest {
 
-    @Mock private RestClient restClient;
-    @Mock private RestClient.RequestBodyUriSpec requestBodyUriSpec;
-    @Mock private RestClient.RequestBodySpec requestBodySpec;
-    @Mock private RestClient.RequestHeadersSpec<?> requestHeadersSpec;
-    @Mock private RestClient.ResponseSpec responseSpec;
+    private static final String REGISTRY = "http://registry:8082";
+    private static final String INSTALLATION = "http://installation:8081";
+    private static final String RUNTIME = "http://runtime:8084";
+    private static final String USER_UUID = "9f3c1a2e-0000-4000-8000-000000000001";
 
+    private MockRestServiceServer server;
+    private MxidEnricher enricher;
     private PluginPlatformProxyService service;
-
-    private static final String REGISTRY_URL    = "http://registry:8082";
-    private static final String INSTALLATION_URL = "http://installation:8083";
-    private static final String USER_ID          = "@user:homeserver.org";
+    private MockHttpServletRequest in;
 
     @BeforeEach
     void setUp() {
-        service = new PluginPlatformProxyService(REGISTRY_URL, INSTALLATION_URL, restClient);
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    @SuppressWarnings("unchecked")
-    private void mockExchange(ResponseEntity<String> response) {
-        when(restClient.method(any(HttpMethod.class))).thenReturn(requestBodyUriSpec);
-        when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
-        when(requestBodySpec.headers(any())).thenReturn(requestBodySpec);
-        when(requestBodySpec.exchange(any())).thenReturn(response);
-    }
-
-    @SuppressWarnings("unchecked")
-    private void mockExchangeWithBody(ResponseEntity<String> response) {
-        when(restClient.method(any(HttpMethod.class))).thenReturn(requestBodyUriSpec);
-        when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
-        when(requestBodySpec.headers(any())).thenReturn(requestBodySpec);
-        when(requestBodySpec.body(anyString())).thenReturn(requestBodySpec);
-        when(requestBodySpec.exchange(any())).thenReturn(response);
-    }
-
-    private ResponseEntity<String> ok(String body) {
-        return ResponseEntity.ok(body);
-    }
-
-    // ── listPlugins ───────────────────────────────────────────────────────────
-
-    @Test
-    void listPlugins_buildsCorrectUrl() {
-        mockExchange(ok("{\"items\":[]}"));
-
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("page", "0");
-        params.add("limit", "20");
-
-        ResponseEntity<String> result = service.listPlugins(params);
-
-        assertEquals(HttpStatus.OK, result.getStatusCode());
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-
-        String uri = uriCaptor.getValue();
-        assertTrue(uri.startsWith(REGISTRY_URL + "/api/v1/plugins"));
-        assertTrue(uri.contains("page=0"));
-        assertTrue(uri.contains("limit=20"));
-    }
-
-    // ── getPlugin ─────────────────────────────────────────────────────────────
-
-    @Test
-    void getPlugin_buildsCorrectUrl() {
-        mockExchange(ok("{\"id\":\"plugin-123\"}"));
-
-        ResponseEntity<String> result = service.getPlugin("plugin-123");
-
-        assertEquals(HttpStatus.OK, result.getStatusCode());
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-
-        assertTrue(uriCaptor.getValue().contains("/api/v1/plugins/plugin-123"));
-    }
-
-    // ── initPluginUpload ──────────────────────────────────────────────────────
-
-    @Test
-    void initPluginUpload_setsUserIdHeader() {
-        mockExchangeWithBody(ok("{\"pluginId\":\"abc\"}"));
-
-        service.initPluginUpload("{\"name\":\"plugin\"}", USER_ID);
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-        assertTrue(uriCaptor.getValue().endsWith("/api/v1/plugins"));
+        RestClient.Builder builder = RestClient.builder();
+        server = MockRestServiceServer.bindTo(builder).build();
+        enricher = mock(MxidEnricher.class);
+        service = new PluginPlatformProxyService(REGISTRY, INSTALLATION, RUNTIME, builder.build(), enricher);
+        in = new MockHttpServletRequest();
+        in.addHeader("X-User-Id", USER_UUID);
+        in.addHeader("Cookie", "secret=1");
+        in.addHeader("Content-Encoding", "gzip");
     }
 
     @Test
-    void initPluginUpload_withoutUserId_doesNotCrash() {
-        mockExchangeWithBody(ok("{\"pluginId\":\"abc\"}"));
+    void forwardsSelectedHeadersAndQuery() {
+        in.addHeader("Accept", "application/json");
+        in.addHeader("If-None-Match", "\"abc\"");
+        in.addHeader("Content-Type", "application/json");
+        server.expect(requestTo(REGISTRY + "/api/v1/plugins?owned=true&page=0"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("X-User-Id", USER_UUID))
+                .andExpect(header("Accept", "application/json"))
+                .andExpect(header("If-None-Match", "\"abc\""))
+                .andExpect(header("Content-Type", "application/json"))
+                .andExpect(headerDoesNotExist("Cookie"))
+                .andExpect(headerDoesNotExist("Content-Encoding"))
+                .andExpect(content().bytes("{\"a\":1}".getBytes(StandardCharsets.UTF_8)))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        // userId = null — не должно бросать исключение
-        assertDoesNotThrow(() -> service.initPluginUpload("{\"name\":\"plugin\"}", null));
-    }
+        service.forward(HttpMethod.POST, Downstream.REGISTRY, "/api/v1/plugins", "owned=true&page=0",
+                "{\"a\":1}".getBytes(StandardCharsets.UTF_8), in);
 
-    // ── commitPluginUpload ────────────────────────────────────────────────────
-
-    @Test
-    void commitPluginUpload_buildsCorrectUrl() {
-        mockExchangeWithBody(ok("{}"));
-
-        service.commitPluginUpload("plugin-123", "{\"keys\":[]}", USER_ID);
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-        assertTrue(uriCaptor.getValue().contains("/api/v1/plugins/plugin-123/commit"));
-    }
-
-    // ── installPlugin ─────────────────────────────────────────────────────────
-
-    @Test
-    void installPlugin_includesChatIdInUrl() {
-        mockExchangeWithBody(ok("{\"installation\":{}}"));
-
-        service.installPlugin("!room:homeserver.org", USER_ID, "{\"pluginId\":\"abc\"}");
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-
-        String uri = uriCaptor.getValue();
-        assertTrue(uri.contains("/api/v1/installations"));
-        assertTrue(uri.contains("chat_id="));
-    }
-
-    // ── listInstalledPlugins ──────────────────────────────────────────────────
-
-    @Test
-    void listInstalledPlugins_withPageAndLimit() {
-        mockExchange(ok("{\"data\":[]}"));
-
-        service.listInstalledPlugins("!room:homeserver.org", USER_ID, 1, 20);
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-
-        String uri = uriCaptor.getValue();
-        assertTrue(uri.contains("page=1"));
-        assertTrue(uri.contains("limit=20"));
+        server.verify();
     }
 
     @Test
-    void listInstalledPlugins_withoutPageAndLimit_omitsParams() {
-        mockExchange(ok("{\"data\":[]}"));
+    void notModifiedKeepsEtagAndCacheControl() {
+        server.expect(requestTo(REGISTRY + "/api/v1/plugins/p1/code/client"))
+                .andRespond(withStatus(HttpStatus.NOT_MODIFIED)
+                        .header("ETag", "\"v1\"")
+                        .header("Cache-Control", "private, max-age=0")
+                        .header("X-Internal", "leak"));
 
-        service.listInstalledPlugins("!room:homeserver.org", USER_ID, null, null);
+        ResponseEntity<byte[]> response = service.forward(HttpMethod.GET, Downstream.REGISTRY,
+                "/api/v1/plugins/p1/code/client", null, null, in);
 
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-
-        String uri = uriCaptor.getValue();
-        assertFalse(uri.contains("page="));
-        assertFalse(uri.contains("limit="));
-    }
-
-    // ── confirmInstall ────────────────────────────────────────────────────────
-
-    @Test
-    void confirmInstall_buildsCorrectUrl() {
-        mockExchangeWithBody(ok("{\"installation\":{}}"));
-
-        service.confirmInstall("{\"confirmationToken\":\"tok\"}", USER_ID);
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-        assertTrue(uriCaptor.getValue().endsWith("/api/v1/installations/confirm"));
-    }
-
-    // ── uninstallPlugin ───────────────────────────────────────────────────────
-
-    @Test
-    void uninstallPlugin_buildsCorrectUrl() {
-        mockExchange(ResponseEntity.noContent().build());
-
-        service.uninstallPlugin("install-999", USER_ID);
-
-        ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-        verify(requestBodyUriSpec).uri(uriCaptor.capture());
-        assertTrue(uriCaptor.getValue().contains("/api/v1/installations/install-999"));
+        assertEquals(HttpStatus.NOT_MODIFIED, response.getStatusCode());
+        assertEquals("\"v1\"", response.getHeaders().getETag());
+        assertEquals("private, max-age=0", response.getHeaders().getCacheControl());
+        assertNull(response.getHeaders().getFirst("X-Internal"));
+        verifyNoInteractions(enricher);
     }
 
     @Test
-    void uninstallPlugin_usesDeleteMethod() {
-        mockExchange(ResponseEntity.noContent().build());
+    void errorStatusAndBodyPassThroughWithoutEnrichment() {
+        server.expect(requestTo(INSTALLATION + "/api/v1/installations/x"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"forbidden\"}"));
 
-        service.uninstallPlugin("install-999", USER_ID);
+        ResponseEntity<byte[]> response = service.forward(HttpMethod.DELETE, Downstream.INSTALLATION,
+                "/api/v1/installations/x", null, null, in);
 
-        verify(restClient).method(HttpMethod.DELETE);
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertArrayEquals("{\"error\":\"forbidden\"}".getBytes(StandardCharsets.UTF_8), response.getBody());
+        verifyNoInteractions(enricher);
+    }
+
+    @Test
+    void registryJsonIsEnriched() {
+        byte[] enriched = "{\"enriched\":true}".getBytes(StandardCharsets.UTF_8);
+        when(enricher.enrich(any())).thenReturn(enriched);
+        server.expect(requestTo(REGISTRY + "/api/v1/plugins"))
+                .andRespond(withSuccess("{\"items\":[]}", MediaType.APPLICATION_JSON));
+
+        ResponseEntity<byte[]> response = service.forward(HttpMethod.GET, Downstream.REGISTRY,
+                "/api/v1/plugins", null, null, in);
+
+        assertArrayEquals(enriched, response.getBody());
+    }
+
+    @Test
+    void codeAndRuntimeResponsesAreNotEnriched() {
+        server.expect(requestTo(REGISTRY + "/api/v1/plugins/p1/code/server"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(RUNTIME + "/plugins/p1/state?chat_id=%21r%3Ax"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        service.forward(HttpMethod.GET, Downstream.REGISTRY, "/api/v1/plugins/p1/code/server", null, null, in);
+        service.forward(HttpMethod.GET, Downstream.RUNTIME, "/plugins/p1/state", "chat_id=%21r%3Ax", null, in);
+
+        verify(enricher, never()).enrich(any());
+        server.verify();
+    }
+
+    @Test
+    void nonJsonResponseIsNotEnriched() {
+        server.expect(requestTo(REGISTRY + "/api/v1/plugins/p1"))
+                .andRespond(withSuccess("plain", MediaType.TEXT_PLAIN));
+
+        ResponseEntity<byte[]> response = service.forward(HttpMethod.GET, Downstream.REGISTRY,
+                "/api/v1/plugins/p1", null, null, in);
+
+        assertEquals(MediaType.TEXT_PLAIN, response.getHeaders().getContentType());
+        verifyNoInteractions(enricher);
     }
 }
