@@ -3,557 +3,585 @@ package ru.fstick.registry_service.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.fstick.registry_service.dto.Status;
-import ru.fstick.registry_service.dto.api.request.*;
-import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
-import ru.fstick.registry_service.dto.api.request.commit.CommitScreenshotsRequest;
-import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
-import ru.fstick.registry_service.dto.api.response.*;
-import ru.fstick.registry_service.dto.api.view.*;
-import ru.fstick.registry_service.dto.model.PluginData;
-import ru.fstick.registry_service.dto.model.Screenshot;
-import ru.fstick.registry_service.dto.model.Version;
-import ru.fstick.registry_service.dto.service.FileRequest;
-import ru.fstick.registry_service.repository.PluginsRepository;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.EmptyResultDataAccessException;
+import ru.fstick.registry_service.client.InstallationClient;
+import ru.fstick.registry_service.client.IntegrationClient;
+import ru.fstick.registry_service.dto.BranchStatus;
+import ru.fstick.registry_service.dto.Status;
+import ru.fstick.registry_service.dto.api.request.AddPluginRequest;
+import ru.fstick.registry_service.dto.api.request.PluginRequest;
+import ru.fstick.registry_service.dto.api.request.UpdateScreenshotsRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
+import ru.fstick.registry_service.dto.api.response.AddPluginResponse;
+import ru.fstick.registry_service.dto.api.response.ChangeStatusResponse;
+import ru.fstick.registry_service.dto.api.response.UpdateScreenshotsResponse;
+import ru.fstick.registry_service.dto.api.view.CandidateView;
+import ru.fstick.registry_service.dto.api.view.LastRejectionView;
+import ru.fstick.registry_service.dto.api.view.PluginViewExtend;
+import ru.fstick.registry_service.dto.api.view.PluginViewOwned;
+import ru.fstick.registry_service.dto.api.view.PluginViewShrink;
+import ru.fstick.registry_service.dto.api.view.PluginsView;
+import ru.fstick.registry_service.dto.model.Branch;
+import ru.fstick.registry_service.dto.model.PluginData;
+import ru.fstick.registry_service.dto.model.Screenshot;
+import ru.fstick.registry_service.dto.service.FileRequest;
+import ru.fstick.registry_service.exception.ApiException;
+import ru.fstick.registry_service.repository.BranchRepository;
+import ru.fstick.registry_service.repository.PluginsRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static ru.fstick.registry_service.TestData.branch;
+import static ru.fstick.registry_service.TestData.plugin;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class PluginsServiceTest {
 
-    @Mock private PluginsRepository pluginsRepository;
-    @Mock private S3Service s3Service;
-
-    @InjectMocks private PluginsService pluginsService;
-
-    private static final UUID PLUGIN_ID     = UUID.randomUUID();
-    private static final UUID VERSION_ID    = UUID.randomUUID();
-    private static final UUID AUTHOR_ID     = UUID.randomUUID();
+    private static final UUID PLUGIN_ID = UUID.randomUUID();
+    private static final UUID AUTHOR_ID = UUID.randomUUID();
+    private static final UUID STRANGER_ID = UUID.randomUUID();
     private static final UUID SCREENSHOT_ID = UUID.randomUUID();
+    private static final String CHAT = "!room:example.org";
 
+    @Mock private PluginsRepository pluginsRepository;
+    @Mock private BranchRepository branchRepository;
+    @Mock private S3Service s3Service;
+    @Mock private BlobStore blobStore;
+    @Mock private TemplateProvider templateProvider;
+    @Mock private InstallationClient installationClient;
+    @Mock private IntegrationClient integrationClient;
+    @Mock private ModeratorService moderatorService;
+
+    private PluginsService pluginsService;
     private PluginData samplePlugin;
-    private Version    sampleVersion;
-    private Screenshot sampleScreenshot;
 
     @BeforeEach
     void setUp() {
-        samplePlugin = PluginData.builder()
-                .id(PLUGIN_ID)
-                .authorId(AUTHOR_ID)
-                .name("Test Plugin")
-                .description("Description")
-                .category("Tools")
-                .tags(List.of("tag1", "tag2"))
-                .status("ACTIVE")
-                .iconUrlKey("plugins/" + PLUGIN_ID + "/icon")
-                .createdAt("2024-01-01")
-                .updatedAt("2024-01-02")
-                .build();
+        AccessGuard accessGuard = new AccessGuard(pluginsRepository, installationClient, integrationClient, moderatorService);
+        pluginsService = new PluginsService(pluginsRepository, branchRepository, s3Service, blobStore, templateProvider, accessGuard);
 
-        sampleVersion = Version.builder()
-                .versionId(VERSION_ID)
-                .pluginId(PLUGIN_ID)
-                .version("1.0.0")
-                .changelog("Initial release")
-                .runtime("sv.java@21.0.0")
-                .build();
-
-        sampleScreenshot = Screenshot.builder()
-                .screenshotId(SCREENSHOT_ID)
-                .pluginId(PLUGIN_ID)
-                .s3ScreenshotKey("plugins/" + PLUGIN_ID + "/screenshots/shot.png")
-                .build();
+        samplePlugin = plugin(PLUGIN_ID, AUTHOR_ID);
+        when(pluginsRepository.findPlugin(PLUGIN_ID)).thenReturn(Optional.of(samplePlugin));
+        when(pluginsRepository.getPlugin(PLUGIN_ID)).thenReturn(samplePlugin);
+        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of());
+        when(s3Service.generateDownloadUrl(anyString(), eq(true))).thenAnswer(inv -> "http://minio/" + inv.getArgument(0));
     }
-
-    // ── helpers ───────────────────────────────────────────────────────────────
 
     private FileRequest fileRequest(String fileName, String type) {
-        FileRequest f = new FileRequest();
-        f.setFileName(fileName);
-        f.setType(type);
-        return f;
+        FileRequest file = new FileRequest();
+        file.setFileName(fileName);
+        file.setType(type);
+        return file;
     }
 
-    private void stubFullPlugin() {
-        when(pluginsRepository.getVersionsOfPlugin(PLUGIN_ID)).thenReturn(List.of(sampleVersion));
-        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of(sampleScreenshot));
-        when(s3Service.generateDownloadUrl(anyString())).thenReturn("http://cdn/url");
+    private AddPluginRequest addRequest(FileRequest icon) {
+        AddPluginRequest request = new AddPluginRequest();
+        request.setName("P");
+        request.setDescription("D");
+        request.setCategory("Tools");
+        request.setTags(List.of("t"));
+        request.setIcon(icon);
+        return request;
+    }
+
+    private static ApiException thrown(org.junit.jupiter.api.function.Executable call) {
+        return assertThrows(ApiException.class, call);
     }
 
     // ── getPlugins ────────────────────────────────────────────────────────────
 
     @Test
-    void getPlugins_singlePage_returnsCorrectPagination() {
-        when(pluginsRepository.getPlugins(0, 10, "", "", "created_at", "DESC"))
-                .thenReturn(List.of(samplePlugin));
-        when(pluginsRepository.getPluginsTotal("", "")).thenReturn(1);
-        when(s3Service.generateDownloadUrl(anyString())).thenReturn("http://cdn/icon");
+    void getPlugins_publicList_usesNullOwnerAndReturnsReleasedSemver() {
+        PluginData released = plugin(PLUGIN_ID, AUTHOR_ID);
+        released.setReleasedSemver("1.2.0");
+        when(pluginsRepository.getPlugins(0, 20, "", "", "plugin_name", "asc", null)).thenReturn(List.of(released));
+        when(pluginsRepository.getPluginsTotal("", "", null)).thenReturn(1);
 
-        PluginsView result = pluginsService.getPlugins(0, 10, "", "", "created_at", "DESC");
+        PluginsView<PluginViewShrink> view = pluginsService.getPlugins(0, 20, "", "", "plugin_name", "asc");
 
-        assertEquals(1, result.getItems().size());
-        assertEquals(PLUGIN_ID, result.getItems().get(0).getId());
-        assertEquals(1, result.getPagination().getTotal());
-        assertFalse(result.getPagination().isHasNext());
-        assertFalse(result.getPagination().isHasPrev());
+        assertEquals(1, view.getItems().size());
+        assertEquals("1.2.0", view.getItems().get(0).getReleasedSemver());
+        assertEquals("http://minio/plugins/" + PLUGIN_ID + "/icon", view.getItems().get(0).getIconUrl());
+        assertEquals(1, view.getPagination().getTotal());
+        assertFalse(view.getPagination().isHasNext());
+        assertFalse(view.getPagination().isHasPrev());
     }
 
     @Test
     void getPlugins_firstOfManyPages_hasNextTrueHasPrevFalse() {
-        when(pluginsRepository.getPlugins(0, 5, "", "", "created_at", "DESC"))
-                .thenReturn(List.of(samplePlugin));
-        when(pluginsRepository.getPluginsTotal("", "")).thenReturn(12);
-        when(s3Service.generateDownloadUrl(any())).thenReturn("http://cdn/icon");
+        when(pluginsRepository.getPlugins(anyInt(), anyInt(), any(), any(), any(), any(), any())).thenReturn(List.of(samplePlugin));
+        when(pluginsRepository.getPluginsTotal(any(), any(), any())).thenReturn(50);
 
-        PluginsView result = pluginsService.getPlugins(0, 5, "", "", "created_at", "DESC");
+        PluginsView<PluginViewShrink> view = pluginsService.getPlugins(0, 10, "", "", "plugin_name", "asc");
 
-        assertTrue(result.getPagination().isHasNext());
-        assertFalse(result.getPagination().isHasPrev());
-        assertEquals(3, result.getPagination().getTotalPages());
+        assertEquals(5, view.getPagination().getTotalPages());
+        assertTrue(view.getPagination().isHasNext());
+        assertFalse(view.getPagination().isHasPrev());
     }
 
     @Test
     void getPlugins_middlePage_hasBothNextAndPrev() {
-        when(pluginsRepository.getPlugins(5, 5, "", "", "created_at", "DESC"))
-                .thenReturn(List.of(samplePlugin));
-        when(pluginsRepository.getPluginsTotal("", "")).thenReturn(12);
-        when(s3Service.generateDownloadUrl(any())).thenReturn("http://cdn/icon");
+        when(pluginsRepository.getPlugins(anyInt(), anyInt(), any(), any(), any(), any(), any())).thenReturn(List.of(samplePlugin));
+        when(pluginsRepository.getPluginsTotal(any(), any(), any())).thenReturn(50);
 
-        PluginsView result = pluginsService.getPlugins(1, 5, "", "", "created_at", "DESC");
+        PluginsView<PluginViewShrink> view = pluginsService.getPlugins(2, 10, "", "", "plugin_name", "asc");
 
-        assertTrue(result.getPagination().isHasNext());
-        assertTrue(result.getPagination().isHasPrev());
+        assertTrue(view.getPagination().isHasNext());
+        assertTrue(view.getPagination().isHasPrev());
+        verify(pluginsRepository).getPlugins(20, 10, "", "", "plugin_name", "asc", null);
     }
 
     @Test
     void getPlugins_emptyResult_returnsZeroItems() {
-        when(pluginsRepository.getPlugins(0, 10, "", "", "created_at", "DESC"))
-                .thenReturn(List.of());
-        when(pluginsRepository.getPluginsTotal("", "")).thenReturn(0);
+        when(pluginsRepository.getPlugins(anyInt(), anyInt(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(pluginsRepository.getPluginsTotal(any(), any(), any())).thenReturn(0);
 
-        PluginsView result = pluginsService.getPlugins(0, 10, "", "", "created_at", "DESC");
+        PluginsView<PluginViewShrink> view = pluginsService.getPlugins(0, 20, "", "", "plugin_name", "asc");
 
-        assertTrue(result.getItems().isEmpty());
-        assertEquals(0, result.getPagination().getTotal());
-    }
-
-    // ── getPlugin ─────────────────────────────────────────────────────────────
-
-    @Test
-    void getPlugin_returnsExtendedViewWithVersionsAndScreenshots() {
-        when(pluginsRepository.getPlugin(PLUGIN_ID)).thenReturn(samplePlugin);
-        stubFullPlugin();
-
-        PluginViewExtend result = pluginsService.getPlugin(PLUGIN_ID);
-
-        assertEquals(PLUGIN_ID, result.getId());
-        assertEquals(AUTHOR_ID, result.getAuthorId());
-        assertEquals(1, result.getVersions().size());
-        assertEquals("1.0.0", result.getVersions().get(0).getVersion());
-        assertEquals(1, result.getScreenshots().size());
-        assertEquals("http://cdn/url", result.getScreenshots().get(0).getScreenshotUrl());
+        assertTrue(view.getItems().isEmpty());
+        assertEquals(0, view.getPagination().getTotalPages());
     }
 
     @Test
-    void getPlugin_noVersionsNoScreenshots_returnsEmptyLists() {
-        when(pluginsRepository.getPlugin(PLUGIN_ID)).thenReturn(samplePlugin);
-        when(pluginsRepository.getVersionsOfPlugin(PLUGIN_ID)).thenReturn(List.of());
-        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of());
-        when(s3Service.generateDownloadUrl(anyString())).thenReturn("http://cdn/icon");
+    void getPlugins_pluginWithoutIcon_usesTemplateIcon() {
+        samplePlugin.setIconUrlKey(null);
+        when(pluginsRepository.getPlugins(anyInt(), anyInt(), any(), any(), any(), any(), any())).thenReturn(List.of(samplePlugin));
+        when(pluginsRepository.getPluginsTotal(any(), any(), any())).thenReturn(1);
 
-        PluginViewExtend result = pluginsService.getPlugin(PLUGIN_ID);
+        PluginsView<PluginViewShrink> view = pluginsService.getPlugins(0, 20, "", "", "plugin_name", "asc");
 
-        assertTrue(result.getVersions().isEmpty());
-        assertTrue(result.getScreenshots().isEmpty());
+        assertEquals("http://minio/" + TemplateProvider.ICON_KEY, view.getItems().get(0).getIconUrl());
     }
 
-    // ── updatePlugin ──────────────────────────────────────────────────────────
+    // ── getOwnedPlugins ───────────────────────────────────────────────────────
 
     @Test
-    void updatePlugin_updatesMetadataAndReturnsView() {
+    void getOwnedPlugins_filtersByCallerAndExposesDevBranch() {
+        UUID devBranch = UUID.randomUUID();
+        samplePlugin.setDevBranchId(devBranch);
+        when(pluginsRepository.getPlugins(0, 20, "", "", "plugin_name", "asc", AUTHOR_ID)).thenReturn(List.of(samplePlugin));
+        when(pluginsRepository.getPluginsTotal("", "", AUTHOR_ID)).thenReturn(1);
+
+        PluginsView<PluginViewOwned> view = pluginsService.getOwnedPlugins(AUTHOR_ID, 0, 20, "", "", "plugin_name", "asc");
+
+        PluginViewOwned item = view.getItems().get(0);
+        assertEquals(devBranch, item.getDevBranchId());
+        assertNull(item.getReleasedSemver());
+        assertNull(item.getCandidate());
+        assertNull(item.getLastRejection());
+        assertEquals(1, view.getPagination().getTotal());
+    }
+
+    @Test
+    void getOwnedPlugins_exposesCandidateAndLastRejection() {
+        UUID candidateBranch = UUID.randomUUID();
+        samplePlugin.setCandidate(CandidateView.builder().branchId(candidateBranch).semver("1.2.0").status("WAITING_APPROVE").build());
+        samplePlugin.setLastRejection(LastRejectionView.builder().reason("no").semver("1.1.0").build());
+        when(pluginsRepository.getPlugins(0, 20, "", "", "plugin_name", "asc", AUTHOR_ID)).thenReturn(List.of(samplePlugin));
+        when(pluginsRepository.getPluginsTotal("", "", AUTHOR_ID)).thenReturn(1);
+
+        PluginViewOwned item = pluginsService.getOwnedPlugins(AUTHOR_ID, 0, 20, "", "", "plugin_name", "asc").getItems().get(0);
+
+        assertEquals(candidateBranch, item.getCandidate().getBranchId());
+        assertEquals("no", item.getLastRejection().getReason());
+    }
+
+    // ── getPlugin visibility ──────────────────────────────────────────────────
+
+    private void stubBranches(Branch... branches) {
+        when(branchRepository.findByPlugin(PLUGIN_ID)).thenReturn(List.of(branches));
+    }
+
+    @Test
+    void getPlugin_author_seesAllBranches() {
+        stubBranches(branch(PLUGIN_ID, BranchStatus.WORKING),
+                branch(PLUGIN_ID, BranchStatus.RELEASED),
+                branch(PLUGIN_ID, BranchStatus.WAITING_APPROVE),
+                branch(PLUGIN_ID, BranchStatus.REJECTED),
+                branch(PLUGIN_ID, BranchStatus.CANCELLED));
+
+        PluginViewExtend view = pluginsService.getPlugin(PLUGIN_ID, AUTHOR_ID, null);
+
+        assertEquals(5, view.getBranches().size());
+        assertEquals("cl.js@1.0.0", view.getBranches().get(0).getRuntime().getClient());
+        assertEquals("sv.lua@1.0.0", view.getBranches().get(0).getRuntime().getServer());
+    }
+
+    @Test
+    void getPlugin_lastRejection_visibleToAuthorOnly() {
+        samplePlugin.setLastRejection(LastRejectionView.builder().reason("no").semver("1.1.0").build());
+        stubBranches(branch(PLUGIN_ID, BranchStatus.RELEASED));
+
+        assertEquals("no", pluginsService.getPlugin(PLUGIN_ID, AUTHOR_ID, null).getLastRejection().getReason());
+        assertNull(pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, null).getLastRejection());
+    }
+
+    @Test
+    void getPlugin_stranger_seesReleasedOnly() {
+        stubBranches(branch(PLUGIN_ID, BranchStatus.WORKING),
+                branch(PLUGIN_ID, BranchStatus.RELEASED),
+                branch(PLUGIN_ID, BranchStatus.WAITING_APPROVE));
+
+        PluginViewExtend view = pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, null);
+
+        assertEquals(1, view.getBranches().size());
+        assertEquals("RELEASED", view.getBranches().get(0).getStatus());
+    }
+
+    @Test
+    void getPlugin_anonymous_seesReleasedOnly() {
+        stubBranches(branch(PLUGIN_ID, BranchStatus.WORKING), branch(PLUGIN_ID, BranchStatus.RELEASED));
+
+        PluginViewExtend view = pluginsService.getPlugin(PLUGIN_ID, null, null);
+
+        assertEquals(1, view.getBranches().size());
+    }
+
+    @Test
+    void getPlugin_strangerAndNoReleasedBranch_404() {
+        stubBranches(branch(PLUGIN_ID, BranchStatus.WORKING), branch(PLUGIN_ID, BranchStatus.WAITING_APPROVE));
+
+        ApiException ex = thrown(() -> pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, null));
+
+        assertEquals(404, ex.getStatus().value());
+        assertEquals("plugin_not_found", ex.getCode());
+    }
+
+    @Test
+    void getPlugin_chatMemberWithDevInstall_seesDevBranchToo() {
+        Branch dev = branch(PLUGIN_ID, BranchStatus.WORKING);
+        stubBranches(dev, branch(PLUGIN_ID, BranchStatus.RELEASED));
+        when(installationClient.resolve(PLUGIN_ID, CHAT)).thenReturn(Optional.of(new InstallationClient.Resolved(dev.getId(), "WORKING")));
+        when(integrationClient.isMember(CHAT, STRANGER_ID)).thenReturn(true);
+
+        PluginViewExtend view = pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, CHAT);
+
+        assertEquals(2, view.getBranches().size());
+    }
+
+    @Test
+    void getPlugin_chatMemberWithDevInstallAndNoRelease_seesDevBranchInsteadOf404() {
+        Branch dev = branch(PLUGIN_ID, BranchStatus.WORKING);
+        stubBranches(dev);
+        when(installationClient.resolve(PLUGIN_ID, CHAT)).thenReturn(Optional.of(new InstallationClient.Resolved(dev.getId(), "WORKING")));
+        when(integrationClient.isMember(CHAT, STRANGER_ID)).thenReturn(true);
+
+        PluginViewExtend view = pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, CHAT);
+
+        assertEquals(1, view.getBranches().size());
+        assertEquals("WORKING", view.getBranches().get(0).getStatus());
+    }
+
+    @Test
+    void getPlugin_chatCheckFails_404() {
+        Branch dev = branch(PLUGIN_ID, BranchStatus.WORKING);
+        stubBranches(dev);
+        when(installationClient.resolve(PLUGIN_ID, CHAT)).thenReturn(Optional.of(new InstallationClient.Resolved(dev.getId(), "WORKING")));
+        when(integrationClient.isMember(CHAT, STRANGER_ID)).thenReturn(false);
+
+        assertEquals(404, thrown(() -> pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, CHAT)).getStatus().value());
+    }
+
+    @Test
+    void getPlugin_deletedPlugin_404() {
+        samplePlugin.setStatus("DELETED");
+        stubBranches(branch(PLUGIN_ID, BranchStatus.RELEASED));
+
+        assertEquals(404, thrown(() -> pluginsService.getPlugin(PLUGIN_ID, AUTHOR_ID, null)).getStatus().value());
+    }
+
+    @Test
+    void getPlugin_unknownPlugin_404() {
+        UUID unknown = UUID.randomUUID();
+        when(pluginsRepository.findPlugin(unknown)).thenReturn(Optional.empty());
+
+        assertEquals("plugin_not_found", thrown(() -> pluginsService.getPlugin(unknown, AUTHOR_ID, null)).getCode());
+    }
+
+    @Test
+    void getPlugin_includesScreenshotsAndIcon() {
+        stubBranches(branch(PLUGIN_ID, BranchStatus.RELEASED));
+        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of(Screenshot.builder()
+                .screenshotId(SCREENSHOT_ID).pluginId(PLUGIN_ID).s3ScreenshotKey("plugins/x/screenshots/a.png").build()));
+
+        PluginViewExtend view = pluginsService.getPlugin(PLUGIN_ID, null, null);
+
+        assertEquals(1, view.getScreenshots().size());
+        assertEquals("http://minio/plugins/x/screenshots/a.png", view.getScreenshots().get(0).getScreenshotUrl());
+        assertEquals("http://minio/plugins/" + PLUGIN_ID + "/icon", view.getIconUrl());
+    }
+
+    // ── ownership ─────────────────────────────────────────────────────────────
+
+    @Test
+    void updatePlugin_author_updatesAndReturnsView() {
         PluginRequest request = new PluginRequest();
-        request.setName("Updated");
-        request.setDescription("New desc");
+        request.setName("New");
+        request.setDescription("Desc");
         request.setCategory("Tools");
-        request.setTags(List.of("a", "b"));
+        request.setTags(List.of("a"));
+        when(pluginsRepository.updatePlugin(PLUGIN_ID, "New", "Desc", "Tools", List.of("a"))).thenReturn(samplePlugin);
+        stubBranches(branch(PLUGIN_ID, BranchStatus.WORKING));
 
-        when(pluginsRepository.updatePlugin(PLUGIN_ID, "Updated", "New desc", "Tools", List.of("a", "b")))
-                .thenReturn(samplePlugin);
-        when(pluginsRepository.getVersionsOfPlugin(PLUGIN_ID)).thenReturn(List.of());
-        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of());
-        when(s3Service.generateDownloadUrl(any())).thenReturn("http://cdn/icon");
+        PluginViewExtend view = pluginsService.updatePlugin(PLUGIN_ID, AUTHOR_ID, request);
 
-        PluginViewExtend result = pluginsService.updatePlugin(PLUGIN_ID, request);
-
-        assertEquals(PLUGIN_ID, result.getId());
-        verify(pluginsRepository).updatePlugin(PLUGIN_ID, "Updated", "New desc", "Tools", List.of("a", "b"));
-    }
-
-    // ── deletePlugin ──────────────────────────────────────────────────────────
-
-    @Test
-    void deletePlugin_returnsOldAndNewStatus() {
-        PluginData afterDelete = PluginData.builder()
-                .id(PLUGIN_ID).authorId(AUTHOR_ID).name("Test Plugin")
-                .description("Description").category("Tools").tags(List.of("tag1", "tag2"))
-                .status("DELETED").iconUrlKey("plugins/" + PLUGIN_ID + "/icon")
-                .createdAt("2024-01-01").updatedAt("2024-01-02").build();
-
-        when(pluginsRepository.getPlugin(PLUGIN_ID)).thenReturn(samplePlugin);
-        when(pluginsRepository.deletePlugin(PLUGIN_ID)).thenReturn(afterDelete);
-
-        ChangeStatusResponse result = pluginsService.deletePlugin(PLUGIN_ID);
-
-        assertEquals(PLUGIN_ID, result.getPluginId());
-        assertEquals("ACTIVE",  result.getOldStatus());
-        assertEquals("DELETED", result.getNewStatus());
-    }
-
-    // ── commitPlugin ──────────────────────────────────────────────────────────
-
-    @Test
-    void commitPlugin_validVersion_commitsFilesAndReturnsView() {
-        CommitPluginRequest request = new CommitPluginRequest();
-        request.setVersionId(VERSION_ID);
-        request.setKeys(List.of(
-                "plugins/" + PLUGIN_ID + "/icon",
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/sv/java/21.0.0/main.jar",
-                "plugins/" + PLUGIN_ID + "/screenshots/shot.png"
-        ));
-
-        when(pluginsRepository.getVersionPluginId(VERSION_ID)).thenReturn(PLUGIN_ID);
-        when(s3Service.getObject(anyString())).thenReturn(new byte[0]);
-        when(pluginsRepository.addFiles(eq(PLUGIN_ID), eq(VERSION_ID), any(), any(), any()))
-                .thenReturn(samplePlugin);
-        stubFullPlugin();
-
-        PluginViewExtend result = pluginsService.commitPlugin(PLUGIN_ID, request);
-
-        assertEquals(PLUGIN_ID, result.getId());
-        verify(pluginsRepository).addFiles(eq(PLUGIN_ID), eq(VERSION_ID), any(), any(), any());
+        assertEquals(PLUGIN_ID, view.getId());
+        assertEquals(1, view.getBranches().size());
     }
 
     @Test
-    void commitPlugin_versionBelongsToDifferentPlugin_throwsException() {
-        CommitPluginRequest request = new CommitPluginRequest();
-        request.setVersionId(VERSION_ID);
-        request.setKeys(List.of("plugins/" + PLUGIN_ID + "/icon"));
+    void updatePlugin_nonAuthor_403AndNothingWritten() {
+        ApiException ex = thrown(() -> pluginsService.updatePlugin(PLUGIN_ID, STRANGER_ID, new PluginRequest()));
 
-        when(pluginsRepository.getVersionPluginId(VERSION_ID)).thenReturn(UUID.randomUUID());
-
-        assertThrows(RuntimeException.class, () -> pluginsService.commitPlugin(PLUGIN_ID, request));
+        assertEquals(403, ex.getStatus().value());
+        verify(pluginsRepository, never()).updatePlugin(any(), any(), any(), any(), any());
     }
 
     @Test
-    void commitPlugin_s3ObjectMissing_throwsException() {
-        CommitPluginRequest request = new CommitPluginRequest();
-        request.setVersionId(VERSION_ID);
-        request.setKeys(List.of(
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/sv/java/21.0.0/missing.jar"
-        ));
+    void updatePlugin_unknownPlugin_404() {
+        UUID unknown = UUID.randomUUID();
+        when(pluginsRepository.findPlugin(unknown)).thenReturn(Optional.empty());
 
-        when(pluginsRepository.getVersionPluginId(VERSION_ID)).thenReturn(PLUGIN_ID);
-        doThrow(new RuntimeException("not found")).when(s3Service).getObject(anyString());
-
-        assertThrows(RuntimeException.class, () -> pluginsService.commitPlugin(PLUGIN_ID, request));
-    }
-
-    // ── initPluginUpload ──────────────────────────────────────────────────────
-
-    @Test
-    void initPluginUpload_generatesUploadsAndCreatesPlugin() {
-        AddPluginRequest request = new AddPluginRequest();
-        request.setName("My Plugin");
-        request.setDescription("Description");
-        request.setCategory("Tools");
-        request.setTags(List.of("x"));
-        request.setVersion("1.0.0");
-        request.setRuntime("sv.java@21.0.0");
-        request.setIcon(fileRequest("icon.png", "image/png"));
-        request.setFiles(List.of(fileRequest("main.jar", "code/sv.java@21.0.0")));
-
-        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://upload-url");
-        when(pluginsRepository.createVersion(any(), eq("1.0.0"), anyString(), eq("sv.java@21.0.0")))
-                .thenReturn(VERSION_ID);
-
-        AddPluginResponse result = pluginsService.initPluginUpload(request, AUTHOR_ID);
-
-        assertNotNull(result.getPluginId());
-        assertEquals(VERSION_ID, result.getVersionId());
-        assertEquals(1, result.getUploads().size());
-        assertNotNull(result.getIconUpload());
-        assertEquals("http://upload-url", result.getUploads().get(0).getUploadUrl());
-        // ключ кода содержит sv/java/21.0.0
-        assertTrue(result.getUploads().get(0).getKey().contains("/sv/java/21.0.0/"));
-        // ключ иконки
-        assertTrue(result.getIconUpload().getKey().contains("/icon"));
-        verify(pluginsRepository).addPlugin(any(), eq("My Plugin"), eq("Description"),
-                eq("Tools"), eq(List.of("x")), eq(AUTHOR_ID));
+        assertEquals(404, thrown(() -> pluginsService.updatePlugin(unknown, AUTHOR_ID, new PluginRequest())).getStatus().value());
     }
 
     @Test
-    void initPluginUpload_clientRuntimeFile_keyContainsClSegment() {
-        AddPluginRequest request = new AddPluginRequest();
-        request.setName("Plugin"); request.setDescription("Desc");
-        request.setVersion("1.0.0"); request.setRuntime("cl.js@18.0.0");
-        request.setIcon(fileRequest("icon.png", "image/png"));
-        request.setFiles(List.of(fileRequest("app.js", "code/cl.js@18.0.0")));
+    void deletePlugin_author_returnsOldAndNewStatus() {
+        PluginData deleted = plugin(PLUGIN_ID, AUTHOR_ID);
+        deleted.setStatus("DELETED");
+        when(pluginsRepository.deletePlugin(PLUGIN_ID)).thenReturn(deleted);
 
-        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://upload-url");
-        when(pluginsRepository.createVersion(any(), any(), any(), any())).thenReturn(VERSION_ID);
+        ChangeStatusResponse response = pluginsService.deletePlugin(PLUGIN_ID, AUTHOR_ID);
 
-        AddPluginResponse result = pluginsService.initPluginUpload(request, AUTHOR_ID);
-
-        assertTrue(result.getUploads().get(0).getKey().contains("/cl/js/18.0.0/"));
+        assertEquals("ACTIVE", response.getOldStatus());
+        assertEquals("DELETED", response.getNewStatus());
     }
 
     @Test
-    void initPluginUpload_invalidFileType_throwsException() {
-        AddPluginRequest request = new AddPluginRequest();
-        request.setName("P"); request.setDescription("D");
-        request.setVersion("1.0.0"); request.setRuntime("sv.java@21.0.0");
-        request.setIcon(fileRequest("icon.png", "image/png"));
-        request.setFiles(List.of(fileRequest("script.sh", "unknown/something")));
-
-        assertThrows(Exception.class, () -> pluginsService.initPluginUpload(request, AUTHOR_ID));
+    void deletePlugin_nonAuthor_403() {
+        assertEquals(403, thrown(() -> pluginsService.deletePlugin(PLUGIN_ID, STRANGER_ID)).getStatus().value());
+        verify(pluginsRepository, never()).deletePlugin(any());
     }
 
     @Test
-    void initPluginUpload_invalidIconType_throwsException() {
-        AddPluginRequest request = new AddPluginRequest();
-        request.setName("P"); request.setDescription("D");
-        request.setVersion("1.0.0"); request.setRuntime("sv.java@21.0.0");
-        request.setIcon(fileRequest("icon.pdf", "code/sv.java@21.0.0")); // не image → key null
-        request.setFiles(List.of(fileRequest("main.jar", "code/sv.java@21.0.0")));
+    void changeStatus_author_toHidden() {
+        PluginData hidden = plugin(PLUGIN_ID, AUTHOR_ID);
+        hidden.setStatus("HIDDEN");
+        when(pluginsRepository.getPlugin(PLUGIN_ID)).thenReturn(hidden);
 
-        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://upload-url");
+        ChangeStatusResponse response = pluginsService.changeStatus(PLUGIN_ID, AUTHOR_ID, Status.HIDDEN);
 
-        assertThrows(RuntimeException.class, () -> pluginsService.initPluginUpload(request, AUTHOR_ID));
-    }
-
-    // ── initVersionUpload ─────────────────────────────────────────────────────
-
-    @Test
-    void initVersionUpload_createsVersionAndReturnsUploads() {
-        AddPluginVersionRequest request = new AddPluginVersionRequest();
-        request.setVersion("2.0.0");
-        request.setChangelog("New features");
-        request.setRuntime("sv.java@21.0.0");
-        request.setFiles(List.of(fileRequest("main.jar", "code/sv.java@21.0.0")));
-
-        when(pluginsRepository.createVersion(PLUGIN_ID, "2.0.0", "New features", "sv.java@21.0.0"))
-                .thenReturn(VERSION_ID);
-        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://upload-url");
-
-        AddVersionResponse result = pluginsService.initVersionUpload(PLUGIN_ID, request);
-
-        assertEquals(PLUGIN_ID, result.getPluginId());
-        assertEquals(VERSION_ID, result.getVersionId());
-        assertEquals(1, result.getUploads().size());
-        assertTrue(result.getUploads().get(0).getKey().contains("/versions/2.0.0/sv/java/21.0.0/"));
+        assertEquals("HIDDEN", response.getNewStatus());
+        verify(pluginsRepository).changeStatus(PLUGIN_ID, Status.HIDDEN);
     }
 
     @Test
-    void initVersionUpload_imageFileType_throwsException() {
-        // initVersionUpload допускает только code/*, не image/*
-        AddPluginVersionRequest request = new AddPluginVersionRequest();
-        request.setVersion("2.0.0");
-        request.setChangelog("changelog");
-        request.setRuntime("sv.java@21.0.0");
-        request.setFiles(List.of(fileRequest("shot.png", "image/png")));
+    void changeStatus_archived_422() {
+        ApiException ex = thrown(() -> pluginsService.changeStatus(PLUGIN_ID, AUTHOR_ID, Status.ARCHIVED));
 
-        when(pluginsRepository.createVersion(any(), any(), any(), any())).thenReturn(VERSION_ID);
-
-        assertThrows(RuntimeException.class, () -> pluginsService.initVersionUpload(PLUGIN_ID, request));
-    }
-
-    // ── commitVersion ─────────────────────────────────────────────────────────
-
-    @Test
-    void commitVersion_validVersion_addsFilesAndReturnsView() {
-        CommitVersionRequest request = new CommitVersionRequest();
-        request.setVersionId(VERSION_ID);
-        request.setKeys(List.of(
-                "plugins/" + PLUGIN_ID + "/versions/2.0.0/sv/java/21.0.0/main.jar"
-        ));
-
-        when(pluginsRepository.getVersionPluginId(VERSION_ID)).thenReturn(PLUGIN_ID);
-        when(pluginsRepository.addVersion(eq(PLUGIN_ID), eq(VERSION_ID), anyList()))
-                .thenReturn(samplePlugin);
-        stubFullPlugin();
-
-        PluginViewExtend result = pluginsService.commitVersion(PLUGIN_ID, request);
-
-        assertEquals(PLUGIN_ID, result.getId());
-        verify(pluginsRepository).addVersion(eq(PLUGIN_ID), eq(VERSION_ID), anyList());
+        assertEquals(422, ex.getStatus().value());
+        verify(pluginsRepository, never()).changeStatus(any(), any());
     }
 
     @Test
-    void commitVersion_wrongPlugin_throwsException() {
-        CommitVersionRequest request = new CommitVersionRequest();
-        request.setVersionId(VERSION_ID);
-        request.setKeys(List.of());
-
-        when(pluginsRepository.getVersionPluginId(VERSION_ID)).thenReturn(UUID.randomUUID());
-
-        assertThrows(RuntimeException.class, () -> pluginsService.commitVersion(PLUGIN_ID, request));
+    void changeStatus_nonAuthor_403() {
+        assertEquals(403, thrown(() -> pluginsService.changeStatus(PLUGIN_ID, STRANGER_ID, Status.ACTIVE)).getStatus().value());
+        verify(pluginsRepository, never()).changeStatus(any(), any());
     }
 
-    // ── updateScreenshots ─────────────────────────────────────────────────────
+    // ── createPlugin ──────────────────────────────────────────────────────────
+
+    private void stubCreate(UUID devBranchId) {
+        when(templateProvider.getClientCode()).thenReturn("client-template");
+        when(templateProvider.getServerCode()).thenReturn("server-template");
+        when(blobStore.put(anyString(), eq("client-template"))).thenReturn("c".repeat(64));
+        when(blobStore.put(anyString(), eq("server-template"))).thenReturn("5".repeat(64));
+        when(branchRepository.createDevBranch(any(), anyString(), anyString())).thenReturn(devBranchId);
+    }
+
+    @Test
+    void createPlugin_withoutIcon_createsDevBranchFromTemplates() {
+        UUID devBranchId = UUID.randomUUID();
+        stubCreate(devBranchId);
+
+        AddPluginResponse response = pluginsService.createPlugin(addRequest(null), AUTHOR_ID);
+
+        assertEquals(devBranchId, response.getDevBranchId());
+        assertNull(response.getIconUpload());
+        verify(s3Service, never()).generateUploadUrl(anyString());
+
+        ArgumentCaptor<UUID> pluginId = ArgumentCaptor.forClass(UUID.class);
+        verify(pluginsRepository).addPlugin(pluginId.capture(), eq("P"), eq("D"), eq("Tools"), eq(List.of("t")), eq(AUTHOR_ID));
+        assertEquals(pluginId.getValue(), response.getPluginId());
+        verify(blobStore).put(pluginId.getValue().toString(), "client-template");
+        verify(blobStore).put(pluginId.getValue().toString(), "server-template");
+        verify(branchRepository).createDevBranch(pluginId.getValue(), "c".repeat(64), "5".repeat(64));
+    }
+
+    @Test
+    void createPlugin_withIcon_returnsPresignedUpload() {
+        stubCreate(UUID.randomUUID());
+        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://minio/upload");
+
+        AddPluginResponse response = pluginsService.createPlugin(addRequest(fileRequest("icon.png", "image/png")), AUTHOR_ID);
+
+        assertEquals("plugins/" + response.getPluginId() + "/icon", response.getIconUpload().getKey());
+        assertEquals("http://minio/upload", response.getIconUpload().getUploadUrl());
+    }
+
+    @Test
+    void createPlugin_codeTypeAsIcon_422AndNothingCreated() {
+        ApiException ex = thrown(() -> pluginsService.createPlugin(addRequest(fileRequest("icon", "code/sv.lua@1.0.0")), AUTHOR_ID));
+
+        assertEquals(422, ex.getStatus().value());
+        verifyNoInteractions(blobStore, branchRepository);
+        verify(pluginsRepository, never()).addPlugin(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void createPlugin_malformedIconType_422() {
+        ApiException ex = thrown(() -> pluginsService.createPlugin(addRequest(fileRequest("icon", "png")), AUTHOR_ID));
+
+        assertEquals("invalid_type", ex.getCode());
+    }
+
+    // ── screenshots and assets ────────────────────────────────────────────────
 
     @Test
     void updateScreenshots_imageFiles_generatesUploadUrls() {
         UpdateScreenshotsRequest request = new UpdateScreenshotsRequest();
-        request.setFiles(List.of(fileRequest("new-shot.png", "image/png")));
+        request.setFiles(List.of(fileRequest("shot.png", "image/png")));
+        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://minio/upload");
 
-        when(s3Service.generateUploadUrl(anyString())).thenReturn("http://upload-url");
+        UpdateScreenshotsResponse response = pluginsService.updateScreenshots(PLUGIN_ID, AUTHOR_ID, request);
 
-        UpdateScreenshotsResponse result = pluginsService.updateScreenshots(PLUGIN_ID, request);
-
-        assertEquals(PLUGIN_ID, result.getPluginId());
-        assertEquals(1, result.getUploads().size());
-        assertTrue(result.getUploads().get(0).getKey().contains("/screenshots/new-shot.png"));
-        assertEquals("http://upload-url", result.getUploads().get(0).getUploadUrl());
+        assertEquals(1, response.getUploads().size());
+        assertEquals("plugins/" + PLUGIN_ID + "/screenshots/shot.png", response.getUploads().get(0).getKey());
     }
 
     @Test
-    void updateScreenshots_nonImageType_throwsException() {
+    void updateScreenshots_nonImageType_422() {
         UpdateScreenshotsRequest request = new UpdateScreenshotsRequest();
-        request.setFiles(List.of(fileRequest("code.jar", "code/sv.java@21.0.0")));
+        request.setFiles(List.of(fileRequest("main.lua", "code/sv.lua@1.0.0")));
 
-        assertThrows(RuntimeException.class, () -> pluginsService.updateScreenshots(PLUGIN_ID, request));
-    }
-
-    // ── commitScreenshots ─────────────────────────────────────────────────────
-
-    @Test
-    void commitScreenshots_addsScreenshotsAndReturnsView() {
-        CommitScreenshotsRequest request = new CommitScreenshotsRequest();
-        request.setKeys(List.of(
-                "plugins/" + PLUGIN_ID + "/screenshots/new-shot.png"
-        ));
-
-        when(pluginsRepository.addScreenshots(eq(PLUGIN_ID), anyList())).thenReturn(samplePlugin);
-        when(pluginsRepository.getVersionsOfPlugin(PLUGIN_ID)).thenReturn(List.of());
-        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of(sampleScreenshot));
-        when(s3Service.generateDownloadUrl(anyString())).thenReturn("http://cdn/shot");
-
-        PluginViewExtend result = pluginsService.commitScreenshots(PLUGIN_ID, request);
-
-        assertEquals(PLUGIN_ID, result.getId());
-        assertEquals(1, result.getScreenshots().size());
-        verify(pluginsRepository).addScreenshots(eq(PLUGIN_ID), argThat(list ->
-                list.size() == 1 && list.get(0).contains("/screenshots/")));
+        assertEquals(422, thrown(() -> pluginsService.updateScreenshots(PLUGIN_ID, AUTHOR_ID, request)).getStatus().value());
     }
 
     @Test
-    void commitScreenshots_keysWithoutScreenshots_addsEmptyList() {
-        CommitScreenshotsRequest request = new CommitScreenshotsRequest();
-        // ключи только для кода — getAllScreenshots вернёт пустой список
-        request.setKeys(List.of(
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/sv/java/21.0.0/main.jar"
-        ));
+    void updateScreenshots_nonAuthor_403() {
+        UpdateScreenshotsRequest request = new UpdateScreenshotsRequest();
+        request.setFiles(List.of(fileRequest("shot.png", "image/png")));
 
-        when(pluginsRepository.addScreenshots(eq(PLUGIN_ID), eq(List.of()))).thenReturn(samplePlugin);
-        when(pluginsRepository.getVersionsOfPlugin(PLUGIN_ID)).thenReturn(List.of());
-        when(pluginsRepository.getScreenshots(PLUGIN_ID)).thenReturn(List.of());
-        when(s3Service.generateDownloadUrl(any())).thenReturn("http://cdn/icon");
-
-        PluginViewExtend result = pluginsService.commitScreenshots(PLUGIN_ID, request);
-
-        assertTrue(result.getScreenshots().isEmpty());
+        assertEquals(403, thrown(() -> pluginsService.updateScreenshots(PLUGIN_ID, STRANGER_ID, request)).getStatus().value());
+        verify(s3Service, never()).generateUploadUrl(anyString());
     }
 
-    // ── deleteScreenshot ──────────────────────────────────────────────────────
+    private CommitAssetsRequest commit(String... keys) {
+        CommitAssetsRequest request = new CommitAssetsRequest();
+        request.setKeys(List.of(keys));
+        return request;
+    }
 
     @Test
-    void deleteScreenshot_deletesFromS3AndRepository() {
-        String key = "plugins/" + PLUGIN_ID + "/screenshots/shot.png";
-        when(pluginsRepository.getScreenshotKey(PLUGIN_ID, SCREENSHOT_ID)).thenReturn(key);
+    void commitAssets_iconAndScreenshot_setsIconAndAddsScreenshots() {
+        String icon = "plugins/" + PLUGIN_ID + "/icon";
+        String shot = "plugins/" + PLUGIN_ID + "/screenshots/a.png";
+        when(s3Service.exists(anyString())).thenReturn(true);
+        when(pluginsRepository.addScreenshots(PLUGIN_ID, List.of(shot))).thenReturn(samplePlugin);
+        stubBranches(branch(PLUGIN_ID, BranchStatus.WORKING));
 
-        pluginsService.deleteScreenshot(PLUGIN_ID, SCREENSHOT_ID);
+        PluginViewExtend view = pluginsService.commitAssets(PLUGIN_ID, AUTHOR_ID, commit(icon, shot));
 
-        verify(s3Service).deleteScreenshot(key);
+        assertEquals(PLUGIN_ID, view.getId());
+        verify(pluginsRepository).setIcon(PLUGIN_ID, icon);
+        verify(pluginsRepository).addScreenshots(PLUGIN_ID, List.of(shot));
+    }
+
+    @Test
+    void commitAssets_screenshotOnly_doesNotTouchIcon() {
+        String shot = "plugins/" + PLUGIN_ID + "/screenshots/a.png";
+        when(s3Service.exists(anyString())).thenReturn(true);
+        when(pluginsRepository.addScreenshots(PLUGIN_ID, List.of(shot))).thenReturn(samplePlugin);
+
+        pluginsService.commitAssets(PLUGIN_ID, AUTHOR_ID, commit(shot));
+
+        verify(pluginsRepository, never()).setIcon(any(), any());
+    }
+
+    @Test
+    void commitAssets_keyOfAnotherPlugin_422() {
+        String foreign = "plugins/" + UUID.randomUUID() + "/icon";
+
+        ApiException ex = thrown(() -> pluginsService.commitAssets(PLUGIN_ID, AUTHOR_ID, commit(foreign)));
+
+        assertEquals("invalid_key", ex.getCode());
+        verify(pluginsRepository, never()).setIcon(any(), any());
+    }
+
+    @Test
+    void commitAssets_blobKey_422() {
+        String blob = "plugins/" + PLUGIN_ID + "/blobs/" + "a".repeat(64);
+
+        assertEquals("invalid_key", thrown(() -> pluginsService.commitAssets(PLUGIN_ID, AUTHOR_ID, commit(blob))).getCode());
+    }
+
+    @Test
+    void commitAssets_iconWithExtension_422() {
+        String icon = "plugins/" + PLUGIN_ID + "/icon.png";
+
+        assertEquals("invalid_key", thrown(() -> pluginsService.commitAssets(PLUGIN_ID, AUTHOR_ID, commit(icon))).getCode());
+    }
+
+    @Test
+    void commitAssets_objectNotUploaded_422() {
+        String shot = "plugins/" + PLUGIN_ID + "/screenshots/a.png";
+        when(s3Service.exists(shot)).thenReturn(false);
+
+        ApiException ex = thrown(() -> pluginsService.commitAssets(PLUGIN_ID, AUTHOR_ID, commit(shot)));
+
+        assertEquals("object_not_found", ex.getCode());
+        verify(pluginsRepository, never()).addScreenshots(any(), any());
+    }
+
+    @Test
+    void commitAssets_nonAuthor_403() {
+        String shot = "plugins/" + PLUGIN_ID + "/screenshots/a.png";
+
+        assertEquals(403, thrown(() -> pluginsService.commitAssets(PLUGIN_ID, STRANGER_ID, commit(shot))).getStatus().value());
+        verifyNoInteractions(s3Service);
+    }
+
+    @Test
+    void deleteScreenshot_author_deletesFromS3AndRepository() {
+        when(pluginsRepository.getScreenshotKey(PLUGIN_ID, SCREENSHOT_ID)).thenReturn("plugins/x/screenshots/a.png");
+
+        pluginsService.deleteScreenshot(PLUGIN_ID, AUTHOR_ID, SCREENSHOT_ID);
+
+        verify(s3Service).deleteScreenshot("plugins/x/screenshots/a.png");
         verify(pluginsRepository).deleteScreenshot(SCREENSHOT_ID);
     }
 
-    // ── changeStatus ──────────────────────────────────────────────────────────
-
     @Test
-    void changeStatus_toDeleted_returnsCorrectStatuses() {
-        PluginData deleted = PluginData.builder()
-                .id(PLUGIN_ID).authorId(AUTHOR_ID).name("Test Plugin")
-                .description("Description").category("Tools").tags(List.of("tag1", "tag2"))
-                .status("DELETED").iconUrlKey("plugins/" + PLUGIN_ID + "/icon")
-                .createdAt("2024-01-01").updatedAt("2024-01-02").build();
+    void deleteScreenshot_unknownScreenshot_404() {
+        when(pluginsRepository.getScreenshotKey(PLUGIN_ID, SCREENSHOT_ID)).thenThrow(new EmptyResultDataAccessException(1));
 
-        when(pluginsRepository.getPlugin(PLUGIN_ID))
-                .thenReturn(samplePlugin)
-                .thenReturn(deleted);
-
-        ChangeStatusResponse result = pluginsService.changeStatus(PLUGIN_ID, Status.DELETED);
-
-        assertEquals("ACTIVE",  result.getOldStatus());
-        assertEquals("DELETED", result.getNewStatus());
-    }
-
-    // ── getPluginCodeClient / getPluginCodeServer ─────────────────────────────
-
-    @Test
-    void getPluginCodeClient_returnsOnlyClientDownloadLinks() {
-        List<String> all = List.of(
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/cl/js/18.0.0/app.js",
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/sv/java/21.0.0/main.jar"
-        );
-        List<String> clientOnly = List.of(all.get(0));
-
-        when(pluginsRepository.getCode(PLUGIN_ID, "1.0.0", "cl.js@18.0.0")).thenReturn(all);
-        when(s3Service.getOnlyClientKeys(all)).thenReturn(clientOnly);
-        when(s3Service.generateDownloadUrl(anyString())).thenReturn("http://cdn/client");
-
-        CodeLinksResponse result = pluginsService.getPluginCodeClient(PLUGIN_ID, "1.0.0", "cl.js@18.0.0");
-
-        assertEquals(1, result.getFiles().size());
-        verify(s3Service).getOnlyClientKeys(all);
-        verify(s3Service, never()).getOnlyServerKeys(any());
+        assertEquals("screenshot_not_found", thrown(() -> pluginsService.deleteScreenshot(PLUGIN_ID, AUTHOR_ID, SCREENSHOT_ID)).getCode());
     }
 
     @Test
-    void getPluginCodeServer_returnsOnlyServerDownloadLinks() {
-        List<String> all = List.of(
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/cl/js/18.0.0/app.js",
-                "plugins/" + PLUGIN_ID + "/versions/1.0.0/sv/java/21.0.0/main.jar"
-        );
-        List<String> serverOnly = List.of(all.get(1));
-
-        when(pluginsRepository.getCode(PLUGIN_ID, "1.0.0", "sv.java@21.0.0")).thenReturn(all);
-        when(s3Service.getOnlyServerKeys(all)).thenReturn(serverOnly);
-        when(s3Service.generateDownloadUrl(anyString())).thenReturn("http://cdn/server");
-
-        CodeLinksResponse result = pluginsService.getPluginCodeServer(PLUGIN_ID, "1.0.0", "sv.java@21.0.0");
-
-        assertEquals(1, result.getFiles().size());
-        verify(s3Service).getOnlyServerKeys(all);
-        verify(s3Service, never()).getOnlyClientKeys(any());
-    }
-
-    @Test
-    void getPluginCodeClient_noCodeFiles_returnsEmptyList() {
-        when(pluginsRepository.getCode(PLUGIN_ID, "1.0.0", "cl.js@18.0.0")).thenReturn(List.of());
-        when(s3Service.getOnlyClientKeys(List.of())).thenReturn(List.of());
-
-        CodeLinksResponse result = pluginsService.getPluginCodeClient(PLUGIN_ID, "1.0.0", "cl.js@18.0.0");
-
-        assertTrue(result.getFiles().isEmpty());
+    void deleteScreenshot_nonAuthor_403() {
+        assertEquals(403, thrown(() -> pluginsService.deleteScreenshot(PLUGIN_ID, STRANGER_ID, SCREENSHOT_ID)).getStatus().value());
+        verify(s3Service, never()).deleteScreenshot(any());
     }
 }

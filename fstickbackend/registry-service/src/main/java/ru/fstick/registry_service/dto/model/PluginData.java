@@ -3,6 +3,8 @@ package ru.fstick.registry_service.dto.model;
 
 import lombok.Builder;
 import lombok.Data;
+import ru.fstick.registry_service.dto.api.view.CandidateView;
+import ru.fstick.registry_service.dto.api.view.LastRejectionView;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +20,10 @@ public class PluginData {
     private List<String> tags;
     private String status;
     private String iconUrlKey;
+    private UUID devBranchId;
+    private String releasedSemver;
+    private CandidateView candidate;
+    private LastRejectionView lastRejection;
     private String createdAt;
     private String updatedAt;
 }
