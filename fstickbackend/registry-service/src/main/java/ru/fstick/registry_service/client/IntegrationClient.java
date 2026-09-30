@@ -10,6 +10,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import ru.fstick.registry_service.exception.ApiException;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -39,6 +41,18 @@ public class IntegrationClient {
         }
     }
 
+    public void pushPluginEvent(String type, List<String> chatIds, Map<String, Object> content) {
+        try {
+            restClient.post()
+                    .uri("/api/v1/plugin-events/push")
+                    .body(new PluginEventRequest(type, chatIds, content))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ex) {
+            throw unavailable(ex);
+        }
+    }
+
     private static ApiException unavailable(Exception ex) {
         return new ApiException(HttpStatus.BAD_GATEWAY, "integration_unavailable",
                 "Integration service unavailable: " + ex.getMessage());
@@ -47,5 +61,11 @@ public class IntegrationClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record MemberResponse(
             @JsonProperty("member") @JsonAlias("is_member") boolean member
+    ) {}
+
+    private record PluginEventRequest(
+            String type,
+            @JsonProperty("chat_ids") List<String> chatIds,
+            Map<String, Object> content
     ) {}
 }
