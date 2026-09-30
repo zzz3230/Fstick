@@ -36,6 +36,25 @@ paths:
           description: Accepted, fan-out to chat members runs asynchronously
         "400":
           description: type does not start with fstick.plugin.
+  /api/v1/dev-room/notify:
+    post:
+      tags:
+      - dev-room-controller
+      summary: Notify a plugin author about a moderation outcome (internal, called by Registry)
+      description: Maps author_id to an MXID and pushes the sync event fstick.dev.notification with the same content
+        to the author. An author without a known MXID is logged and dropped, the response stays 202.
+      operationId: notify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevRoomNotifyRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: author_id missing or kind is not released or rejected (invalid_notification)
   /api/v1/chats/{chatId}/messages:
     post:
       tags:
@@ -195,6 +214,31 @@ paths:
           description: unknown_user
 components:
   schemas:
+    DevRoomNotifyRequest:
+      type: object
+      required:
+      - author_id
+      - kind
+      properties:
+        author_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - released
+          - rejected
+        plugin_id:
+          type: string
+          format: uuid
+        plugin_name:
+          type: string
+        semver:
+          type: string
+        reason:
+          type: string
+          nullable: true
+          description: Only for kind=rejected
     PluginEventPushRequest:
       type: object
       properties:
