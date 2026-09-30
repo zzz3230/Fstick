@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.dto.api.response.CodeResponse;
+import ru.fstick.registry_service.dto.api.response.InternalBranchResponse;
 import ru.fstick.registry_service.dto.api.response.InternalPluginResponse;
 import ru.fstick.registry_service.dto.model.Branch;
 import ru.fstick.registry_service.dto.model.PluginData;
@@ -40,6 +41,17 @@ public class CodeService {
 
     public CodeResponse getInternalServerCode(UUID pluginId, UUID branchId) {
         return read(pluginId, branchOf(pluginId, branchId).getServerBlobSha());
+    }
+
+    public InternalBranchResponse getInternalBranch(UUID branchId) {
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> branchNotFound(branchId));
+
+        return InternalBranchResponse.builder()
+                .branchId(branch.getId())
+                .pluginId(branch.getPluginId())
+                .status(branch.getStatus().name())
+                .semver(branch.getSemver())
+                .build();
     }
 
     public InternalPluginResponse getInternalPlugin(UUID pluginId) {

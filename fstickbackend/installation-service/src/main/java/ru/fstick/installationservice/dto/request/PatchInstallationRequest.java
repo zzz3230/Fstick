@@ -9,7 +9,6 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-public class InstallRequest {
-    private UUID pluginId;
+public class PatchInstallationRequest {
     private UUID branchId;
 }

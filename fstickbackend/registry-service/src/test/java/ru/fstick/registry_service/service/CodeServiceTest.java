@@ -11,6 +11,7 @@ import ru.fstick.registry_service.client.InstallationClient;
 import ru.fstick.registry_service.client.IntegrationClient;
 import ru.fstick.registry_service.dto.BranchStatus;
 import ru.fstick.registry_service.dto.api.response.CodeResponse;
+import ru.fstick.registry_service.dto.api.response.InternalBranchResponse;
 import ru.fstick.registry_service.dto.api.response.InternalPluginResponse;
 import ru.fstick.registry_service.dto.model.Branch;
 import ru.fstick.registry_service.dto.model.PluginData;
@@ -233,6 +234,27 @@ class CodeServiceTest {
         assertNull(response.getBranches().get(0).getSemver());
         assertEquals("sha256:" + SERVER_HEX, response.getBranches().get(0).getServerBlobSha());
         assertEquals(CLIENT_SHA, response.getBranches().get(1).getClientBlobSha());
+    }
+
+    @Test
+    void getInternalBranch_returnsPluginStatusAndSemver() {
+        Branch dev = branch(PLUGIN_ID, BranchStatus.WORKING);
+        when(branchRepository.findById(dev.getId())).thenReturn(Optional.of(dev));
+
+        InternalBranchResponse response = codeService.getInternalBranch(dev.getId());
+
+        assertEquals(dev.getId(), response.getBranchId());
+        assertEquals(PLUGIN_ID, response.getPluginId());
+        assertEquals("WORKING", response.getStatus());
+        assertNull(response.getSemver());
+    }
+
+    @Test
+    void getInternalBranch_unknown_404() {
+        UUID unknown = UUID.randomUUID();
+        when(branchRepository.findById(unknown)).thenReturn(Optional.empty());
+
+        assertNotFound(() -> codeService.getInternalBranch(unknown), "branch_not_found");
     }
 
     @Test

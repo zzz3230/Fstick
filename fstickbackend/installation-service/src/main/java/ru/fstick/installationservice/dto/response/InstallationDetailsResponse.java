@@ -8,11 +8,14 @@ import java.util.UUID;
 
 @Getter
 @AllArgsConstructor
-public class InstallationResponse {
+public class InstallationDetailsResponse {
     private UUID installationId;
     private UUID pluginId;
     private UUID branchId;
     private String branchStatus;
+    private UUID authorId;
+    private String chatId;
     private UUID installedBy;
     private OffsetDateTime installedAt;
+    private OffsetDateTime updatedAt;
 }
