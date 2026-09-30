@@ -20,6 +20,22 @@ paths:
       responses:
         "200":
           description: OK
+  /api/v1/plugin-events/push:
+    post:
+      tags:
+      - plugin-events-controller
+      operationId: push
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PluginEventPushRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted, fan-out to chat members runs asynchronously
+        "400":
+          description: type does not start with fstick.plugin.
   /api/v1/chats/{chatId}/messages:
     post:
       tags:
@@ -179,6 +195,18 @@ paths:
           description: unknown_user
 components:
   schemas:
+    PluginEventPushRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          example: fstick.plugin.reloaded
+        chat_ids:
+          type: array
+          items:
+            type: string
+        content:
+          type: object
     PushEventRequest:
       type: object
       properties:

@@ -199,6 +199,30 @@ class FstickProxyServiceTest {
         verify(identityService, times(1)).resolveBatch(anyCollection());
     }
 
+    @Test
+    void getChatMemberMxids_returnsOnlyJoinedMembersWithoutUuidResolution() {
+        FstickProxyService.UpstreamChatMembersResponse upstream = buildMembers("@a:hs");
+        upstream.members = List.of(upstream.members.get(0), buildUpstream(false, "@left:hs", "REGULAR"));
+        when(getResponseSpec.body(any(Class.class))).thenReturn(upstream);
+
+        assertEquals(List.of("@a:hs"), service.getChatMemberMxids(CHAT_ID));
+        verifyNoInteractions(identityService);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void pushToMxid_postsTypeAndContentForMxid() {
+        when(postResponseSpec.toBodilessEntity()).thenReturn(ResponseEntity.ok().build());
+
+        service.pushToMxid(USER_MXID, "fstick.plugin.reloaded", Map.of("chat_id", CHAT_ID));
+
+        ArgumentCaptor<Map> body = ArgumentCaptor.forClass(Map.class);
+        verify(postBodySpec).body(body.capture());
+        assertEquals(USER_MXID, body.getValue().get("user_id"));
+        assertEquals("fstick.plugin.reloaded", body.getValue().get("type"));
+        assertEquals(Map.of("chat_id", CHAT_ID), body.getValue().get("content"));
+    }
+
     // ── broadcastPluginState ──────────────────────────────────────────────────
 
     @Test
