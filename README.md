@@ -44,7 +44,7 @@ DSL_CONTEXT.exports.__app = Column({ gap: 8 }, [
 - there's no file system or network;
 - resource limits apply.
 
-A broken or malicious plugin can't hurt the platform or other plugins. The runtime is being rewritten, so the plugin API above is the contract, not the current engine.
+A broken or malicious plugin can't hurt the platform or other plugins.
 
 **Develop inside the chat.**
 - The built-in editor shows both files side by side, with a live debug console.
