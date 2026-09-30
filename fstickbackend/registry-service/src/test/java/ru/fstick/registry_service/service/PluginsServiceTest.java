@@ -20,6 +20,8 @@ import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
 import ru.fstick.registry_service.dto.api.response.AddPluginResponse;
 import ru.fstick.registry_service.dto.api.response.ChangeStatusResponse;
 import ru.fstick.registry_service.dto.api.response.UpdateScreenshotsResponse;
+import ru.fstick.registry_service.dto.api.view.CandidateView;
+import ru.fstick.registry_service.dto.api.view.LastRejectionView;
 import ru.fstick.registry_service.dto.api.view.PluginViewExtend;
 import ru.fstick.registry_service.dto.api.view.PluginViewOwned;
 import ru.fstick.registry_service.dto.api.view.PluginViewShrink;
@@ -59,13 +61,14 @@ class PluginsServiceTest {
     @Mock private TemplateProvider templateProvider;
     @Mock private InstallationClient installationClient;
     @Mock private IntegrationClient integrationClient;
+    @Mock private ModeratorService moderatorService;
 
     private PluginsService pluginsService;
     private PluginData samplePlugin;
 
     @BeforeEach
     void setUp() {
-        AccessGuard accessGuard = new AccessGuard(pluginsRepository, installationClient, integrationClient);
+        AccessGuard accessGuard = new AccessGuard(pluginsRepository, installationClient, integrationClient, moderatorService);
         pluginsService = new PluginsService(pluginsRepository, branchRepository, s3Service, blobStore, templateProvider, accessGuard);
 
         samplePlugin = plugin(PLUGIN_ID, AUTHOR_ID);
@@ -180,6 +183,20 @@ class PluginsServiceTest {
         assertEquals(1, view.getPagination().getTotal());
     }
 
+    @Test
+    void getOwnedPlugins_exposesCandidateAndLastRejection() {
+        UUID candidateBranch = UUID.randomUUID();
+        samplePlugin.setCandidate(CandidateView.builder().branchId(candidateBranch).semver("1.2.0").status("WAITING_APPROVE").build());
+        samplePlugin.setLastRejection(LastRejectionView.builder().reason("no").semver("1.1.0").build());
+        when(pluginsRepository.getPlugins(0, 20, "", "", "plugin_name", "asc", AUTHOR_ID)).thenReturn(List.of(samplePlugin));
+        when(pluginsRepository.getPluginsTotal("", "", AUTHOR_ID)).thenReturn(1);
+
+        PluginViewOwned item = pluginsService.getOwnedPlugins(AUTHOR_ID, 0, 20, "", "", "plugin_name", "asc").getItems().get(0);
+
+        assertEquals(candidateBranch, item.getCandidate().getBranchId());
+        assertEquals("no", item.getLastRejection().getReason());
+    }
+
     // ── getPlugin visibility ──────────────────────────────────────────────────
 
     private void stubBranches(Branch... branches) {
@@ -199,6 +216,15 @@ class PluginsServiceTest {
         assertEquals(5, view.getBranches().size());
         assertEquals("cl.js@1.0.0", view.getBranches().get(0).getRuntime().getClient());
         assertEquals("sv.lua@1.0.0", view.getBranches().get(0).getRuntime().getServer());
+    }
+
+    @Test
+    void getPlugin_lastRejection_visibleToAuthorOnly() {
+        samplePlugin.setLastRejection(LastRejectionView.builder().reason("no").semver("1.1.0").build());
+        stubBranches(branch(PLUGIN_ID, BranchStatus.RELEASED));
+
+        assertEquals("no", pluginsService.getPlugin(PLUGIN_ID, AUTHOR_ID, null).getLastRejection().getReason());
+        assertNull(pluginsService.getPlugin(PLUGIN_ID, STRANGER_ID, null).getLastRejection());
     }
 
     @Test

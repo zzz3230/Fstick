@@ -51,6 +51,7 @@ class EditorServiceTest {
     @Mock private BlobStore blobStore;
     @Mock private InstallationClient installationClient;
     @Mock private IntegrationClient integrationClient;
+    @Mock private ModeratorService moderatorService;
     @Mock private RuntimeClient runtimeClient;
     @Mock private ReloadNotifier reloadNotifier;
     @Mock private TransactionTemplate transactionTemplate;
@@ -61,7 +62,7 @@ class EditorServiceTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        AccessGuard guard = new AccessGuard(pluginsRepository, installationClient, integrationClient);
+        AccessGuard guard = new AccessGuard(pluginsRepository, installationClient, integrationClient, moderatorService);
         service = new EditorService(pluginsRepository, branchRepository, blobStore, guard, runtimeClient,
                 reloadNotifier, new LuaSyntaxChecker(), transactionTemplate);
 

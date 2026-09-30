@@ -34,13 +34,14 @@ class AccessGuardTest {
     @Mock private PluginsRepository pluginsRepository;
     @Mock private InstallationClient installationClient;
     @Mock private IntegrationClient integrationClient;
+    @Mock private ModeratorService moderatorService;
 
     private AccessGuard guard;
     private PluginData plugin;
 
     @BeforeEach
     void setUp() {
-        guard = new AccessGuard(pluginsRepository, installationClient, integrationClient);
+        guard = new AccessGuard(pluginsRepository, installationClient, integrationClient, moderatorService);
         plugin = plugin(PLUGIN_ID, AUTHOR);
     }
 
@@ -74,7 +75,10 @@ class AccessGuardTest {
     }
 
     @Test
-    void isModerator_isNotImplementedYet() {
+    void isModerator_delegatesToModeratorService() {
+        when(moderatorService.isModerator(STRANGER)).thenReturn(true);
+
+        assertTrue(guard.isModerator(STRANGER));
         assertFalse(guard.isModerator(AUTHOR));
     }
 
@@ -90,10 +94,13 @@ class AccessGuardTest {
     }
 
     @Test
-    void canReadBranch_candidates_authorOnly() {
+    void canReadBranch_candidates_authorAndModerators() {
+        UUID moderator = UUID.randomUUID();
+        when(moderatorService.isModerator(moderator)).thenReturn(true);
         for (BranchStatus status : List.of(BranchStatus.WAITING_APPROVE, BranchStatus.APPROVING)) {
             Branch candidate = branch(PLUGIN_ID, status);
 
+            assertTrue(guard.canReadBranch(moderator, plugin, candidate, null));
             assertTrue(guard.canReadBranch(AUTHOR, plugin, candidate, null));
             assertFalse(guard.canReadBranch(STRANGER, plugin, candidate, null));
             assertFalse(guard.canReadBranch(null, plugin, candidate, null));

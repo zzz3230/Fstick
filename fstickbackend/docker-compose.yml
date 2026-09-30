@@ -214,6 +214,7 @@ services:
       INSTALLATION_SERVICE_URL: http://installation-service:8081
       INTEGRATION_SERVICE_URL: http://integration-service:8080
       RUNTIME_SERVICE_URL: http://runtime-service:8084
+      REGISTRY_MODERATORS_BOOTSTRAP: ${REGISTRY_MODERATORS_BOOTSTRAP:-}
       SERVER_PORT: 8082
     depends_on:
       registry-db:

@@ -20,6 +20,7 @@ public class AccessGuard {
     private final PluginsRepository pluginsRepository;
     private final InstallationClient installationClient;
     private final IntegrationClient integrationClient;
+    private final ModeratorService moderatorService;
 
     public PluginData requireAuthor(UUID pluginId, UUID caller) {
         PluginData plugin = pluginsRepository.findPlugin(pluginId).orElseThrow(() ->
@@ -35,7 +36,7 @@ public class AccessGuard {
     }
 
     public boolean isModerator(UUID caller) {
-        return false;
+        return moderatorService.isModerator(caller);
     }
 
     public boolean canReadBranch(UUID caller, PluginData plugin, Branch branch, String chatId) {

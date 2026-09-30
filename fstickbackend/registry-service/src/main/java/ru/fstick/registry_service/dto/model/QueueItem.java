@@ -8,19 +8,14 @@ import java.util.UUID;
 
 @Data
 @Builder
-public class Branch {
-    private UUID id;
+public class QueueItem {
     private UUID pluginId;
-    private BranchStatus status;
+    private String pluginName;
+    private UUID branchId;
     private String semver;
-    private String clientBlobSha;
-    private String serverBlobSha;
-    private String runtimeClient;
-    private String runtimeServer;
-    private UUID baseBranchId;
     private String changelog;
+    private BranchStatus status;
+    private UUID authorId;
     private String submittedAt;
     private UUID claimedBy;
-    private String rejectReason;
-    private String createdAt;
 }
