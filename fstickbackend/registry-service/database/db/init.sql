@@ -34,26 +34,10 @@ CREATE TABLE "plugins_tags" (
     PRIMARY KEY (plugin_id, tag_id)
 );
 
-CREATE TABLE "versions" (
-    "version_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    "version_number" VARCHAR(50) NOT NULL,
-    "changelog" VARCHAR(2000) NOT NULL,
-    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    "runtime" VARCHAR(100) NOT NULL,
-    "plugin_id" UUID REFERENCES plugins(plugin_id) ON DELETE CASCADE,
-    UNIQUE (plugin_id, version_number)
-);
-
 CREATE TABLE "screenshots" (
     "screenshot_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "plugin_id" UUID REFERENCES plugins(plugin_id) ON DELETE CASCADE,
     "s3_screenshot_key" VARCHAR(300) NOT NULL
-);
-
-CREATE TABLE "files" (
-    "file_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    "version_id" UUID REFERENCES versions(version_id) ON DELETE CASCADE,
-    "s3_file_key" VARCHAR(300) NOT NULL
 );
 
 CREATE FUNCTION update_updated_at_column()
@@ -66,6 +50,32 @@ $$ language 'plpgsql';
 
 CREATE TRIGGER update_plugins_updated_at
     BEFORE UPDATE ON plugins
+    FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE "branches" (
+    "branch_id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "plugin_id" UUID NOT NULL REFERENCES plugins(plugin_id) ON DELETE CASCADE,
+    "status" VARCHAR(20) NOT NULL
+        CHECK (status IN ('WORKING', 'WAITING_APPROVE', 'APPROVING', 'RELEASED', 'REJECTED', 'CANCELLED')),
+    "semver" VARCHAR(50),
+    "client_blob_sha" CHAR(64) NOT NULL,
+    "server_blob_sha" CHAR(64) NOT NULL,
+    "runtime_client" VARCHAR(50) NOT NULL DEFAULT 'cl.js@1.0.0',
+    "runtime_server" VARCHAR(50) NOT NULL DEFAULT 'sv.lua@1.0.0',
+    "base_branch_id" UUID REFERENCES branches(branch_id),
+    "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK ((status = 'WORKING') = (semver IS NULL))
+);
+
+CREATE UNIQUE INDEX uq_one_dev_branch ON branches(plugin_id) WHERE status = 'WORKING';
+CREATE UNIQUE INDEX uq_semver_per_plugin ON branches(plugin_id, semver)
+    WHERE semver IS NOT NULL AND status IN ('WAITING_APPROVE', 'APPROVING', 'RELEASED');
+CREATE INDEX idx_branches_status ON branches(status);
+
+CREATE TRIGGER update_branches_updated_at
+    BEFORE UPDATE ON branches
     FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
@@ -97,110 +107,3 @@ INSERT INTO tags (name) VALUES
                             ('auth'),
                             ('logging');
 
--- =========================
--- PLUGINS
--- =========================
-INSERT INTO plugins (
-    name,
-    description,
-    status_id,
-    category_id,
-    author_id,
-    s3_icon_key
-)
-VALUES
-    (
-        'Smart Analytics',
-        'Advanced analytics plugin with AI insights.',
-        (SELECT status_id FROM statuses WHERE name = 'ACTIVE'),
-        (SELECT category_id FROM categories WHERE name = 'Analytics'),
-        gen_random_uuid(),
-        'icons/smart-analytics.png'
-    ),
-    (
-        'Task Automator',
-        'Automates repetitive workflows and tasks.',
-        (SELECT status_id FROM statuses WHERE name = 'HIDDEN'),
-        (SELECT category_id FROM categories WHERE name = 'Productivity'),
-        gen_random_uuid(),
-        'icons/task-automator.png'
-    ),
-    (
-        'Secure Auth',
-        'Adds authentication and security layers.',
-        (SELECT status_id FROM statuses WHERE name = 'ACTIVE'),
-        (SELECT category_id FROM categories WHERE name = 'Security'),
-        gen_random_uuid(),
-        'icons/secure-auth.png'
-    );
-
--- =========================
--- PLUGIN - TAG RELATIONS
--- =========================
-INSERT INTO plugins_tags (plugin_id, tag_id)
-SELECT p.plugin_id, t.tag_id
-FROM plugins p, tags t
-WHERE (p.name = 'Smart Analytics' AND t.name IN ('AI', 'dashboard'))
-   OR (p.name = 'Task Automator' AND t.name IN ('automation', 'AI'))
-   OR (p.name = 'Secure Auth' AND t.name IN ('auth', 'logging'));
-
--- =========================
--- VERSIONS
--- =========================
-INSERT INTO versions (
-    version_number,
-    changelog,
-    runtime,
-    plugin_id
-)
-VALUES
-    (
-        '1.0.0',
-        'Initial release with core features.',
-        '1.0.0',
-        (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics')
-    ),
-    (
-        '1.1.0',
-        'Added predictive models.',
-        '1.0.0',
-        (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics')
-    ),
-    (
-        '0.1.0',
-        'Beta release of automation engine.',
-        '1.0.0',
-        (SELECT plugin_id FROM plugins WHERE name = 'Task Automator')
-    ),
-    (
-        '2.0.0',
-        'Major security overhaul.',
-        '1.0.0',
-        (SELECT plugin_id FROM plugins WHERE name = 'Secure Auth')
-    );
-
--- =========================
--- SCREENSHOTS
--- =========================
-INSERT INTO screenshots (plugin_id, s3_screenshot_key)
-VALUES
-    (
-        (SELECT plugin_id FROM plugins WHERE name = 'Smart Analytics'),
-        'screenshots/smart-analytics-1.png'
-    ),
-    (
-        (SELECT plugin_id FROM plugins WHERE name = 'Task Automator'),
-        'screenshots/task-automator-1.png'
-    ),
-    (
-        (SELECT plugin_id FROM plugins WHERE name = 'Secure Auth'),
-        'screenshots/secure-auth-1.png'
-    );
-
--- =========================
--- FILES (for versions)
--- =========================
-INSERT INTO files (version_id, s3_file_key)
-SELECT v.version_id, 'files/' || p.name || '/' || v.version_number || '/main.tar.gz'
-FROM versions v
-         JOIN plugins p ON p.plugin_id = v.plugin_id;
