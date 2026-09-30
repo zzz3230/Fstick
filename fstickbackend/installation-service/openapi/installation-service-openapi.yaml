@@ -7,7 +7,7 @@ info:
     Сервис принимает запросы только от Gateway Service.
     Плагины привязываются к чату (Matrix Room), а не к пользователю.
 
-    Аутентификация: Matrix User ID передаётся в заголовке X-User-Id.
+    Аутентификация: internal_uuid пользователя передаётся в заголовке X-User-Id.
     chat_id передаётся как query parameter.
 
     Проверка членства пользователя в чате выполняется внутри сервиса
@@ -29,10 +29,11 @@ components:
       name: X-User-Id
       in: header
       required: true
-      description: Matrix User ID пользователя. Проставляется Gateway Service.
+      description: internal_uuid пользователя. Проставляется Gateway Service.
       schema:
         type: string
-      example: "@maksim:homeserver.org"
+        format: uuid
+      example: "3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10"
 
     ChatId:
       name: chat_id
@@ -75,7 +76,8 @@ components:
           example: "!roomid:homeserver.org"
         installed_by:
           type: string
-          example: "@maksim:homeserver.org"
+          format: uuid
+          example: "3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10"
         installed_at:
           type: string
           format: date-time
@@ -111,7 +113,8 @@ components:
           example: "660f9511-f3ac-52e5-b827-557766551111"
         installed_by:
           type: string
-          example: "@maksim:homeserver.org"
+          format: uuid
+          example: "3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10"
         installed_at:
           type: string
           format: date-time

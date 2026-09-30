@@ -6,6 +6,8 @@ import ru.fstick.integrationservice.dto.response.ChatMemberResponse;
 import ru.fstick.integrationservice.dto.response.ChatMembersResponse;
 import ru.fstick.integrationservice.service.FstickProxyService;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/chats")
 public class ChatsController {
@@ -18,7 +20,7 @@ public class ChatsController {
 
     /** GET /api/v1/chats/{chatId}/members/{userId} — проверить одного участника */
     @GetMapping("/{chatId}/members/{userId}")
-    public ChatMemberResponse userInChat(@PathVariable String chatId, @PathVariable String userId) {
+    public ChatMemberResponse userInChat(@PathVariable String chatId, @PathVariable UUID userId) {
         return proxyService.getChatMember(chatId, userId);
     }
 

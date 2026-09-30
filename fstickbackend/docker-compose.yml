@@ -260,7 +260,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://integration-db:5432/integration_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_DATA_REDIS_HOST: integration-redis
       SPRING_DATA_REDIS_PORT: 6379
       REGISTRY_SERVICE_URL: http://registry-service:8082
@@ -345,6 +344,8 @@ services:
       gateway-db:
         condition: service_healthy
       registry-service:
+        condition: service_started
+      integration-service:
         condition: service_started
     networks:
       - fstick-network

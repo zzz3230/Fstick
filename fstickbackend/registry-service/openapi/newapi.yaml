@@ -152,6 +152,13 @@ paths:
       tags:
       - plugins-controller
       operationId: addPlugin
+      parameters:
+      - name: X-User-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
@@ -462,7 +469,6 @@ components:
           type: string
     AddPluginRequest:
       required:
-      - authorId
       - description
       - files
       - icon
@@ -493,9 +499,6 @@ components:
           maxLength: 2000
           minLength: 0
           type: string
-        authorId:
-          type: string
-          format: uuid
         category:
           maxLength: 50
           minLength: 0

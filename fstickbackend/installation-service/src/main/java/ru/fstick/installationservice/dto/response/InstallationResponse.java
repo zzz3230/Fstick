@@ -13,7 +13,7 @@ public class InstallationResponse {
     private UUID pluginId;
     private UUID versionId;
     private String chatId;
-    private String installedBy;
+    private UUID installedBy;
     private OffsetDateTime installedAt;
     private OffsetDateTime updatedAt;
 }

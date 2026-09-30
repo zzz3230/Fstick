@@ -5,7 +5,7 @@ CREATE TABLE installations (
     plugin_id       UUID        NOT NULL,
     version_id      UUID        NOT NULL,
     chat_id         VARCHAR(100) NOT NULL,
-    installed_by    VARCHAR(100) NOT NULL,
+    installed_by    UUID        NOT NULL,
     installed_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 

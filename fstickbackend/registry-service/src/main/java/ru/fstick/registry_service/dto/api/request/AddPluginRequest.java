@@ -9,7 +9,6 @@ import lombok.Data;
 import ru.fstick.registry_service.dto.service.FileRequest;
 
 import java.util.List;
-import java.util.UUID;
 
 @Data
 public class AddPluginRequest {
@@ -31,7 +30,6 @@ public class AddPluginRequest {
     @NotBlank
     @Size(max = 2000)
     private String description;
-    private UUID authorId;
     @Size(max = 50)
     private String category;
     @Size(max = 20)

@@ -2,9 +2,11 @@ package ru.fstick.integrationservice.dto.response;
 
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 public class ChatMemberResponse {
-    private String userId;
+    private UUID userId;
     private boolean member;
     private ChatMemberRole role;
 }

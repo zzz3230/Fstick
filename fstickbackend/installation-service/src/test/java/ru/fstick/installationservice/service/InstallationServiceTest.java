@@ -37,7 +37,7 @@ class InstallationServiceTest {
     private UUID pluginId;
     private UUID versionId;
     private String chatId;
-    private String userId;
+    private UUID userId;
     private InstallRequest request;
 
     @BeforeEach
@@ -45,7 +45,7 @@ class InstallationServiceTest {
         pluginId  = UUID.randomUUID();
         versionId = UUID.randomUUID();
         chatId    = "!room:homeserver.org";
-        userId    = "@user:homeserver.org";
+        userId    = UUID.randomUUID();
 
         request = new InstallRequest();
         request.setPluginId(pluginId);
@@ -190,7 +190,7 @@ class InstallationServiceTest {
     @Test
     void confirmInstall_wrongUser_throwsForbidden() {
         PendingInstallStore.PendingInstall pending =
-                new PendingInstallStore.PendingInstall(request, chatId, "@other:homeserver.org");
+                new PendingInstallStore.PendingInstall(request, chatId, UUID.randomUUID());
 
         when(pendingInstallStore.get("token")).thenReturn(pending);
 

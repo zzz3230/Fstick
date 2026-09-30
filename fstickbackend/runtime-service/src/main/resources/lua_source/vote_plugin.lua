@@ -15,19 +15,19 @@ require("backend_stdlib")
   # 1. Проголосовать
   curl -X POST http://localhost:8080/command \
     -H "Content-Type: application/json" \
-    -H "X-User-Id: user1" \
-    -d '{"name":"vote.cast","pluginId":"123e4567-e89b-12d3-a456-426614174001","chatId":"room1","args":{"user_id":"user1","choice":"yes"}}'
+    -H "X-User-Id: 3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10" \
+    -d '{"name":"vote.cast","pluginId":"123e4567-e89b-12d3-a456-426614174001","chatId":"room1","args":{"user_id":"3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10","choice":"yes"}}'
 
   # 2. Результаты
   curl -X POST http://localhost:8080/command \
     -H "Content-Type: application/json" \
-    -H "X-User-Id: user1" \
+    -H "X-User-Id: 3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10" \
     -d '{"name":"vote.results","pluginId":"123e4567-e89b-12d3-a456-426614174001","chatId":"room1","args":{}}'
 
   # 3. Сброс
   curl -X POST http://localhost:8080/command \
     -H "Content-Type: application/json" \
-    -H "X-User-Id: user1" \
+    -H "X-User-Id: 3f2b8c1e-5d4a-4c53-9a1e-0b7d6c2f9a10" \
     -d '{"name":"vote.reset","pluginId":"123e4567-e89b-12d3-a456-426614174001","chatId":"room1","args":{}}'
 ]]
 

@@ -17,7 +17,7 @@ public class InstallationRowMapper implements RowMapper<Installation> {
         installation.setPluginId(UUID.fromString(rs.getString("plugin_id")));
         installation.setVersionId(UUID.fromString(rs.getString("version_id")));
         installation.setChatId(rs.getString("chat_id"));
-        installation.setInstalledBy(rs.getString("installed_by"));
+        installation.setInstalledBy(rs.getObject("installed_by", UUID.class));
         installation.setInstalledAt(rs.getObject("installed_at", java.time.OffsetDateTime.class));
         installation.setUpdatedAt(rs.getObject("updated_at", java.time.OffsetDateTime.class));
 
