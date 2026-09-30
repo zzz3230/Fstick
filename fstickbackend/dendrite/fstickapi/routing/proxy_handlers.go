@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -21,6 +22,10 @@ var gatewayHTTPClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
+const maxProxyBodyBytes = 3 << 20
+
+var gatewayRetryDelay = 500 * time.Millisecond
+
 // corsMiddleware wraps an HTTP handler to add CORS headers to responses.
 // This allows browser-based clients to make cross-origin requests to the fstick API.
 func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -33,8 +38,8 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		w.Header().Set("Access-Control-Expose-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Content-Encoding, If-None-Match, Accept")
+		w.Header().Set("Access-Control-Expose-Headers", "ETag, Cache-Control, Content-Type")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 
@@ -84,48 +89,68 @@ func proxyToGateway(w http.ResponseWriter, r *http.Request, base *url.URL, targe
 	}
 
 	target := *base
-	if strings.HasSuffix(target.Path, "/") && strings.HasPrefix(targetPath, "/") {
-		target.Path = strings.TrimRight(target.Path, "/") + targetPath
-	} else {
-		target.Path = target.Path + targetPath
+	escapedPath := strings.TrimRight(base.EscapedPath(), "/") + targetPath
+	decodedPath, err := url.PathUnescape(escapedPath)
+	if err != nil {
+		http.Error(w, "invalid request path", http.StatusBadRequest)
+		return
 	}
+	target.Path = decodedPath
+	target.RawPath = escapedPath
 	target.RawQuery = r.URL.RawQuery
 
-	req, err := http.NewRequest(r.Method, target.String(), r.Body)
+	var body []byte
+	if r.Body != nil {
+		body, err = io.ReadAll(io.LimitReader(r.Body, maxProxyBodyBytes))
+		if err != nil {
+			http.Error(w, "failed to read request body", http.StatusBadRequest)
+			return
+		}
+		if len(body) >= maxProxyBodyBytes {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			_, _ = w.Write([]byte(`{"error":"body_too_large","message":"Request body is too large"}`))
+			return
+		}
+	}
+
+	newRequest := func() (*http.Request, error) {
+		req, err := http.NewRequest(r.Method, target.String(), bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		for name, vals := range r.Header {
+			if strings.EqualFold(name, "Host") || strings.EqualFold(name, "X-User-Id") {
+				continue
+			}
+			for _, val := range vals {
+				req.Header.Add(name, val)
+			}
+		}
+		// Inject the authenticated user ID so backend services can trust it.
+		if userID != "" {
+			req.Header.Set("X-User-Id", userID)
+		}
+		return req, nil
+	}
+
+	req, err := newRequest()
 	if err != nil {
 		logrus.WithError(err).Error("failed to build gateway proxy request")
 		http.Error(w, "failed to proxy request", http.StatusInternalServerError)
 		return
 	}
 
-	for name, vals := range r.Header {
-		if strings.EqualFold(name, "Host") || strings.EqualFold(name, "X-User-Id") {
-			continue
-		}
-		for _, val := range vals {
-			req.Header.Add(name, val)
-		}
-	}
-	// Inject the authenticated user ID so backend services can trust it.
-	if userID != "" {
-		req.Header.Set("X-User-Id", userID)
-	}
-
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// Retry once — helps with transient Docker DNS failures on startup
+		// Retry once, helps with transient Docker DNS failures on startup
 		logrus.WithError(err).Warn("gateway proxy request failed, retrying once")
-		time.Sleep(500 * time.Millisecond)
-		req2, _ := http.NewRequest(r.Method, target.String(), nil)
-		if req2 != nil {
-			for name, vals := range req.Header {
-				for _, val := range vals {
-					req2.Header.Add(name, val)
-				}
-			}
+		time.Sleep(gatewayRetryDelay)
+		req2, buildErr := newRequest()
+		if buildErr == nil {
 			resp, err = http.DefaultClient.Do(req2)
 		}
-		if err != nil {
+		if buildErr != nil || err != nil {
 			logrus.WithError(err).Error("gateway proxy request failed after retry")
 			http.Error(w, "failed to proxy request", http.StatusBadGateway)
 			return
@@ -145,119 +170,29 @@ func proxyToGateway(w http.ResponseWriter, r *http.Request, base *url.URL, targe
 	_, _ = io.Copy(w, resp.Body)
 }
 
-func ListPluginsProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
+// authProxy authenticates the caller and proxies the request to the gateway path
+// produced by gatewayPath, keeping the query string.
+func authProxy(
+	cfg *config.Dendrite,
+	uAPI userapi.QueryAcccessTokenAPI,
+	gatewayPath func(vars map[string]string) string,
+) http.HandlerFunc {
 	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		userID := authenticateAndGetUserID(w, r, uAPI)
 		if userID == "" {
 			return
 		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins", userID)
+		proxyToGateway(w, r, gatewayURL(cfg), gatewayPath(mux.Vars(r)), userID)
 	})
 }
 
-func GetPluginProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
+// pathTemplate expands {var} placeholders with path-escaped route variables.
+func pathTemplate(template string) func(vars map[string]string) string {
+	return func(vars map[string]string) string {
+		path := template
+		for name, value := range vars {
+			path = strings.ReplaceAll(path, "{"+name+"}", url.PathEscape(value))
 		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID), userID)
-	})
+		return path
+	}
 }
-
-func InitPluginUploadProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins", userID)
-	})
-}
-
-func CommitPluginUploadProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/commit", userID)
-	})
-}
-
-func GetPluginCodeClientProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/code/client", userID)
-	})
-}
-
-func PluginCommandProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/command", userID)
-	})
-}
-
-func PluginStateProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		pluginID := mux.Vars(r)["plugin_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/plugins/"+url.PathEscape(pluginID)+"/state", userID)
-	})
-}
-
-func InstallPluginProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations", userID)
-	})
-}
-
-func ListInstallationsProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations", userID)
-	})
-}
-
-func ConfirmInstallProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations/confirm", userID)
-	})
-}
-
-func UninstallPluginProxy(cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) http.HandlerFunc {
-	return corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := authenticateAndGetUserID(w, r, uAPI)
-		if userID == "" {
-			return
-		}
-		installationID := mux.Vars(r)["installation_id"]
-		proxyToGateway(w, r, gatewayURL(cfg), "/api/v1/installations/"+url.PathEscape(installationID), userID)
-	})
-}
-
