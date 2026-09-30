@@ -17,6 +17,7 @@ public class PluginViewShrink {
     private List<String> tags;
     private String status;
     private String iconUrl;
+    private String releasedSemver;
     private String createdAt;
     private String updatedAt;
 }

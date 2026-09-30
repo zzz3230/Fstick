@@ -2,8 +2,6 @@ package ru.fstick.registry_service.dto.api.view;
 
 import lombok.Builder;
 import lombok.Data;
-import ru.fstick.registry_service.dto.model.Screenshot;
-import ru.fstick.registry_service.dto.model.Version;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +18,7 @@ public class PluginViewExtend {
     private String iconUrl;
     private String createdAt;
     private String updatedAt;
-    private List<VersionView> versions;
+    private List<BranchView> branches;
+    private LastRejectionView lastRejection;
     private List<ScreenshotView> screenshots;
 }
