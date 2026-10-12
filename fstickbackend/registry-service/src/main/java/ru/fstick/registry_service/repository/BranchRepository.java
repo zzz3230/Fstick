@@ -45,4 +45,16 @@ public class BranchRepository {
 
         return jdbcTemplate.query(sql, branchRowMapper, branchId).stream().findFirst();
     }
+
+    public Optional<Branch> lockForUpdate(UUID branchId) {
+        String sql = "SELECT " + COLUMNS + " FROM branches WHERE branch_id = ? FOR UPDATE;";
+
+        return jdbcTemplate.query(sql, branchRowMapper, branchId).stream().findFirst();
+    }
+
+    public void updateShas(UUID branchId, String clientBlobSha, String serverBlobSha) {
+        String sql = "UPDATE branches SET client_blob_sha = ?, server_blob_sha = ? WHERE branch_id = ?;";
+
+        jdbcTemplate.update(sql, clientBlobSha, serverBlobSha, branchId);
+    }
 }

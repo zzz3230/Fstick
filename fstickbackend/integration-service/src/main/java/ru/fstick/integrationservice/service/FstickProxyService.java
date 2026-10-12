@@ -131,6 +131,32 @@ public class FstickProxyService {
         }
     }
 
+    public List<String> getChatMemberMxids(String chatId) {
+        return fetchMembers(chatId).stream()
+                .filter(m -> m.isMember)
+                .map(m -> m.userId)
+                .toList();
+    }
+
+    public void pushToMxid(String mxid, String type, Map<String, Object> content) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("user_id", mxid);
+        body.put("type", type);
+        body.put("content", content);
+
+        try {
+            restClient.post()
+                    .uri("/api/v1/events/push")
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException ex) {
+            throw new ResponseStatusException(ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
+        } catch (RestClientException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to call fstick API", ex);
+        }
+    }
+
     public ChatMembersResponse getChatMembers(String chatId) {
         List<UpstreamChatMemberResponse> upstreamMembers = fetchMembers(chatId);
         Map<String, UUID> uuids = identityService.resolveBatch(

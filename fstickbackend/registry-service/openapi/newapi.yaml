@@ -444,6 +444,128 @@ paths:
                 $ref: "#/components/schemas/CodeResponse"
         "404":
           $ref: "#/components/responses/BranchNotFound"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/edit:
+    get:
+      tags:
+      - editor-controller
+      summary: Load both sources of the dev branch for the editor
+      description: Author only, WORKING branch only. chat_id is echoed and not validated against installations.
+      operationId: edit
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      - $ref: "#/components/parameters/ChatId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EditResponse"
+        "400":
+          description: chat_id missing (missing_parameter)
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: Branch is not the dev branch (not_dev_branch)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/code:
+    put:
+      tags:
+      - editor-controller
+      summary: Save one or both sources of the dev branch
+      description: Optimistic concurrency by base_sha; nothing is written on any 4xx. A server (Lua) change triggers
+        one Runtime reload after commit; a client (JS) change pushes fstick.plugin.reloaded to the chats running
+        the branch. Any runtime key is rejected with 422 runtime_change_unsupported.
+      operationId: save
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      - $ref: "#/components/parameters/ChatId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveCodeRequest"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveCodeResponse"
+        "400":
+          description: chat_id missing (missing_parameter) or malformed base_sha (invalid_sha)
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: stale_code (with current shas) or not_dev_branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: file_too_large (side, limit, actual) or body_too_large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: runtime_change_unsupported or validation_failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/reload:
+    post:
+      tags:
+      - editor-controller
+      summary: Hot-reload the dev branch in the given chat
+      operationId: reload
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      - $ref: "#/components/parameters/ChatId"
+      responses:
+        "200":
+          description: Reloaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReloadResponse"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: Branch is not the dev branch (not_dev_branch)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: reload_throttled, with retry_after_ms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Runtime unavailable (runtime_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   parameters:
     PluginId:
@@ -460,6 +582,19 @@ components:
       schema:
         type: string
         format: uuid
+    BranchId:
+      name: branchId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChatId:
+      name: chat_id
+      in: query
+      required: true
+      schema:
+        type: string
   responses:
     NotAuthor:
       description: Caller is not the plugin author (not_author)
@@ -824,6 +959,103 @@ components:
         sha:
           type: string
           example: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    EditResponse:
+      type: object
+      properties:
+        plugin:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            author_id:
+              type: string
+              format: uuid
+        branch:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              example: WORKING
+            runtime:
+              type: object
+              properties:
+                client:
+                  type: string
+                  example: cl.js@1.0.0
+                server:
+                  type: string
+                  example: sv.lua@1.0.0
+        source:
+          type: object
+          properties:
+            client:
+              $ref: "#/components/schemas/CodeResponse"
+            server:
+              $ref: "#/components/schemas/CodeResponse"
+        chat_id:
+          type: string
+    SaveCodeSide:
+      type: object
+      required:
+      - text
+      - base_sha
+      properties:
+        text:
+          type: string
+          description: At most 500000 bytes UTF-8
+        base_sha:
+          type: string
+          example: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    SaveCodeRequest:
+      type: object
+      description: At least one of client, server. The runtime key is always rejected (422).
+      properties:
+        client:
+          $ref: "#/components/schemas/SaveCodeSide"
+        server:
+          $ref: "#/components/schemas/SaveCodeSide"
+        runtime:
+          type: object
+    SaveCodeResponse:
+      type: object
+      properties:
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              side:
+                type: string
+              message:
+                type: string
+              line:
+                type: integer
+        sha:
+          type: object
+          properties:
+            client:
+              type: string
+            server:
+              type: string
+        reloaded:
+          type: boolean
+        retry_after_ms:
+          type: integer
+          format: int64
+          nullable: true
+        client_changed:
+          type: boolean
+    ReloadResponse:
+      type: object
+      properties:
+        reloaded:
+          type: boolean
     InternalBranchResponse:
       type: object
       properties:
