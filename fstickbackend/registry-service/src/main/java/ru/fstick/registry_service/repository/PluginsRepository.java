@@ -37,13 +37,23 @@ public class PluginsRepository {
                 (SELECT b.semver FROM branches b
                   WHERE b.plugin_id = p.plugin_id AND b.status = 'RELEASED'
                   ORDER BY string_to_array(b.semver, '.')::int[] DESC LIMIT 1) as released_semver,
+                (SELECT b.branch_id FROM branches b
+                  WHERE b.plugin_id = p.plugin_id AND b.status IN ('WAITING_APPROVE', 'APPROVING')) as candidate_branch_id,
+                (SELECT b.semver FROM branches b
+                  WHERE b.plugin_id = p.plugin_id AND b.status IN ('WAITING_APPROVE', 'APPROVING')) as candidate_semver,
+                (SELECT b.status FROM branches b
+                  WHERE b.plugin_id = p.plugin_id AND b.status IN ('WAITING_APPROVE', 'APPROVING')) as candidate_status,
+                p.last_rejection->>'reason' as rejection_reason,
+                p.last_rejection->>'at' as rejection_at,
+                p.last_rejection->>'semver' as rejection_semver,
+                (p.last_rejection->>'branch_id')::uuid as rejection_branch_id,
                 COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), '{}') as tags
             """;
 
     private static final String PLUGIN_GROUP_BY =
             """
                 p.plugin_id, p.author_id, p.name, p.description,
-                c.name, s.name, p.s3_icon_key, p.created_at, p.updated_at
+                c.name, s.name, p.s3_icon_key, p.created_at, p.updated_at, p.last_rejection
             """;
 
     private static final String PUBLIC_SCOPE =
@@ -360,6 +370,21 @@ public class PluginsRepository {
         }
 
         return jdbcTemplate.queryForObject(pluginsTotalSql, Integer.class, args.toArray());
+    }
+
+    public void setLastRejection(UUID pluginId, String reason, String semver, UUID branchId) {
+        String sql =
+                """
+                    UPDATE plugins
+                    SET last_rejection = jsonb_build_object('reason', ?::text, 'at', now(), 'semver', ?::text, 'branch_id', ?::text)
+                    WHERE plugin_id = ?;
+                """;
+
+        jdbcTemplate.update(sql, reason, semver, branchId.toString(), pluginId);
+    }
+
+    public void clearLastRejection(UUID pluginId) {
+        jdbcTemplate.update("UPDATE plugins SET last_rejection = NULL WHERE plugin_id = ?;", pluginId);
     }
 
     public void setIcon(UUID pluginId, String iconKey) {

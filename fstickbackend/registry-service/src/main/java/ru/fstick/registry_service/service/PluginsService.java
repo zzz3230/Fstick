@@ -81,7 +81,9 @@ public class PluginsService {
                 .status(pluginData.getStatus())
                 .iconUrl(iconUrl(pluginData))
                 .devBranchId(pluginData.getDevBranchId())
+                .candidate(pluginData.getCandidate())
                 .releasedSemver(pluginData.getReleasedSemver())
+                .lastRejection(pluginData.getLastRejection())
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .build()).toList();
@@ -106,7 +108,7 @@ public class PluginsService {
             throw pluginNotFound(pluginId);
         }
 
-        return extendView(pluginData, branches);
+        return extendView(pluginData, branches, accessGuard.isAuthor(pluginData, caller));
     }
 
 
@@ -122,7 +124,7 @@ public class PluginsService {
                 pluginRequest.getCategory(),
                 pluginRequest.getTags());
 
-        return extendView(pluginData, branchRepository.findByPlugin(pluginId));
+        return extendView(pluginData, branchRepository.findByPlugin(pluginId), true);
     }
 
 
@@ -221,7 +223,7 @@ public class PluginsService {
         }
         PluginData pluginData = pluginsRepository.addScreenshots(pluginId, screenshotKeys);
 
-        return extendView(pluginData, branchRepository.findByPlugin(pluginId));
+        return extendView(pluginData, branchRepository.findByPlugin(pluginId), true);
     }
 
     @Transactional
@@ -255,7 +257,7 @@ public class PluginsService {
                 .build();
     }
 
-    private PluginViewExtend extendView(PluginData pluginData, List<Branch> branches) {
+    private PluginViewExtend extendView(PluginData pluginData, List<Branch> branches, boolean authorView) {
         List<ScreenshotView> screenshotViews = pluginsRepository.getScreenshots(pluginData.getId()).stream()
                 .map(this::screenshotView)
                 .toList();
@@ -272,6 +274,7 @@ public class PluginsService {
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
                 .branches(branches.stream().map(PluginsService::branchView).toList())
+                .lastRejection(authorView ? pluginData.getLastRejection() : null)
                 .screenshots(screenshotViews)
                 .build();
     }

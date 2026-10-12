@@ -2,6 +2,7 @@ package ru.fstick.registry_service.client;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -53,6 +54,18 @@ public class IntegrationClient {
         }
     }
 
+    public void notifyDevRoom(UUID authorId, String kind, UUID pluginId, String pluginName, String semver, String reason) {
+        try {
+            restClient.post()
+                    .uri("/api/v1/dev-room/notify")
+                    .body(new DevRoomNotifyRequest(authorId, kind, pluginId, pluginName, semver, reason))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ex) {
+            throw unavailable(ex);
+        }
+    }
+
     private static ApiException unavailable(Exception ex) {
         return new ApiException(HttpStatus.BAD_GATEWAY, "integration_unavailable",
                 "Integration service unavailable: " + ex.getMessage());
@@ -61,6 +74,16 @@ public class IntegrationClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record MemberResponse(
             @JsonProperty("member") @JsonAlias("is_member") boolean member
+    ) {}
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record DevRoomNotifyRequest(
+            @JsonProperty("author_id") UUID authorId,
+            String kind,
+            @JsonProperty("plugin_id") UUID pluginId,
+            @JsonProperty("plugin_name") String pluginName,
+            String semver,
+            String reason
     ) {}
 
     private record PluginEventRequest(

@@ -18,5 +18,9 @@ public class Branch {
     private String runtimeClient;
     private String runtimeServer;
     private UUID baseBranchId;
+    private String changelog;
+    private String submittedAt;
+    private UUID claimedBy;
+    private String rejectReason;
     private String createdAt;
 }

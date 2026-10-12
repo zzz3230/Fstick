@@ -566,6 +566,265 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/publish:
+    post:
+      tags:
+      - moderation-controller
+      summary: Snapshot the dev branch into a candidate branch (author)
+      operationId: publish
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishRequest"
+      responses:
+        "201":
+          description: Candidate created in WAITING_APPROVE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResponse"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: The plugin already has an open candidate (open_candidate_exists)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: validation_failed, invalid_semver, semver_not_greater (must be strictly greater than the highest RELEASED),
+            changelog_too_long, not_dev_branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/moderation/branches:
+    get:
+      tags:
+      - moderation-controller
+      summary: Review queue, oldest submission first (moderator)
+      operationId: queue
+      parameters:
+      - $ref: "#/components/parameters/UserId"
+      - name: status
+        in: query
+        required: false
+        description: Defaults to both open statuses
+        schema:
+          type: string
+          enum:
+          - WAITING_APPROVE
+          - APPROVING
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: limit
+        in: query
+        required: false
+        description: Clamped to 1..100
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Queue page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueView"
+        "403":
+          $ref: "#/components/responses/NotModerator"
+        "422":
+          description: invalid_status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/claim:
+    post:
+      tags:
+      - moderation-controller
+      summary: WAITING_APPROVE to APPROVING (moderator)
+      description: Repeat by the same moderator returns 200 with the current row.
+      operationId: claim
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimResponse"
+        "403":
+          $ref: "#/components/responses/NotModerator"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: claimed_by_other, or invalid_transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/approve:
+    post:
+      tags:
+      - moderation-controller
+      summary: APPROVING to RELEASED (the claimer)
+      description: Clears plugins.last_rejection and notifies the author (released). Repeat on a RELEASED branch returns 200.
+      operationId: approve
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Released
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveResponse"
+        "403":
+          description: not_moderator, or not_claimer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: invalid_transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/reject:
+    post:
+      tags:
+      - moderation-controller
+      summary: Reject a candidate (moderator)
+      description: From WAITING_APPROVE by any moderator, from APPROVING by the claimer only. Sets plugins.last_rejection
+        and notifies the author (rejected). Repeat on a REJECTED branch returns 200.
+      operationId: reject
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectRequest"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchStatusResponse"
+        "403":
+          description: not_moderator, or not_claimer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: invalid_transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: invalid_reason (required, 1..2000 characters)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/branches/{branchId}/cancel:
+    post:
+      tags:
+      - moderation-controller
+      summary: Withdraw an open candidate (author)
+      description: From WAITING_APPROVE or APPROVING. No notification and no last_rejection. Repeat on a CANCELLED branch
+        returns 200.
+      operationId: cancel
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/BranchId"
+      - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchStatusResponse"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+        "409":
+          description: invalid_transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /internal/moderators:
+    post:
+      tags:
+      - internal-moderators-controller
+      summary: Grant the moderator role (internal)
+      description: Idempotent.
+      operationId: grantModerator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantModeratorRequest"
+      responses:
+        "201":
+          description: Granted
+        "422":
+          description: internal_uuid is required (validation_failed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /internal/moderators/{internalUuid}:
+    delete:
+      tags:
+      - internal-moderators-controller
+      summary: Revoke the moderator role (internal)
+      description: Idempotent. The moderator check is cached for 60 seconds.
+      operationId: revokeModerator
+      parameters:
+      - name: internalUuid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Revoked
 components:
   parameters:
     PluginId:
@@ -598,6 +857,12 @@ components:
   responses:
     NotAuthor:
       description: Caller is not the plugin author (not_author)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotModerator:
+      description: Caller is not a moderator (not_moderator)
       content:
         application/json:
           schema:
@@ -1100,3 +1365,130 @@ components:
           type: string
         client_blob_sha:
           type: string
+    PublishRequest:
+      type: object
+      required:
+      - source_branch_id
+      - semver
+      properties:
+        source_branch_id:
+          type: string
+          format: uuid
+        semver:
+          type: string
+          pattern: "^\\d+\\.\\d+\\.\\d+$"
+          example: 1.2.0
+        changelog:
+          type: string
+          maxLength: 2000
+          nullable: true
+    PublishResponse:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        semver:
+          type: string
+        status:
+          type: string
+          example: WAITING_APPROVE
+    ClaimResponse:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: APPROVING
+        claimed_by:
+          type: string
+          format: uuid
+    ApproveResponse:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: RELEASED
+        semver:
+          type: string
+    RejectRequest:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    BranchStatusResponse:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    QueueView:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QueueItem"
+        page:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+    QueueItem:
+      type: object
+      properties:
+        plugin_id:
+          type: string
+          format: uuid
+        plugin_name:
+          type: string
+        branch_id:
+          type: string
+          format: uuid
+        semver:
+          type: string
+        changelog:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+          - WAITING_APPROVE
+          - APPROVING
+        author:
+          type: object
+          description: The Gateway adds mxid
+          properties:
+            id:
+              type: string
+              format: uuid
+        submitted_at:
+          type: string
+        claimed_by:
+          type: string
+          format: uuid
+          nullable: true
+    GrantModeratorRequest:
+      type: object
+      required:
+      - internal_uuid
+      properties:
+        internal_uuid:
+          type: string
+          format: uuid
+        granted_by:
+          type: string
+          format: uuid
+          nullable: true

@@ -42,12 +42,13 @@ class CodeServiceTest {
     @Mock private BlobStore blobStore;
     @Mock private InstallationClient installationClient;
     @Mock private IntegrationClient integrationClient;
+    @Mock private ModeratorService moderatorService;
 
     private CodeService codeService;
 
     @BeforeEach
     void setUp() {
-        AccessGuard guard = new AccessGuard(pluginsRepository, installationClient, integrationClient);
+        AccessGuard guard = new AccessGuard(pluginsRepository, installationClient, integrationClient, moderatorService);
         codeService = new CodeService(pluginsRepository, branchRepository, blobStore, guard);
 
         PluginData plugin = plugin(PLUGIN_ID, AUTHOR);
