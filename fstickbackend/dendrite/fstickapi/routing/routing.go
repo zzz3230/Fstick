@@ -12,6 +12,44 @@ import (
 	userapi "github.com/element-hq/dendrite/userapi/api"
 )
 
+type proxyRoute struct {
+	method      string
+	path        string
+	gatewayPath string
+}
+
+// proxyRoutes lists the browser-facing routes proxied to the gateway.
+// Service-only /internal paths must never be added here.
+var proxyRoutes = []proxyRoute{
+	{http.MethodGet, "/api/v1/me", "/api/v1/me"},
+
+	{http.MethodGet, "/api/v1/registry/plugins", "/api/v1/plugins"},
+	{http.MethodPost, "/api/v1/registry/plugins", "/api/v1/plugins"},
+	{http.MethodGet, "/api/v1/registry/plugins/{plugin_id}", "/api/v1/plugins/{plugin_id}"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/assets/commit", "/api/v1/plugins/{plugin_id}/assets/commit"},
+	{http.MethodGet, "/api/v1/registry/plugins/{plugin_id}/code/client", "/api/v1/plugins/{plugin_id}/code/client"},
+	{http.MethodGet, "/api/v1/registry/plugins/{plugin_id}/code/server", "/api/v1/plugins/{plugin_id}/code/server"},
+	{http.MethodGet, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/edit", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/edit"},
+	{http.MethodPut, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/code", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/code"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/reload", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/reload"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/publish", "/api/v1/plugins/{plugin_id}/publish"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/cancel", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/cancel"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/claim", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/claim"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/approve", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/approve"},
+	{http.MethodPost, "/api/v1/registry/plugins/{plugin_id}/branches/{branch_id}/reject", "/api/v1/plugins/{plugin_id}/branches/{branch_id}/reject"},
+	{http.MethodGet, "/api/v1/registry/moderation/branches", "/api/v1/moderation/branches"},
+
+	{http.MethodPost, "/api/v1/plugins/{plugin_id}/command", "/api/v1/plugins/{plugin_id}/command"},
+	{http.MethodGet, "/api/v1/plugins/{plugin_id}/state", "/api/v1/plugins/{plugin_id}/state"},
+	{http.MethodPut, "/api/v1/plugins/{plugin_id}/state", "/api/v1/plugins/{plugin_id}/state"},
+
+	{http.MethodPost, "/api/v1/installations", "/api/v1/installations"},
+	{http.MethodGet, "/api/v1/installations", "/api/v1/installations"},
+	{http.MethodPost, "/api/v1/installations/confirm", "/api/v1/installations/confirm"},
+	{http.MethodPatch, "/api/v1/installations/{installation_id}", "/api/v1/installations/{installation_id}"},
+	{http.MethodDelete, "/api/v1/installations/{installation_id}", "/api/v1/installations/{installation_id}"},
+}
+
 // Setup registers all Fstick API routes on the provided router.
 // The router is expected to be scoped to the /fstick/ path prefix.
 //
@@ -52,59 +90,14 @@ func Setup(
 		PushFstickEvent(fstickStore),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Plugin list endpoint (registry-namespaced path)
-	router.Handle(
-		"/api/v1/registry/plugins",
-		ListPluginsProxy(cfg, userAPI),
-	).Methods(http.MethodGet, http.MethodOptions)
+	registerProxyRoutes(router, cfg, userAPI)
+}
 
-	router.Handle(
-		"/api/v1/registry/plugins/{plugin_id}",
-		GetPluginProxy(cfg, userAPI),
-	).Methods(http.MethodGet, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/registry/plugins",
-		InitPluginUploadProxy(cfg, userAPI),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/registry/plugins/{plugin_id}/commit",
-		CommitPluginUploadProxy(cfg, userAPI),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/registry/plugins/{plugin_id}/code/client",
-		GetPluginCodeClientProxy(cfg, userAPI),
-	).Methods(http.MethodGet, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/plugins/{plugin_id}/command",
-		PluginCommandProxy(cfg, userAPI),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/plugins/{plugin_id}/state",
-		PluginStateProxy(cfg, userAPI),
-	).Methods(http.MethodGet, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/installations",
-		InstallPluginProxy(cfg, userAPI),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/installations",
-		ListInstallationsProxy(cfg, userAPI),
-	).Methods(http.MethodGet, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/installations/confirm",
-		ConfirmInstallProxy(cfg, userAPI),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	router.Handle(
-		"/api/v1/installations/{installation_id}",
-		UninstallPluginProxy(cfg, userAPI),
-	).Methods(http.MethodDelete, http.MethodOptions)
+func registerProxyRoutes(router *mux.Router, cfg *config.Dendrite, uAPI userapi.QueryAcccessTokenAPI) {
+	for _, route := range proxyRoutes {
+		router.Handle(
+			route.path,
+			authProxy(cfg, uAPI, pathTemplate(route.gatewayPath)),
+		).Methods(route.method, http.MethodOptions)
+	}
 }
