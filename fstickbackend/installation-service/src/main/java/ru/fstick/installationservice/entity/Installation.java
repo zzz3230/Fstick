@@ -13,7 +13,9 @@ import java.util.UUID;
 public class Installation {
     private UUID installationId;
     private UUID pluginId;
-    private UUID versionId;
+    private UUID branchId;
+    private String branchStatus;
+    private UUID pluginAuthorId;
     private String chatId;
     private UUID installedBy;
     private OffsetDateTime installedAt;

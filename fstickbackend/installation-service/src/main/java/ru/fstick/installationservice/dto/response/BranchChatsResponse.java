@@ -7,7 +7,6 @@ import java.util.List;
 
 @Getter
 @AllArgsConstructor
-public class InstallationWithWarningsResponse {
-    private InstallationResponse installation;
-    private List<InstallWarning> warnings;
+public class BranchChatsResponse {
+    private List<String> chatIds;
 }

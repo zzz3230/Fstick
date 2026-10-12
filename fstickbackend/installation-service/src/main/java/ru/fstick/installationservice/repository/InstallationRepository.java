@@ -20,16 +20,41 @@ public class InstallationRepository {
     public Installation save(Installation installation) {
         String sql = """
                 INSERT INTO installations
-                    (plugin_id, version_id, chat_id, installed_by)
-                VALUES (?, ?, ?, ?)
+                    (plugin_id, branch_id, branch_status, plugin_author_id, chat_id, installed_by)
+                VALUES (?, ?, ?, ?, ?, ?)
                 RETURNING *
                 """;
 
         return jdbcTemplate.queryForObject(sql, rowMapper,
                 installation.getPluginId(),
-                installation.getVersionId(),
+                installation.getBranchId(),
+                installation.getBranchStatus(),
+                installation.getPluginAuthorId(),
                 installation.getChatId(),
                 installation.getInstalledBy());
+    }
+
+    public Installation updateBranch(UUID installationId, UUID branchId, String branchStatus) {
+        String sql = """
+                UPDATE installations
+                SET branch_id = ?, branch_status = ?, updated_at = NOW()
+                WHERE installation_id = ?
+                RETURNING *
+                """;
+
+        return jdbcTemplate.queryForObject(sql, rowMapper, branchId, branchStatus, installationId);
+    }
+
+    public Optional<Installation> findByPluginIdAndChatId(UUID pluginId, String chatId) {
+        String sql = "SELECT * FROM installations WHERE plugin_id = ? AND chat_id = ?";
+
+        List<Installation> result = jdbcTemplate.query(sql, rowMapper, pluginId, chatId);
+        return result.stream().findFirst();
+    }
+
+    public List<String> findChatIdsByBranchId(UUID branchId) {
+        String sql = "SELECT DISTINCT chat_id FROM installations WHERE branch_id = ?";
+        return jdbcTemplate.queryForList(sql, String.class, branchId);
     }
 
     public Optional<Installation> findById(UUID installationId) {

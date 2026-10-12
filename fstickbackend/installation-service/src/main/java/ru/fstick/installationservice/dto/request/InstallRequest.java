@@ -11,5 +11,5 @@ import java.util.UUID;
 @NoArgsConstructor
 public class InstallRequest {
     private UUID pluginId;
-    private UUID versionId;
+    private UUID branchId;
 }

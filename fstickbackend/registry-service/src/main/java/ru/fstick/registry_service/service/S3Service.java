@@ -1,6 +1,7 @@
 package ru.fstick.registry_service.service;
 
 import io.minio.*;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.fstick.registry_service.config.MinioProperties;
 
-import java.util.List;
+import java.io.ByteArrayInputStream;
 
 @Service
 public class S3Service {
@@ -136,27 +137,34 @@ public class S3Service {
         }
     }
 
-    public List<String> getOnlyServerKeys(List<String> keys) {
-        log.debug("[S3] filtering server keys from {} items", keys.size());
-
-        List<String> result = keys.stream()
-                .filter(key -> key.contains("/sv/"))
-                .toList();
-
-        log.debug("[S3] server keys count = {}", result.size());
-
-        return result;
+    public boolean exists(String key) {
+        try {
+            minioClient.statObject(StatObjectArgs.builder()
+                    .bucket(props.getBucket())
+                    .object(key)
+                    .build());
+            return true;
+        } catch (ErrorResponseException e) {
+            String code = e.errorResponse().code();
+            if ("NoSuchKey".equals(code) || "NoSuchObject".equals(code)) {
+                return false;
+            }
+            throw new RuntimeException("Failed to stat object: " + key, e);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to stat object: " + key, e);
+        }
     }
 
-    public List<String> getOnlyClientKeys(List<String> keys) {
-        log.debug("[S3] filtering client keys from {} items", keys.size());
-
-        List<String> result = keys.stream()
-                .filter(key -> key.contains("/cl/"))
-                .toList();
-
-        log.debug("[S3] client keys count = {}", result.size());
-
-        return result;
+    public void putObject(String key, byte[] data, String contentType) {
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(props.getBucket())
+                    .object(key)
+                    .stream(new ByteArrayInputStream(data), data.length, -1)
+                    .contentType(contentType)
+                    .build());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to put object: " + key, e);
+        }
     }
 }

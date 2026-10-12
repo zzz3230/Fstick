@@ -6,103 +6,28 @@ servers:
 - url: http://localhost:8080
   description: Generated server url
 paths:
-  /api/v1/plugins/{pluginId}:
-    get:
-      tags:
-      - plugins-controller
-      operationId: getPlugin
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PluginViewExtend"
-    put:
-      tags:
-      - plugins-controller
-      operationId: updatePlugin
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PluginRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PluginViewExtend"
-    delete:
-      tags:
-      - plugins-controller
-      operationId: deletePlugin
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ChangeStatusResponse"
-  /api/v1/plugins/{pluginId}/status:
-    put:
-      tags:
-      - plugins-controller
-      operationId: changeStatus
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: string
-              enum:
-              - ACTIVE
-              - DELETED
-              - HIDDEN
-              - ARCHIVED
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ChangeStatusResponse"
   /api/v1/plugins:
     get:
       tags:
       - plugins-controller
+      summary: Public catalog, or the caller's own plugins with owned=true
+      description: Without owned, returns ACTIVE plugins that have at least one RELEASED branch. With owned=true,
+        returns the plugins whose author is X-User-Id (DELETED excluded).
       operationId: getPlugins
       parameters:
+      - name: X-User-Id
+        in: header
+        required: false
+        description: Required only with owned=true
+        schema:
+          type: string
+          format: uuid
+      - name: owned
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
       - name: page
         in: query
         required: false
@@ -143,22 +68,24 @@ paths:
           default: asc
       responses:
         "200":
-          description: OK
+          description: PluginsView of PluginViewShrink items, or of PluginViewOwned items when owned=true
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PluginsView"
+        "400":
+          description: owned=true without X-User-Id (missing_user)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       tags:
       - plugins-controller
+      summary: Create a plugin with an empty template dev branch
       operationId: addPlugin
       parameters:
-      - name: X-User-Id
-        in: header
-        required: true
-        schema:
-          type: string
-          format: uuid
+      - $ref: "#/components/parameters/UserId"
       requestBody:
         content:
           application/json:
@@ -166,74 +93,173 @@ paths:
               $ref: "#/components/schemas/AddPluginRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/AddPluginResponse"
-  /api/v1/plugins/{pluginId}/versions:
-    post:
-      tags:
-      - plugins-controller
-      operationId: addPluginVersion
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AddPluginVersionRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
+        "422":
+          description: Icon type is not an image (invalid_type)
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: "#/components/schemas/AddVersionResponse"
-  /api/v1/plugins/{pluginId}/versions/commit:
-    post:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}:
+    get:
       tags:
       - plugins-controller
-      operationId: commitVersion
+      summary: Plugin with the branches visible to the caller
+      description: |
+        Author sees every branch. Anyone else sees RELEASED branches. With chat_id, a member of a chat whose
+        installation points at the WORKING branch also sees that branch. No visible branch gives 404.
+      operationId: getPlugin
       parameters:
-      - name: pluginId
-        in: path
-        required: true
+      - $ref: "#/components/parameters/PluginId"
+      - name: X-User-Id
+        in: header
+        required: false
         schema:
           type: string
           format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CommitVersionRequest"
-        required: true
+      - name: chat_id
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/PluginViewExtend"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
+    put:
+      tags:
+      - plugins-controller
+      summary: Update plugin metadata (author only)
+      operationId: updatePlugin
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PluginRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginViewExtend"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
+    delete:
+      tags:
+      - plugins-controller
+      summary: Mark the plugin DELETED (author only)
+      operationId: deletePlugin
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeStatusResponse"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
+  /api/v1/plugins/{pluginId}/status:
+    put:
+      tags:
+      - plugins-controller
+      summary: Set ACTIVE, HIDDEN or DELETED (author only)
+      operationId: changeStatus
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              enum:
+              - ACTIVE
+              - DELETED
+              - HIDDEN
+              - ARCHIVED
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeStatusResponse"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
+        "422":
+          description: ARCHIVED is not settable (invalid_status)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/assets/commit:
+    post:
+      tags:
+      - plugins-controller
+      summary: Register uploaded icon and screenshots (author only)
+      description: Accepts only plugins/{pluginId}/icon and plugins/{pluginId}/screenshots/* keys and verifies that
+        each object exists.
+      operationId: commitAssets
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommitAssetsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginViewExtend"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
+        "422":
+          description: Foreign key or object not uploaded (invalid_key, object_not_found)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/plugins/{pluginId}/screenshots:
     post:
       tags:
       - plugins-controller
+      summary: Presign screenshot uploads (author only)
       operationId: updateScreenshots
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
       requestBody:
         content:
           application/json:
@@ -244,129 +270,22 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/UpdateScreenshotsResponse"
-  /api/v1/plugins/{pluginId}/screenshots/commit:
-    post:
-      tags:
-      - plugins-controller
-      operationId: commitScreenshots
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CommitScreenshotsRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PluginViewExtend"
-  /api/v1/plugins/{pluginId}/commit:
-    post:
-      tags:
-      - plugins-controller
-      operationId: commitPlugin
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CommitPluginRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PluginViewExtend"
-  /api/v1/plugins/{pluginId}/code/server:
-    get:
-      tags:
-      - plugins-controller
-      operationId: getPluginCodeServer
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: version
-        in: query
-        required: true
-        schema:
-          type: string
-      - name: runtime
-        in: query
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/CodeLinksResponse"
-  /api/v1/plugins/{pluginId}/code/client:
-    get:
-      tags:
-      - plugins-controller
-      operationId: getPluginCodeClient
-      parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: version
-        in: query
-        required: true
-        schema:
-          type: string
-      - name: runtime
-        in: query
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/CodeLinksResponse"
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
   /api/v1/plugins/{pluginId}/screenshots/{screenshotId}:
     delete:
       tags:
       - plugins-controller
+      summary: Delete a screenshot (author only)
       operationId: deleteScreenshot
       parameters:
-      - name: pluginId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+      - $ref: "#/components/parameters/PluginId"
+      - $ref: "#/components/parameters/UserId"
       - name: screenshotId
         in: path
         required: true
@@ -376,8 +295,198 @@ paths:
       responses:
         "200":
           description: OK
+        "403":
+          $ref: "#/components/responses/NotAuthor"
+        "404":
+          description: Unknown plugin or screenshot (plugin_not_found, screenshot_not_found)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/plugins/{pluginId}/code/server:
+    get:
+      tags:
+      - plugins-controller
+      summary: Server (Lua) source of a branch, inline
+      description: RELEASED for anyone; WORKING, WAITING_APPROVE, APPROVING, REJECTED and CANCELLED for the
+        author only. A branch the caller cannot read is 404.
+      operationId: getPluginCodeServer
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - name: X-User-Id
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: branch_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeResponse"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+  /api/v1/plugins/{pluginId}/code/client:
+    get:
+      tags:
+      - plugins-controller
+      summary: Client (JS) source of a branch, inline
+      description: Same access rules as code/server; additionally a member of chat_id whose installation points at
+        the WORKING branch may read it.
+      operationId: getPluginCodeClient
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - name: X-User-Id
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: If-None-Match
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: branch_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: chat_id
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          headers:
+            ETag:
+              description: Quoted sha256 of the source
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeResponse"
+        "304":
+          description: If-None-Match equals the current sha
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+  /internal/branches/{branchId}:
+    get:
+      tags:
+      - internal-branches-controller
+      summary: Branch status, semver and owning plugin (service-to-service, no user gate)
+      operationId: getInternalBranch
+      parameters:
+      - name: branchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalBranchResponse"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
+  /internal/plugins/{pluginId}:
+    get:
+      tags:
+      - internal-plugins-controller
+      summary: Plugin status, author and all branches (service-to-service, no user gate)
+      operationId: getInternalPlugin
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalPluginResponse"
+        "404":
+          $ref: "#/components/responses/PluginNotFound"
+  /internal/plugins/{pluginId}/code/server:
+    get:
+      tags:
+      - internal-plugins-controller
+      summary: Server (Lua) source of any branch (service-to-service, no user gate)
+      operationId: getInternalServerCode
+      parameters:
+      - $ref: "#/components/parameters/PluginId"
+      - name: branch_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeResponse"
+        "404":
+          $ref: "#/components/responses/BranchNotFound"
 components:
+  parameters:
+    PluginId:
+      name: pluginId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    NotAuthor:
+      description: Caller is not the plugin author (not_author)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PluginNotFound:
+      description: Unknown plugin, or no branch visible to the caller (plugin_not_found)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BranchNotFound:
+      description: Unknown plugin or branch, or a branch not visible to the caller (plugin_not_found, branch_not_found)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
     PluginRequest:
       required:
       - description
@@ -402,95 +511,16 @@ components:
           type: array
           items:
             type: string
-    PluginViewExtend:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        authorId:
-          type: string
-          format: uuid
-        name:
-          type: string
-        description:
-          type: string
-        category:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        status:
-          type: string
-        iconUrl:
-          type: string
-        createdAt:
-          type: string
-        updatedAt:
-          type: string
-        versions:
-          type: array
-          items:
-            $ref: "#/components/schemas/VersionView"
-        screenshots:
-          type: array
-          items:
-            $ref: "#/components/schemas/ScreenshotView"
-    ScreenshotView:
-      type: object
-      properties:
-        screenshotId:
-          type: string
-          format: uuid
-        screenshotUrl:
-          type: string
-    VersionView:
-      type: object
-      properties:
-        versionId:
-          type: string
-          format: uuid
-        version:
-          type: string
-        changelog:
-          type: string
-        createdAt:
-          type: string
-    ChangeStatusResponse:
-      type: object
-      properties:
-        pluginId:
-          type: string
-          format: uuid
-        newStatus:
-          type: string
-        oldStatus:
-          type: string
     AddPluginRequest:
       required:
       - description
-      - files
-      - icon
       - name
-      - runtime
-      - version
       type: object
       properties:
-        version:
-          maxLength: 50
-          minLength: 0
-          type: string
-        runtime:
-          maxLength: 100
-          minLength: 0
-          type: string
-        files:
-          type: array
-          items:
-            $ref: "#/components/schemas/FileRequest"
         icon:
-          $ref: "#/components/schemas/FileRequest"
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/FileRequest"
         name:
           maxLength: 50
           minLength: 0
@@ -511,88 +541,43 @@ components:
             type: string
     FileRequest:
       required:
-      - fileName
+      - file_name
       - type
       type: object
       properties:
-        fileName:
+        file_name:
           type: string
         type:
           type: string
     AddPluginResponse:
       type: object
       properties:
-        pluginId:
+        plugin_id:
           type: string
           format: uuid
-        versionId:
+        dev_branch_id:
           type: string
           format: uuid
-        uploads:
-          type: array
-          items:
-            $ref: "#/components/schemas/FileUploadData"
-        iconUpload:
-          $ref: "#/components/schemas/FileUploadData"
-    FileUploadData:
+        icon_upload:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/IconUploadData"
+    IconUploadData:
       type: object
       properties:
-        fileName:
+        upload_url:
           type: string
         key:
           type: string
-        uploadUrl:
-          type: string
-    AddPluginVersionRequest:
-      required:
-      - changelog
-      - files
-      - runtime
-      - version
+    FileUploadData:
       type: object
       properties:
-        files:
-          type: array
-          items:
-            $ref: "#/components/schemas/FileRequest"
-        version:
-          maxLength: 50
-          minLength: 0
+        file_name:
           type: string
-        changelog:
-          maxLength: 2000
-          minLength: 0
+        key:
           type: string
-        runtime:
-          maxLength: 100
-          minLength: 0
+        upload_url:
           type: string
-    AddVersionResponse:
-      type: object
-      properties:
-        pluginId:
-          type: string
-          format: uuid
-        versionId:
-          type: string
-          format: uuid
-        uploads:
-          type: array
-          items:
-            $ref: "#/components/schemas/FileUploadData"
-    CommitVersionRequest:
-      required:
-      - keys
-      - versionId
-      type: object
-      properties:
-        versionId:
-          type: string
-          format: uuid
-        keys:
-          type: array
-          items:
-            type: string
     UpdateScreenshotsRequest:
       required:
       - files
@@ -605,14 +590,14 @@ components:
     UpdateScreenshotsResponse:
       type: object
       properties:
-        pluginId:
+        plugin_id:
           type: string
           format: uuid
         uploads:
           type: array
           items:
             $ref: "#/components/schemas/FileUploadData"
-    CommitScreenshotsRequest:
+    CommitAssetsRequest:
       required:
       - keys
       type: object
@@ -621,45 +606,23 @@ components:
           type: array
           items:
             type: string
-    CommitPluginRequest:
-      required:
-      - keys
-      - versionId
+    ChangeStatusResponse:
       type: object
       properties:
-        versionId:
+        plugin_id:
           type: string
           format: uuid
-        keys:
-          type: array
-          items:
-            type: string
-    PaginationData:
-      type: object
-      properties:
-        page:
-          type: integer
-          format: int32
-        limit:
-          type: integer
-          format: int32
-        total:
-          type: integer
-          format: int32
-        totalPages:
-          type: integer
-          format: int32
-        hasPrev:
-          type: boolean
-        hasNext:
-          type: boolean
-    PluginViewShrink:
+        new_status:
+          type: string
+        old_status:
+          type: string
+    PluginViewExtend:
       type: object
       properties:
         id:
           type: string
           format: uuid
-        authorId:
+        author_id:
           type: string
           format: uuid
         name:
@@ -674,11 +637,173 @@ components:
             type: string
         status:
           type: string
-        iconUrl:
+        icon_url:
           type: string
-        createdAt:
+        created_at:
           type: string
-        updatedAt:
+        updated_at:
+          type: string
+        branches:
+          type: array
+          items:
+            $ref: "#/components/schemas/BranchView"
+        last_rejection:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/LastRejectionView"
+        screenshots:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScreenshotView"
+    BranchView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - WORKING
+          - WAITING_APPROVE
+          - APPROVING
+          - RELEASED
+          - REJECTED
+          - CANCELLED
+        semver:
+          type: string
+          nullable: true
+        runtime:
+          $ref: "#/components/schemas/RuntimeView"
+        created_at:
+          type: string
+    RuntimeView:
+      type: object
+      properties:
+        client:
+          type: string
+        server:
+          type: string
+    LastRejectionView:
+      type: object
+      properties:
+        reason:
+          type: string
+        at:
+          type: string
+        semver:
+          type: string
+        branch_id:
+          type: string
+          format: uuid
+    CandidateView:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        semver:
+          type: string
+        status:
+          type: string
+    ScreenshotView:
+      type: object
+      properties:
+        screenshot_id:
+          type: string
+          format: uuid
+        screenshot_url:
+          type: string
+    PaginationData:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+        total_pages:
+          type: integer
+          format: int32
+        has_prev:
+          type: boolean
+        has_next:
+          type: boolean
+    PluginViewShrink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        icon_url:
+          type: string
+        released_semver:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+    PluginViewOwned:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        author_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        icon_url:
+          type: string
+        dev_branch_id:
+          type: string
+          format: uuid
+          nullable: true
+        candidate:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CandidateView"
+        released_semver:
+          type: string
+          nullable: true
+        last_rejection:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/LastRejectionView"
+        created_at:
+          type: string
+        updated_at:
           type: string
     PluginsView:
       type: object
@@ -686,18 +811,60 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/PluginViewShrink"
+            oneOf:
+            - $ref: "#/components/schemas/PluginViewShrink"
+            - $ref: "#/components/schemas/PluginViewOwned"
         pagination:
           $ref: "#/components/schemas/PaginationData"
-    CodeLinksResponse:
+    CodeResponse:
       type: object
       properties:
-        files:
+        text:
+          type: string
+        sha:
+          type: string
+          example: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    InternalBranchResponse:
+      type: object
+      properties:
+        branch_id:
+          type: string
+          format: uuid
+        plugin_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        semver:
+          type: string
+          nullable: true
+    InternalPluginResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        author_id:
+          type: string
+          format: uuid
+        branches:
           type: array
           items:
-            $ref: "#/components/schemas/FileDownloadData"
-    FileDownloadData:
+            $ref: "#/components/schemas/InternalBranch"
+    InternalBranch:
       type: object
       properties:
-        downloadUrl:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        semver:
+          type: string
+          nullable: true
+        server_blob_sha:
+          type: string
+        client_blob_sha:
           type: string

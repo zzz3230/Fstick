@@ -1,25 +1,27 @@
 package ru.fstick.registry_service.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.fstick.registry_service.dto.Status;
 import ru.fstick.registry_service.dto.api.request.*;
-import ru.fstick.registry_service.dto.api.request.commit.CommitScreenshotsRequest;
-import ru.fstick.registry_service.dto.api.request.commit.CommitPluginRequest;
-import ru.fstick.registry_service.dto.api.request.commit.CommitVersionRequest;
+import ru.fstick.registry_service.dto.api.request.commit.CommitAssetsRequest;
 import ru.fstick.registry_service.dto.api.response.*;
 import ru.fstick.registry_service.dto.api.view.*;
-import ru.fstick.registry_service.dto.model.Screenshot;
-import ru.fstick.registry_service.dto.model.Version;
-import ru.fstick.registry_service.dto.service.FileDownloadData;
-import ru.fstick.registry_service.dto.service.FileUploadData;
-import ru.fstick.registry_service.dto.service.PaginationData;
+import ru.fstick.registry_service.dto.model.Branch;
 import ru.fstick.registry_service.dto.model.PluginData;
+import ru.fstick.registry_service.dto.model.Screenshot;
+import ru.fstick.registry_service.dto.service.FileUploadData;
+import ru.fstick.registry_service.dto.service.IconUploadData;
+import ru.fstick.registry_service.dto.service.PaginationData;
+import ru.fstick.registry_service.exception.ApiException;
+import ru.fstick.registry_service.repository.BranchRepository;
 import ru.fstick.registry_service.repository.PluginsRepository;
 import ru.fstick.registry_service.util.Container;
+import ru.fstick.registry_service.util.KeyType;
 import ru.fstick.registry_service.util.MinioKeyParser;
-import ru.fstick.registry_service.util.RuntimeParser;
 import ru.fstick.registry_service.util.TypeParser;
 
 import java.util.ArrayList;
@@ -31,21 +33,19 @@ import java.util.UUID;
 public class PluginsService {
 
     private final PluginsRepository pluginsRepository;
+    private final BranchRepository branchRepository;
     private final S3Service s3Service;
-
+    private final BlobStore blobStore;
+    private final TemplateProvider templateProvider;
+    private final AccessGuard accessGuard;
 
     //получить список плагинов и их пагинацию по критериям
 
     @Transactional
-    public PluginsView getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
-        Integer offset = page * limit;
-        List<PluginData> pluginsData = pluginsRepository.getPlugins(offset, limit, category, search, sort, order);
+    public PluginsView<PluginViewShrink> getPlugins(Integer page, Integer limit, String category, String search, String sort, String order) {
+        List<PluginData> pluginsData = pluginsRepository.getPlugins(page * limit, limit, category, search, sort, order, null);
 
-        System.out.println(pluginsData);
-
-        List<PluginViewShrink> pluginViewShrinks = new ArrayList<>();
-
-        pluginsData.forEach(pluginData -> pluginViewShrinks.add(PluginViewShrink.builder()
+        List<PluginViewShrink> items = pluginsData.stream().map(pluginData -> PluginViewShrink.builder()
                 .id(pluginData.getId())
                 .authorId(pluginData.getAuthorId())
                 .name(pluginData.getName())
@@ -53,75 +53,68 @@ public class PluginsService {
                 .category(pluginData.getCategory())
                 .tags(pluginData.getTags())
                 .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
+                .iconUrl(iconUrl(pluginData))
+                .releasedSemver(pluginData.getReleasedSemver())
                 .createdAt(pluginData.getCreatedAt())
                 .updatedAt(pluginData.getUpdatedAt())
-                .build()));
+                .build()).toList();
 
+        int pluginsTotal = pluginsRepository.getPluginsTotal(category, search, null);
 
-        int pluginsTotal = pluginsRepository.getPluginsTotal(category, search);
-
-        int totalPages = (int) Math.ceil((double) pluginsTotal / limit);
-
-        PaginationData paginationData = PaginationData.builder()
-                .page(page)
-                .limit(limit)
-                .total(pluginsTotal)
-                .totalPages(totalPages)
-                .hasNext(page<totalPages-1)
-                .hasPrev(page>0)
+        return PluginsView.<PluginViewShrink>builder()
+                .items(items)
+                .pagination(pagination(page, limit, pluginsTotal))
                 .build();
+    }
 
-        return PluginsView.builder()
-                .items(pluginViewShrinks)
-                .pagination(paginationData)
+    @Transactional
+    public PluginsView<PluginViewOwned> getOwnedPlugins(UUID caller, Integer page, Integer limit, String category, String search, String sort, String order) {
+        List<PluginData> pluginsData = pluginsRepository.getPlugins(page * limit, limit, category, search, sort, order, caller);
+
+        List<PluginViewOwned> items = pluginsData.stream().map(pluginData -> PluginViewOwned.builder()
+                .id(pluginData.getId())
+                .authorId(pluginData.getAuthorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(iconUrl(pluginData))
+                .devBranchId(pluginData.getDevBranchId())
+                .releasedSemver(pluginData.getReleasedSemver())
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .build()).toList();
+
+        int pluginsTotal = pluginsRepository.getPluginsTotal(category, search, caller);
+
+        return PluginsView.<PluginViewOwned>builder()
+                .items(items)
+                .pagination(pagination(page, limit, pluginsTotal))
                 .build();
     }
 
     //получить плагин по id
     @Transactional
-    public PluginViewExtend getPlugin(UUID pluginId) {
-        PluginData pluginData = pluginsRepository.getPlugin(pluginId);
+    public PluginViewExtend getPlugin(UUID pluginId, UUID caller, String chatId) {
+        PluginData pluginData = pluginsRepository.findPlugin(pluginId)
+                .filter(plugin -> !Status.DELETED.getValue().equals(plugin.getStatus()))
+                .orElseThrow(() -> pluginNotFound(pluginId));
 
-        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
+        List<Branch> branches = accessGuard.visibleBranches(caller, pluginData, branchRepository.findByPlugin(pluginId), chatId);
+        if (branches.isEmpty()) {
+            throw pluginNotFound(pluginId);
+        }
 
-        List<VersionView> versionViews = new ArrayList<>();
-        versions.forEach(version -> {versionViews.add(VersionView.builder()
-                .versionId(version.getVersionId())
-                .version(version.getVersion())
-                .runtime(version.getRuntime())
-                .changelog(version.getChangelog())
-                .build());});
-
-        List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> {screenshotViews.add(ScreenshotView.builder()
-                .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
-                .build());});
-
-        String iconUrl = s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true);
-
-        return PluginViewExtend.builder()
-                .id(pluginData.getId())
-                .authorId(pluginData.getAuthorId())
-                .name(pluginData.getName())
-                .description(pluginData.getDescription())
-                .category(pluginData.getCategory())
-                .tags(pluginData.getTags())
-                .status(pluginData.getStatus())
-                .iconUrl(iconUrl)
-                .createdAt(pluginData.getCreatedAt())
-                .updatedAt(pluginData.getUpdatedAt())
-                .versions(versionViews)
-                .screenshots(screenshotViews)
-                .build();
+        return extendView(pluginData, branches);
     }
 
 
     //обновить метаданные плагина
     @Transactional
-    public PluginViewExtend updatePlugin(UUID pluginId, PluginRequest pluginRequest) {
+    public PluginViewExtend updatePlugin(UUID pluginId, UUID caller, PluginRequest pluginRequest) {
+        accessGuard.requireAuthor(pluginId, caller);
+
         PluginData pluginData = pluginsRepository.updatePlugin(
                 pluginId,
                 pluginRequest.getName(),
@@ -129,45 +122,15 @@ public class PluginsService {
                 pluginRequest.getCategory(),
                 pluginRequest.getTags());
 
-        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
-
-        List<VersionView> versionViews = new ArrayList<>();
-        versions.forEach(version -> {versionViews.add(VersionView.builder()
-                .versionId(version.getVersionId())
-                .version(version.getVersion())
-                .runtime(version.getRuntime())
-                .changelog(version.getChangelog())
-                .build());});
-
-        List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
-                .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
-                .build()));
-
-        return PluginViewExtend.builder()
-                .id(pluginData.getId())
-                .authorId(pluginData.getAuthorId())
-                .name(pluginData.getName())
-                .description(pluginData.getDescription())
-                .category(pluginData.getCategory())
-                .tags(pluginData.getTags())
-                .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
-                .createdAt(pluginData.getCreatedAt())
-                .updatedAt(pluginData.getUpdatedAt())
-                .versions(versionViews)
-                .screenshots(screenshotViews)
-                .build();
+        return extendView(pluginData, branchRepository.findByPlugin(pluginId));
     }
 
 
     //Удалить плагин
     @Transactional
-    public ChangeStatusResponse deletePlugin(UUID pluginId) {
+    public ChangeStatusResponse deletePlugin(UUID pluginId, UUID caller) {
         // Получаем текущие данные плагина до изменения статуса
-        PluginData before = pluginsRepository.getPlugin(pluginId);
+        PluginData before = accessGuard.requireAuthor(pluginId, caller);
 
         // Помечаем как удалённый
         PluginData after = pluginsRepository.deletePlugin(pluginId);
@@ -179,234 +142,45 @@ public class PluginsService {
                 .build();
     }
 
-    //подтвердить создание плагина
     @Transactional
-    public PluginViewExtend commitPlugin(UUID pluginId, CommitPluginRequest commitPluginRequest) {
-
-        try {
-            UUID versionOwner = pluginsRepository.getVersionPluginId(commitPluginRequest.getVersionId());
-            if (!pluginId.equals(versionOwner)) {
-                throw new RuntimeException("Provided versionId does not belong to plugin");
-            }
-        } catch (Exception ex) {
-            throw new RuntimeException("Invalid versionId: " + commitPluginRequest.getVersionId(), ex);
-        }
-
-        commitPluginRequest.getKeys().forEach(key -> {
-            try {
-                s3Service.getObject(key);
-                //TODO VALIDATION
-            } catch (Exception ex) {
-                throw new RuntimeException("Failed to read object for key: " + key, ex);
-            }
-        });
-
-        List<String> icons = MinioKeyParser.getAllIcons(commitPluginRequest.getKeys());
-        String icon = icons.isEmpty() ? null : icons.get(0);
-
-        PluginData pluginData = pluginsRepository.addFiles(
-                pluginId,
-                commitPluginRequest.getVersionId(),
-                icon,
-                MinioKeyParser.getAllScreenshots(commitPluginRequest.getKeys()),
-                MinioKeyParser.getAllFiles(commitPluginRequest.getKeys()));
-
-        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
-
-        List<VersionView> versionViews = new ArrayList<>();
-        versions.forEach(version -> {versionViews.add(VersionView.builder()
-                .versionId(version.getVersionId())
-                .version(version.getVersion())
-                .runtime(version.getRuntime())
-                .changelog(version.getChangelog())
-                .build());});
-
-        List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
-                .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
-                .build()));
-
-        return PluginViewExtend.builder()
-                .id(pluginData.getId())
-                .authorId(pluginData.getAuthorId())
-                .name(pluginData.getName())
-                .description(pluginData.getDescription())
-                .category(pluginData.getCategory())
-                .tags(pluginData.getTags())
-                .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
-                .createdAt(pluginData.getCreatedAt())
-                .updatedAt(pluginData.getUpdatedAt())
-                .versions(versionViews)
-                .screenshots(screenshotViews)
-                .build();
-    }
-
-    @Transactional
-    public AddPluginResponse initPluginUpload(AddPluginRequest request, UUID authorId) {
+    public AddPluginResponse createPlugin(AddPluginRequest request, UUID authorId) {
         UUID pluginId = UUID.randomUUID();
 
-        List<FileUploadData> uploads = request.getFiles().stream()
-                .map(file -> {
-                    TypeParser.Result resultType = TypeParser.parse(file.getType());
-                    String key = null;
-
-                    if (resultType.container==Container.CODE) {
-                        RuntimeParser.Result resultRuntime = RuntimeParser.parse(resultType.type);
-                        key = "plugins/" + pluginId + "/versions/" + request.getVersion() + "/" + resultRuntime.getTarget() + "/" + resultRuntime.getLanguage() + "/" + resultRuntime.getVersion() + "/" + file.getFileName();
-                    }
-                    else if (resultType.container==Container.IMAGE) {
-                        key = "plugins/" + pluginId + "/screenshots/" + file.getFileName();
-                    }
-
-                    if (key==null) {
-                        throw new RuntimeException();
-                    }
-
-                    String url = s3Service.generateUploadUrl(key);
-
-                    return FileUploadData.builder()
-                            .fileName(file.getFileName())
-                            .key(key)
-                            .uploadUrl(url)
-                            .build();
-                })
-                .toList();
-
-        //генерация url для иконки
-        //--------
-        TypeParser.Result resultType = TypeParser.parse(request.getIcon().getType());
-        String key = null;
-        if (resultType.container==Container.IMAGE) {
-            key = "plugins/" + pluginId + "/icon";
+        String iconKey = null;
+        if (request.getIcon() != null) {
+            iconKey = imageKey(request.getIcon().getType(), "plugins/" + pluginId + "/icon");
         }
-        if (key==null) {
-            throw new RuntimeException();
-        }
-        FileUploadData iconUpload = FileUploadData.builder()
-                .fileName("icon")
-                .key(key)
-                .uploadUrl(s3Service.generateUploadUrl(key))
-                .build();
-        //--------
 
         pluginsRepository.addPlugin(pluginId, request.getName(), request.getDescription(), request.getCategory(), request.getTags(), authorId);
 
-        // Создаём первую версию плагина
-        UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), "Initial release", request.getRuntime());
+        String clientSha = blobStore.put(pluginId.toString(), templateProvider.getClientCode());
+        String serverSha = blobStore.put(pluginId.toString(), templateProvider.getServerCode());
+        UUID devBranchId = branchRepository.createDevBranch(pluginId, clientSha, serverSha);
+
+        IconUploadData iconUpload = iconKey == null ? null : IconUploadData.builder()
+                .key(iconKey)
+                .uploadUrl(s3Service.generateUploadUrl(iconKey))
+                .build();
 
         return AddPluginResponse.builder()
                 .pluginId(pluginId)
-                .versionId(versionId)
-                .uploads(uploads)
+                .devBranchId(devBranchId)
                 .iconUpload(iconUpload)
                 .build();
     }
 
     @Transactional
-    public AddVersionResponse initVersionUpload(UUID pluginId, AddPluginVersionRequest request) {
-        UUID versionId = pluginsRepository.createVersion(pluginId, request.getVersion(), request.getChangelog(), request.getRuntime());
+    public UpdateScreenshotsResponse updateScreenshots(UUID pluginId, UUID caller, UpdateScreenshotsRequest request) {
+        accessGuard.requireAuthor(pluginId, caller);
 
         List<FileUploadData> uploads = request.getFiles().stream()
                 .map(file -> {
-                    TypeParser.Result resultType = TypeParser.parse(file.getType());
-                    String key = null;
-
-                    if (resultType.container==Container.CODE) {
-                        RuntimeParser.Result resultRuntime = RuntimeParser.parse(resultType.type);
-                        key = "plugins/" + pluginId + "/versions/" + request.getVersion() + "/" + resultRuntime.getTarget() + "/" + resultRuntime.getLanguage() + "/" + resultRuntime.getVersion() + "/" + file.getFileName();
-                    }
-
-                    if (key==null) {
-                        throw new RuntimeException();
-                    }
-
-                    String url = s3Service.generateUploadUrl(key);
+                    String key = imageKey(file.getType(), "plugins/" + pluginId + "/screenshots/" + file.getFileName());
 
                     return FileUploadData.builder()
                             .fileName(file.getFileName())
                             .key(key)
-                            .uploadUrl(url)
-                            .build();
-                })
-                .toList();
-
-        return AddVersionResponse.builder()
-                .pluginId(pluginId)
-                .versionId(versionId)
-                .uploads(uploads)
-                .build();
-    }
-
-    @Transactional
-    public PluginViewExtend commitVersion(UUID pluginId, CommitVersionRequest commitVersionRequest) {
-        UUID versionOwner = pluginsRepository.getVersionPluginId(commitVersionRequest.getVersionId());
-        if (!pluginId.equals(versionOwner)) {
-            throw new RuntimeException("Provided versionId does not belong to plugin");
-        }
-
-        PluginData pluginData = pluginsRepository.addVersion(
-                pluginId,
-                commitVersionRequest.getVersionId(),
-                MinioKeyParser.getAllFiles(commitVersionRequest.getKeys()));
-
-        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
-
-        List<VersionView> versionViews = new ArrayList<>();
-        versions.forEach(version -> {versionViews.add(VersionView.builder()
-                .versionId(version.getVersionId())
-                .version(version.getVersion())
-                .runtime(version.getRuntime())
-                .changelog(version.getChangelog())
-                .build());});
-
-        List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
-                .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
-                .build()));
-
-        return PluginViewExtend.builder()
-                .id(pluginData.getId())
-                .authorId(pluginData.getAuthorId())
-                .name(pluginData.getName())
-                .description(pluginData.getDescription())
-                .category(pluginData.getCategory())
-                .tags(pluginData.getTags())
-                .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
-                .createdAt(pluginData.getCreatedAt())
-                .updatedAt(pluginData.getUpdatedAt())
-                .versions(versionViews)
-                .screenshots(screenshotViews)
-                .build();
-
-    }
-
-    @Transactional
-    public UpdateScreenshotsResponse updateScreenshots(UUID pluginId, UpdateScreenshotsRequest request) {
-        List<FileUploadData> uploads = request.getFiles().stream()
-                .map(file -> {
-                    TypeParser.Result resultType = TypeParser.parse(file.getType());
-                    String key = null;
-
-                    if (resultType.container==Container.IMAGE) {
-                        key = "plugins/" + pluginId + "/screenshots/" + file.getFileName();
-                    }
-
-                    if (key==null) {
-                        throw new RuntimeException();
-                    }
-
-                    String url = s3Service.generateUploadUrl(key);
-
-                    return FileUploadData.builder()
-                            .fileName(file.getFileName())
-                            .key(key)
-                            .uploadUrl(url)
+                            .uploadUrl(s3Service.generateUploadUrl(key))
                             .build();
                 })
                 .toList();
@@ -418,56 +192,60 @@ public class PluginsService {
     }
 
     @Transactional
-    public PluginViewExtend commitScreenshots(UUID pluginId, CommitScreenshotsRequest commitScreenshotsRequest) {
+    public PluginViewExtend commitAssets(UUID pluginId, UUID caller, CommitAssetsRequest request) {
+        accessGuard.requireAuthor(pluginId, caller);
 
-        PluginData pluginData = pluginsRepository.addScreenshots(
-                pluginId,
-                MinioKeyParser.getAllScreenshots(commitScreenshotsRequest.getKeys()));
+        String prefix = "plugins/" + pluginId + "/";
+        String iconKey = null;
+        List<String> screenshotKeys = new ArrayList<>();
 
-        List<Version> versions = pluginsRepository.getVersionsOfPlugin(pluginData.getId());
-        List<Screenshot> screenshots = pluginsRepository.getScreenshots(pluginData.getId());
+        for (String key : request.getKeys()) {
+            KeyType type = MinioKeyParser.resolveType(key);
+            boolean valid = key.startsWith(prefix)
+                    && (type == KeyType.SCREENSHOT || (type == KeyType.ICON && key.equals(prefix + "icon")));
+            if (!valid) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid_key", "Key is not an icon or screenshot of this plugin: " + key);
+            }
+            if (!s3Service.exists(key)) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "object_not_found", "Object was not uploaded: " + key);
+            }
+            if (type == KeyType.ICON) {
+                iconKey = key;
+            } else {
+                screenshotKeys.add(key);
+            }
+        }
 
-        List<VersionView> versionViews = new ArrayList<>();
-        versions.forEach(version -> {versionViews.add(VersionView.builder()
-                .versionId(version.getVersionId())
-                .version(version.getVersion())
-                .runtime(version.getRuntime())
-                .changelog(version.getChangelog())
-                .build());});
+        if (iconKey != null) {
+            pluginsRepository.setIcon(pluginId, iconKey);
+        }
+        PluginData pluginData = pluginsRepository.addScreenshots(pluginId, screenshotKeys);
 
-        List<ScreenshotView> screenshotViews = new ArrayList<>();
-        screenshots.forEach(screenshot -> screenshotViews.add(ScreenshotView.builder()
-                .screenshotId(screenshot.getScreenshotId())
-                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
-                .build()));
-
-        return PluginViewExtend.builder()
-                .id(pluginData.getId())
-                .authorId(pluginData.getAuthorId())
-                .name(pluginData.getName())
-                .description(pluginData.getDescription())
-                .category(pluginData.getCategory())
-                .tags(pluginData.getTags())
-                .status(pluginData.getStatus())
-                .iconUrl(s3Service.generateDownloadUrl(pluginData.getIconUrlKey(), true))
-                .createdAt(pluginData.getCreatedAt())
-                .updatedAt(pluginData.getUpdatedAt())
-                .versions(versionViews)
-                .screenshots(screenshotViews)
-                .build();
+        return extendView(pluginData, branchRepository.findByPlugin(pluginId));
     }
 
     @Transactional
-    public void deleteScreenshot(UUID pluginId, UUID screenshotId) {
-        String key = pluginsRepository.getScreenshotKey(pluginId, screenshotId);
+    public void deleteScreenshot(UUID pluginId, UUID caller, UUID screenshotId) {
+        accessGuard.requireAuthor(pluginId, caller);
+
+        String key;
+        try {
+            key = pluginsRepository.getScreenshotKey(pluginId, screenshotId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "screenshot_not_found", "Screenshot not found: " + screenshotId);
+        }
 
         s3Service.deleteScreenshot(key);
         pluginsRepository.deleteScreenshot(screenshotId);
     }
 
     @Transactional
-    public ChangeStatusResponse changeStatus(UUID pluginId, Status status) {
-        PluginData before = pluginsRepository.getPlugin(pluginId);
+    public ChangeStatusResponse changeStatus(UUID pluginId, UUID caller, Status status) {
+        PluginData before = accessGuard.requireAuthor(pluginId, caller);
+        if (status == null || status == Status.ARCHIVED) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid_status", "Status must be ACTIVE, HIDDEN or DELETED");
+        }
+
         pluginsRepository.changeStatus(pluginId, status);
         PluginData after = pluginsRepository.getPlugin(pluginId);
         return ChangeStatusResponse.builder()
@@ -477,37 +255,81 @@ public class PluginsService {
                 .build();
     }
 
-    @Transactional
-    public CodeLinksResponse getPluginCodeClient(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepository.getCode(pluginId, version, runtime);
+    private PluginViewExtend extendView(PluginData pluginData, List<Branch> branches) {
+        List<ScreenshotView> screenshotViews = pluginsRepository.getScreenshots(pluginData.getId()).stream()
+                .map(this::screenshotView)
+                .toList();
 
-        List<String> clientKeys = s3Service.getOnlyClientKeys(keys);
-
-
-        List<FileDownloadData> downloads = clientKeys.stream().map(key -> FileDownloadData.builder()
-                .downloadUrl(s3Service.generateDownloadUrl(key, true))
-                .build()).toList();
-
-
-        return CodeLinksResponse.builder()
-                .files(downloads)
+        return PluginViewExtend.builder()
+                .id(pluginData.getId())
+                .authorId(pluginData.getAuthorId())
+                .name(pluginData.getName())
+                .description(pluginData.getDescription())
+                .category(pluginData.getCategory())
+                .tags(pluginData.getTags())
+                .status(pluginData.getStatus())
+                .iconUrl(iconUrl(pluginData))
+                .createdAt(pluginData.getCreatedAt())
+                .updatedAt(pluginData.getUpdatedAt())
+                .branches(branches.stream().map(PluginsService::branchView).toList())
+                .screenshots(screenshotViews)
                 .build();
     }
 
-    @Transactional
-    public CodeLinksResponse getPluginCodeServer(UUID pluginId, String version, String runtime) {
-        List<String> keys = pluginsRepository.getCode(pluginId, version, runtime);
-
-        List<String> serverKeys = s3Service.getOnlyServerKeys(keys);
-
-
-        List<FileDownloadData> downloads = serverKeys.stream().map(key -> FileDownloadData.builder()
-                .downloadUrl(s3Service.generateDownloadUrl(key, false))
-                .build()).toList();
-        
-
-        return CodeLinksResponse.builder()
-                .files(downloads)
+    private static BranchView branchView(Branch branch) {
+        return BranchView.builder()
+                .id(branch.getId())
+                .status(branch.getStatus().name())
+                .semver(branch.getSemver())
+                .runtime(BranchView.RuntimeView.builder()
+                        .client(branch.getRuntimeClient())
+                        .server(branch.getRuntimeServer())
+                        .build())
+                .createdAt(branch.getCreatedAt())
                 .build();
+    }
+
+    private ScreenshotView screenshotView(Screenshot screenshot) {
+        return ScreenshotView.builder()
+                .screenshotId(screenshot.getScreenshotId())
+                .screenshotUrl(s3Service.generateDownloadUrl(screenshot.getS3ScreenshotKey(), true))
+                .build();
+    }
+
+    private String iconUrl(PluginData pluginData) {
+        String key = pluginData.getIconUrlKey() != null ? pluginData.getIconUrlKey() : TemplateProvider.ICON_KEY;
+        return s3Service.generateDownloadUrl(key, true);
+    }
+
+    private static String imageKey(String type, String key) {
+        try {
+            if (TypeParser.parse(type).container == Container.IMAGE) {
+                return key;
+            }
+        } catch (IllegalArgumentException e) {
+            throw invalidType(type);
+        }
+        throw invalidType(type);
+    }
+
+    private static ApiException invalidType(String type) {
+        return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid_type", "Expected an image type, got: " + type);
+    }
+
+    private static PaginationData pagination(int page, int limit, int total) {
+        int totalPages = (int) Math.ceil((double) total / limit);
+
+        return PaginationData.builder()
+                .page(page)
+                .limit(limit)
+                .total(total)
+                .totalPages(totalPages)
+                .hasNext(page < totalPages - 1)
+                .hasPrev(page > 0)
+                .build();
+    }
+
+    private static ApiException pluginNotFound(UUID pluginId) {
+        return new ApiException(HttpStatus.NOT_FOUND, "plugin_not_found", "Plugin not found: " + pluginId);
     }
 }

@@ -18,6 +18,8 @@ public class PluginData {
     private List<String> tags;
     private String status;
     private String iconUrlKey;
+    private UUID devBranchId;
+    private String releasedSemver;
     private String createdAt;
     private String updatedAt;
 }
